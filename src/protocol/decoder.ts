@@ -51,6 +51,8 @@ function decodePayload(portnum: Portnums.PortNum, payload: Uint8Array): unknown 
         return fromBinary(Telemetry.TelemetrySchema, payload);
       case Portnums.PortNum.ROUTING_APP:
         return fromBinary(Mesh.RoutingSchema, payload);
+      case Portnums.PortNum.TRACEROUTE_APP:
+        return fromBinary(Mesh.RouteDiscoverySchema, payload);
       default:
         return payload;
     }

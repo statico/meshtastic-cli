@@ -18,6 +18,7 @@ export const theme = {
     routing: "#666666",
     encrypted: "#ff0040",
     unknown: "#404040",
+    direct: "#00ff00",
   },
   border: {
     normal: "#2d333b",

@@ -1,13 +1,14 @@
 import { HttpTransport } from "./transport";
-import { PacketStore } from "./protocol";
+import { PacketStore, NodeStore } from "./protocol";
 import { App } from "./ui/app";
 
 const ADDRESS = process.argv[2] || "192.168.0.123";
 
 async function main() {
   const transport = await HttpTransport.create(ADDRESS);
-  const store = new PacketStore();
-  const app = new App(transport, store);
+  const packetStore = new PacketStore();
+  const nodeStore = new NodeStore();
+  const app = new App(transport, packetStore, nodeStore);
   await app.start();
 }
 

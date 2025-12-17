@@ -12,28 +12,40 @@ import {
 import { theme } from "./theme";
 import type { DecodedPacket } from "../protocol/decoder";
 import type { PacketStore } from "../protocol/packet-store";
+import type { NodeStore } from "../protocol/node-store";
 import type { Transport, DeviceStatus } from "../transport/types";
-import { Portnums } from "@meshtastic/protobufs";
+import { Mesh, Portnums, Telemetry } from "@meshtastic/protobufs";
 import { PacketInspector } from "./inspector";
+import { NodesPanel } from "./nodes";
+import * as db from "../db";
+
+type AppMode = "packets" | "nodes" | "chat";
 
 export class App {
   private renderer!: CliRenderer;
   private transport: Transport;
-  private store: PacketStore;
+  private packetStore: PacketStore;
+  private nodeStore: NodeStore;
   private status: DeviceStatus = "disconnected";
   private running = true;
+  private mode: AppMode = "packets";
 
   private header!: BoxRenderable;
+  private modeContainer!: BoxRenderable;
   private packetList!: ScrollBoxRenderable;
   private inspector!: PacketInspector;
+  private nodesPanel!: NodesPanel;
   private statusBar!: BoxRenderable;
   private statusText!: TextRenderable;
+  private modeText!: TextRenderable;
+
   private selectedIndex = 0;
   private packetRows: Map<number, BoxRenderable> = new Map();
 
-  constructor(transport: Transport, store: PacketStore) {
+  constructor(transport: Transport, packetStore: PacketStore, nodeStore: NodeStore) {
     this.transport = transport;
-    this.store = store;
+    this.packetStore = packetStore;
+    this.nodeStore = nodeStore;
   }
 
   async start() {
@@ -47,12 +59,14 @@ export class App {
     this.renderer.setBackgroundColor(theme.bg.primary);
     this.createLayout();
     this.setupKeyHandlers();
-    this.store.onPacket((p) => this.running && this.addPacketRow(p));
+    this.packetStore.onPacket((p) => this.running && this.handlePacket(p));
+    this.nodeStore.startPeriodicUpdates(1000);
     this.startTransport();
   }
 
   private async stop() {
     this.running = false;
+    this.nodeStore.stopPeriodicUpdates();
     await this.transport.disconnect();
   }
 
@@ -64,34 +78,32 @@ export class App {
       backgroundColor: theme.bg.panel,
       border: true,
       borderColor: theme.border.normal,
+      flexDirection: "row",
+      justifyContent: "space-between",
       alignItems: "center",
-      justifyContent: "center",
+      paddingLeft: 2,
+      paddingRight: 2,
     });
 
     const title = new TextRenderable(this.renderer, {
-      content: t`${bold(fg(theme.fg.accent)("▓▓▓ MESHTASTIC PACKET VIEWER ▓▓▓"))}`,
+      content: t`${bold(fg(theme.fg.accent)("▓▓▓ MESHTASTIC ▓▓▓"))}`,
+    });
+    this.modeText = new TextRenderable(this.renderer, {
+      content: this.getModeLabel(),
     });
     this.header.add(title);
+    this.header.add(this.modeText);
 
-    this.packetList = new ScrollBoxRenderable(this.renderer, {
-      id: "packet-list",
-      rootOptions: {
-        backgroundColor: theme.bg.panel,
-        border: true,
-        borderColor: theme.border.normal,
-        flexGrow: 1,
-      },
-      viewportOptions: { backgroundColor: theme.bg.primary },
-      contentOptions: { backgroundColor: theme.bg.primary },
-      scrollbarOptions: {
-        trackOptions: {
-          foregroundColor: theme.fg.accent,
-          backgroundColor: theme.bg.panel,
-        },
-      },
+    this.modeContainer = new BoxRenderable(this.renderer, {
+      id: "mode-container",
+      width: "100%",
+      flexGrow: 1,
+      flexDirection: "column",
     });
 
-    this.inspector = new PacketInspector(this.renderer);
+    this.createPacketsView();
+    this.createNodesView();
+    this.showCurrentMode();
 
     this.statusBar = new BoxRenderable(this.renderer, {
       id: "status-bar",
@@ -108,9 +120,58 @@ export class App {
     this.statusBar.add(this.statusText);
 
     this.renderer.root.add(this.header);
-    this.renderer.root.add(this.packetList);
-    this.renderer.root.add(this.inspector.element);
+    this.renderer.root.add(this.modeContainer);
     this.renderer.root.add(this.statusBar);
+  }
+
+  private createPacketsView() {
+    this.packetList = new ScrollBoxRenderable(this.renderer, {
+      id: "packet-list",
+      rootOptions: {
+        backgroundColor: theme.bg.panel,
+        border: true,
+        borderColor: theme.border.normal,
+        flexGrow: 1,
+      },
+      viewportOptions: { backgroundColor: theme.bg.primary },
+      contentOptions: { backgroundColor: theme.bg.primary },
+    });
+
+    this.inspector = new PacketInspector(this.renderer);
+  }
+
+  private createNodesView() {
+    this.nodesPanel = new NodesPanel(this.renderer, this.nodeStore);
+    this.nodesPanel.setActionHandler((action, node) => this.handleNodeAction(action, node));
+  }
+
+  private showCurrentMode() {
+    for (const child of this.modeContainer.getChildren()) {
+      this.modeContainer.remove(child.id);
+    }
+
+    if (this.mode === "packets") {
+      this.modeContainer.add(this.packetList);
+      this.modeContainer.add(this.inspector.element);
+    } else if (this.mode === "nodes") {
+      this.modeContainer.add(this.nodesPanel.element);
+    }
+
+    this.modeText.content = this.getModeLabel();
+    this.updateStatus();
+  }
+
+  private getModeLabel(): string {
+    const modes: { key: AppMode; label: string }[] = [
+      { key: "packets", label: "PACKETS" },
+      { key: "nodes", label: "NODES" },
+      { key: "chat", label: "CHAT" },
+    ];
+    return modes.map((m) =>
+      m.key === this.mode
+        ? t`${bold(fg(theme.fg.accent)(`[${m.label}]`))}`
+        : t`${fg(theme.fg.muted)(`[${m.label}]`)}`
+    ).join(" ");
   }
 
   private setupKeyHandlers() {
@@ -119,43 +180,65 @@ export class App {
         await this.stop();
         process.exit(0);
       }
-      if (key.name === "j" || key.name === "down") this.selectNext();
-      if (key.name === "k" || key.name === "up") this.selectPrev();
-      if (key.name === "tab") this.inspector.nextTab();
-      if (key.name === "1") this.inspector.setTab("normalized");
-      if (key.name === "2") this.inspector.setTab("protobuf");
-      if (key.name === "3") this.inspector.setTab("hex");
+
+      if (key.name === "p") { this.setMode("packets"); return; }
+      if (key.name === "n") { this.setMode("nodes"); return; }
+      if (key.name === "c") { this.setMode("chat"); return; }
+
+      if (this.mode === "packets") {
+        if (key.name === "j" || key.name === "down") this.selectNextPacket();
+        if (key.name === "k" || key.name === "up") this.selectPrevPacket();
+        if (key.name === "tab") this.inspector.nextTab();
+        if (key.name === "1") this.inspector.setTab("normalized");
+        if (key.name === "2") this.inspector.setTab("protobuf");
+        if (key.name === "3") this.inspector.setTab("hex");
+      } else if (this.mode === "nodes") {
+        if (key.name === "j" || key.name === "down") this.nodesPanel.selectNext();
+        if (key.name === "k" || key.name === "up") this.nodesPanel.selectPrev();
+        if (key.name === "t") this.nodesPanel.triggerAction("traceroute");
+        if (key.name === "l") this.nodesPanel.triggerAction("position");
+      }
     });
   }
 
-  private selectNext() {
-    const packets = this.store.getAll();
+  private setMode(mode: AppMode) {
+    if (mode === this.mode) return;
+    this.mode = mode;
+    this.showCurrentMode();
+  }
+
+  private selectNextPacket() {
+    const packets = this.packetStore.getAll();
     if (packets.length === 0) return;
     this.selectedIndex = Math.min(this.selectedIndex + 1, packets.length - 1);
-    this.updateSelection();
+    this.updatePacketSelection();
     this.packetList.scrollBy(0, 1);
   }
 
-  private selectPrev() {
+  private selectPrevPacket() {
     if (this.selectedIndex <= 0) return;
     this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
-    this.updateSelection();
+    this.updatePacketSelection();
     this.packetList.scrollBy(0, -1);
   }
 
-  private updateSelection() {
-    const packets = this.store.getAll();
+  private updatePacketSelection() {
+    const packets = this.packetStore.getAll();
     if (this.selectedIndex >= 0 && this.selectedIndex < packets.length) {
       const packet = packets[this.selectedIndex];
       this.inspector.setPacket(packet);
-      this.highlightRow(packet.id);
+      this.highlightPacketRow(packet.id);
     }
   }
 
-  private highlightRow(packetId: number) {
+  private highlightPacketRow(packetId: number) {
     for (const [id, row] of this.packetRows) {
       row.backgroundColor = id === packetId ? theme.bg.selected : theme.bg.primary;
     }
+  }
+
+  private async handleNodeAction(action: string, node: { num: number }) {
+    // TODO: Implement traceroute and position requests
   }
 
   private async startTransport() {
@@ -167,15 +250,76 @@ export class App {
       } else if (output.type === "packet") {
         const { decodeFromRadio } = await import("../protocol/decoder");
         const decoded = decodeFromRadio(output.data);
-        this.store.add(decoded);
+        this.packetStore.add(decoded);
+      }
+    }
+  }
+
+  private handlePacket(packet: DecodedPacket) {
+    this.addPacketRow(packet);
+    this.processPacketForNodes(packet);
+    this.updateStatus();
+  }
+
+  private processPacketForNodes(packet: DecodedPacket) {
+    const fr = packet.fromRadio;
+    if (!fr) return;
+
+    if (fr.payloadVariant.case === "nodeInfo") {
+      this.nodeStore.updateFromNodeInfo(fr.payloadVariant.value);
+    }
+
+    if (fr.payloadVariant.case === "packet" && packet.meshPacket) {
+      const mp = packet.meshPacket;
+      const hops = mp.hopStart && mp.hopLimit ? mp.hopStart - mp.hopLimit : undefined;
+      this.nodeStore.updateFromPacket(mp.from, mp.rxSnr, hops);
+
+      if (packet.portnum === Portnums.PortNum.NODEINFO_APP && packet.payload instanceof Mesh.User) {
+        this.nodeStore.updateFromUser(mp.from, packet.payload);
+      }
+
+      if (packet.portnum === Portnums.PortNum.POSITION_APP && packet.payload) {
+        this.nodeStore.updatePosition(mp.from, packet.payload as Mesh.Position);
+      }
+
+      if (packet.portnum === Portnums.PortNum.TELEMETRY_APP && packet.payload) {
+        const telem = packet.payload as Telemetry.Telemetry;
+        if (telem.variant.case === "deviceMetrics") {
+          this.nodeStore.updateDeviceMetrics(mp.from, telem.variant.value);
+        }
+      }
+
+      if (packet.portnum === Portnums.PortNum.TEXT_MESSAGE_APP && typeof packet.payload === "string") {
+        db.insertMessage({
+          packetId: mp.id,
+          fromNode: mp.from,
+          toNode: mp.to,
+          channel: mp.channel,
+          text: packet.payload,
+          timestamp: Math.floor(Date.now() / 1000),
+          rxTime: mp.rxTime,
+          rxSnr: mp.rxSnr,
+          rxRssi: mp.rxRssi,
+          hopLimit: mp.hopLimit,
+          hopStart: mp.hopStart,
+        });
       }
     }
   }
 
   private updateStatus() {
     const statusColor = this.status === "connected" ? theme.status.online : theme.status.offline;
-    const count = this.store.count;
-    this.statusText.content = t`${fg(statusColor)(this.status.toUpperCase())} ${fg(theme.fg.muted)("|")} ${fg(theme.fg.secondary)(`Packets: ${count}`)} ${fg(theme.fg.muted)("|")} ${fg(theme.fg.secondary)("[j/k] select [1-3] view [Tab] cycle [q] quit")}`;
+    const count = this.packetStore.count;
+    const nodeCount = this.nodeStore.getSortedNodes().length;
+
+    let helpText = "[p]ackets [n]odes [c]hat [q]uit";
+    if (this.mode === "packets") {
+      helpText = "[j/k] select [1-3] view | " + helpText;
+    } else if (this.mode === "nodes") {
+      helpText = "[j/k] select [t]raceroute | " + helpText;
+    }
+
+    this.statusText.content = t`${fg(statusColor)(this.status.toUpperCase())} ${fg(theme.fg.muted)("|")} ${fg(theme.fg.secondary)(`${count} pkts`)} ${fg(theme.fg.muted)("|")} ${fg(theme.fg.secondary)(`${nodeCount} nodes`)} ${fg(theme.fg.muted)("|")} ${fg(theme.fg.muted)(helpText)}`;
   }
 
   private addPacketRow(packet: DecodedPacket) {
@@ -194,12 +338,10 @@ export class App {
     this.packetList.add(box);
     this.packetRows.set(packet.id, box);
 
-    if (this.store.count === 1) {
+    if (this.packetStore.count === 1) {
       this.selectedIndex = 0;
-      this.updateSelection();
+      this.updatePacketSelection();
     }
-
-    this.updateStatus();
   }
 
   private formatPacketRow(packet: DecodedPacket, time: string): string {
@@ -214,8 +356,8 @@ export class App {
 
     if (variantCase === "packet" && packet.meshPacket) {
       const mp = packet.meshPacket;
-      const from = `!${mp.from.toString(16).padStart(8, "0")}`;
-      const to = mp.to === 0xffffffff ? "broadcast" : `!${mp.to.toString(16).padStart(8, "0")}`;
+      const fromName = this.nodeStore.getNodeName(mp.from);
+      const toName = mp.to === 0xffffffff ? "broadcast" : this.nodeStore.getNodeName(mp.to);
       const portName = packet.portnum !== undefined
         ? Portnums.PortNum[packet.portnum]?.replace(/_APP$/, "") || `PORT_${packet.portnum}`
         : "ENCRYPTED";
@@ -226,7 +368,13 @@ export class App {
         payload = ` "${packet.payload.slice(0, 40)}${packet.payload.length > 40 ? "..." : ""}"`;
       }
 
-      return t`${fg(theme.fg.muted)(`[${time}]`)} ${fg(theme.fg.accent)("◀")} ${fg(color)(portName.padEnd(12))} ${fg(theme.fg.secondary)(from)} ${fg(theme.fg.muted)("→")} ${fg(theme.fg.secondary)(to)}${fg(theme.fg.primary)(payload)}`;
+      return t`${fg(theme.fg.muted)(`[${time}]`)} ${fg(theme.fg.accent)("◀")} ${fg(color)(portName.padEnd(12))} ${fg(theme.fg.secondary)(fromName.padEnd(10))} ${fg(theme.fg.muted)("→")} ${fg(theme.fg.secondary)(toName.padEnd(10))}${fg(theme.fg.primary)(payload)}`;
+    }
+
+    if (variantCase === "nodeInfo") {
+      const info = fr.payloadVariant.value;
+      const name = info.user?.shortName || info.user?.longName || `!${info.num.toString(16)}`;
+      return t`${fg(theme.fg.muted)(`[${time}]`)} ${fg(theme.packet.nodeinfo)("NODEINFO".padEnd(12))} ${fg(theme.fg.accent)(name)}`;
     }
 
     if (variantCase) {
@@ -239,18 +387,12 @@ export class App {
   private getPortColor(portnum?: Portnums.PortNum): string {
     if (portnum === undefined) return theme.packet.encrypted;
     switch (portnum) {
-      case Portnums.PortNum.TEXT_MESSAGE_APP:
-        return theme.packet.message;
-      case Portnums.PortNum.POSITION_APP:
-        return theme.packet.position;
-      case Portnums.PortNum.TELEMETRY_APP:
-        return theme.packet.telemetry;
-      case Portnums.PortNum.NODEINFO_APP:
-        return theme.packet.nodeinfo;
-      case Portnums.PortNum.ROUTING_APP:
-        return theme.packet.routing;
-      default:
-        return theme.packet.unknown;
+      case Portnums.PortNum.TEXT_MESSAGE_APP: return theme.packet.message;
+      case Portnums.PortNum.POSITION_APP: return theme.packet.position;
+      case Portnums.PortNum.TELEMETRY_APP: return theme.packet.telemetry;
+      case Portnums.PortNum.NODEINFO_APP: return theme.packet.nodeinfo;
+      case Portnums.PortNum.ROUTING_APP: return theme.packet.routing;
+      default: return theme.packet.unknown;
     }
   }
 }
