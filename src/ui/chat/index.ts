@@ -119,7 +119,7 @@ export class ChatPanel {
     if (msg.channel === this.currentChannel) {
       this.messages.push(msg);
       this.renderMessage(msg);
-      this.messageList.scrollToBottom();
+      this.messageList.scrollTo(0, this.messageList.scrollHeight);
     }
   }
 
@@ -167,7 +167,7 @@ export class ChatPanel {
       this.renderMessage(msg);
     }
 
-    this.messageList.scrollToBottom();
+    this.messageList.scrollTo(0, this.messageList.scrollHeight);
   }
 
   private renderMessage(msg: ChatMessage) {

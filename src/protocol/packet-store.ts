@@ -12,12 +12,20 @@ export class PacketStore {
   }
 
   private loadFromDb() {
-    const dbPackets = db.getPackets(this.maxSize);
-    for (const dbPacket of dbPackets) {
-      const decoded = decodeFromRadio(dbPacket.raw);
-      decoded.id = dbPacket.id ?? decoded.id;
-      decoded.timestamp = new Date(dbPacket.timestamp);
-      this.packets.push(decoded);
+    try {
+      const dbPackets = db.getPackets(this.maxSize);
+      for (const dbPacket of dbPackets) {
+        try {
+          const decoded = decodeFromRadio(dbPacket.raw);
+          decoded.id = dbPacket.id ?? decoded.id;
+          decoded.timestamp = new Date(dbPacket.timestamp);
+          this.packets.push(decoded);
+        } catch {
+          // Skip corrupted packets
+        }
+      }
+    } catch {
+      // Database error, start fresh
     }
   }
 
