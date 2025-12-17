@@ -2,7 +2,7 @@ import { BoxRenderable, TextRenderable, type CliRenderer, t, fg, bold } from "@o
 import { theme } from "../theme";
 import type { DecodedPacket } from "../../protocol/decoder";
 import { formatHexDump, formatNodeId } from "../../utils/hex";
-import { Portnums } from "@meshtastic/protobufs";
+import { Mesh, Portnums } from "@meshtastic/protobufs";
 
 export type InspectorTab = "normalized" | "protobuf" | "hex";
 
@@ -146,6 +146,14 @@ export class PacketInspector {
 
       if (typeof p.payload === "string") {
         lines.push(t`${fg(theme.fg.secondary)("Payload:")} ${fg(theme.fg.accent)(`"${p.payload}"`)}`);
+      } else if (p.portnum === Portnums.PortNum.TRACEROUTE_APP && p.payload && typeof p.payload === "object" && "route" in p.payload) {
+        const route = (p.payload as Mesh.RouteDiscovery).route;
+        if (route.length > 0) {
+          const hops = route.map((n: number) => formatNodeId(n)).join(" → ");
+          lines.push(t`${fg(theme.fg.secondary)("Route:")} ${fg(theme.packet.traceroute)(hops)}`);
+        } else {
+          lines.push(t`${fg(theme.fg.secondary)("Route:")} ${fg(theme.fg.muted)("(direct)")}`);
+        }
       }
     } else if (fr.payloadVariant.case) {
       lines.push(t`${fg(theme.fg.secondary)("Type:")} ${fg(theme.fg.primary)(fr.payloadVariant.case.toUpperCase())}`);

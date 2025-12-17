@@ -300,7 +300,77 @@ export class App {
   }
 
   private async handleNodeAction(action: string, node: { num: number }) {
-    // TODO: Implement traceroute and position requests
+    if (!this.myNodeNum) return;
+
+    if (action === "traceroute") {
+      await this.sendTraceroute(node.num);
+    } else if (action === "position") {
+      await this.sendPositionRequest(node.num);
+    }
+  }
+
+  private async sendTraceroute(destNode: number) {
+    const routeDiscovery = new Mesh.RouteDiscovery({ route: [] });
+    const payload = toBinary(Mesh.RouteDiscoverySchema, routeDiscovery);
+
+    const data = new Mesh.Data({
+      portnum: Portnums.PortNum.TRACEROUTE_APP,
+      payload,
+      wantResponse: true,
+    });
+
+    const meshPacket = new Mesh.MeshPacket({
+      from: this.myNodeNum,
+      to: destNode,
+      wantAck: true,
+      payloadVariant: { case: "decoded", value: data },
+    });
+
+    const toRadio = new Mesh.ToRadio({
+      payloadVariant: { case: "packet", value: meshPacket },
+    });
+
+    try {
+      const binary = toBinary(Mesh.ToRadioSchema, toRadio);
+      await this.transport.send(binary);
+      this.showNotification(`Traceroute sent to ${this.nodeStore.getNodeName(destNode)}`);
+    } catch {
+      this.showNotification("Failed to send traceroute");
+    }
+  }
+
+  private async sendPositionRequest(destNode: number) {
+    const data = new Mesh.Data({
+      portnum: Portnums.PortNum.POSITION_APP,
+      payload: new Uint8Array(0),
+      wantResponse: true,
+    });
+
+    const meshPacket = new Mesh.MeshPacket({
+      from: this.myNodeNum,
+      to: destNode,
+      wantAck: true,
+      payloadVariant: { case: "decoded", value: data },
+    });
+
+    const toRadio = new Mesh.ToRadio({
+      payloadVariant: { case: "packet", value: meshPacket },
+    });
+
+    try {
+      const binary = toBinary(Mesh.ToRadioSchema, toRadio);
+      await this.transport.send(binary);
+      this.showNotification(`Position request sent to ${this.nodeStore.getNodeName(destNode)}`);
+    } catch {
+      this.showNotification("Failed to send position request");
+    }
+  }
+
+  private showNotification(message: string) {
+    this.statusText.content = t`${fg(theme.fg.accent)(message)}`;
+    setTimeout(() => {
+      this.updateStatus();
+    }, 2000);
   }
 
   private async startTransport() {
@@ -384,7 +454,7 @@ export class App {
     if (this.mode === "packets") {
       helpText = "[j/k] select [1-3] view | " + helpText;
     } else if (this.mode === "nodes") {
-      helpText = "[j/k] select [t]raceroute | " + helpText;
+      helpText = "[j/k] select [t]raceroute [l]ocation | " + helpText;
     } else if (this.mode === "chat") {
       helpText = "[Tab] channel [Enter] send | " + helpText;
     }
@@ -462,6 +532,7 @@ export class App {
       case Portnums.PortNum.TELEMETRY_APP: return theme.packet.telemetry;
       case Portnums.PortNum.NODEINFO_APP: return theme.packet.nodeinfo;
       case Portnums.PortNum.ROUTING_APP: return theme.packet.routing;
+      case Portnums.PortNum.TRACEROUTE_APP: return theme.packet.traceroute;
       default: return theme.packet.unknown;
     }
   }

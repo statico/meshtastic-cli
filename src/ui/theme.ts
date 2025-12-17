@@ -16,6 +16,7 @@ export const theme = {
     telemetry: "#ff9f00",
     nodeinfo: "#bf00ff",
     routing: "#666666",
+    traceroute: "#ffff00",
     encrypted: "#ff0040",
     unknown: "#404040",
     direct: "#00ff00",
