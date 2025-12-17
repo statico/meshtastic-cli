@@ -20,6 +20,7 @@ export class App {
   private transport: Transport;
   private store: PacketStore;
   private status: DeviceStatus = "disconnected";
+  private running = true;
 
   private header!: BoxRenderable;
   private packetList!: ScrollBoxRenderable;
@@ -37,8 +38,13 @@ export class App {
     this.renderer.setBackgroundColor(theme.bg.primary);
     this.createLayout();
     this.setupKeyHandlers();
-    this.store.onPacket((p) => this.addPacketRow(p));
+    this.store.onPacket((p) => this.running && this.addPacketRow(p));
     this.startTransport();
+  }
+
+  private async stop() {
+    this.running = false;
+    await this.transport.disconnect();
   }
 
   private createLayout() {
@@ -96,8 +102,11 @@ export class App {
   }
 
   private setupKeyHandlers() {
-    this.renderer.keyInput.on("keypress", (key: KeyEvent) => {
-      if (key.name === "q") process.exit(0);
+    this.renderer.keyInput.on("keypress", async (key: KeyEvent) => {
+      if (key.name === "q") {
+        await this.stop();
+        process.exit(0);
+      }
       if (key.name === "j" || key.name === "down") this.scrollDown();
       if (key.name === "k" || key.name === "up") this.scrollUp();
     });
@@ -113,6 +122,7 @@ export class App {
 
   private async startTransport() {
     for await (const output of this.transport.fromDevice) {
+      if (!this.running) break;
       if (output.type === "status") {
         this.status = output.status;
         this.updateStatus();
