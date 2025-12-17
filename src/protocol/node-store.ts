@@ -28,6 +28,7 @@ export class NodeStore {
   private nodes: Map<number, NodeData> = new Map();
   private listeners: NodeListener[] = [];
   private updateInterval: Timer | null = null;
+  private emitScheduled = false;
 
   constructor() {
     this.loadFromDb();
@@ -58,7 +59,7 @@ export class NodeStore {
   }
 
   updateFromNodeInfo(info: Mesh.NodeInfo) {
-    const existing = this.nodes.get(info.num) || { num: info.num, lastHeard: 0 };
+    const existing = this.nodes.get(info.num) ?? ({ num: info.num, lastHeard: 0 } as NodeData);
     const updated: NodeData = {
       ...existing,
       userId: info.user?.id || existing.userId,
@@ -80,12 +81,12 @@ export class NodeStore {
       isFavorite: info.isFavorite ?? existing.isFavorite,
     };
     this.nodes.set(info.num, updated);
-    db.upsertNode(updated);
+    this.saveNode(updated);
     this.emit();
   }
 
   updateFromUser(nodeNum: number, user: Mesh.User) {
-    const existing = this.nodes.get(nodeNum) || { num: nodeNum, lastHeard: Date.now() / 1000 };
+    const existing = this.nodes.get(nodeNum) ?? ({ num: nodeNum, lastHeard: Date.now() / 1000 } as NodeData);
     const updated: NodeData = {
       ...existing,
       userId: user.id || existing.userId,
@@ -95,12 +96,12 @@ export class NodeStore {
       lastHeard: Date.now() / 1000,
     };
     this.nodes.set(nodeNum, updated);
-    db.upsertNode(updated);
+    this.saveNode(updated);
     this.emit();
   }
 
   updateFromPacket(from: number, snr?: number, hopsAway?: number) {
-    const existing = this.nodes.get(from) || { num: from, lastHeard: 0 };
+    const existing = this.nodes.get(from) ?? ({ num: from, lastHeard: 0 } as NodeData);
     const updated: NodeData = {
       ...existing,
       lastHeard: Date.now() / 1000,
@@ -108,7 +109,7 @@ export class NodeStore {
       hopsAway: hopsAway ?? existing.hopsAway,
     };
     this.nodes.set(from, updated);
-    db.upsertNode(updated);
+    this.saveNode(updated);
     this.emit();
   }
 
@@ -118,7 +119,7 @@ export class NodeStore {
       existing.latitudeI = position.latitudeI ?? existing.latitudeI;
       existing.longitudeI = position.longitudeI ?? existing.longitudeI;
       existing.altitude = position.altitude ?? existing.altitude;
-      db.upsertNode(existing);
+      this.saveNode(existing);
       this.emit();
     }
   }
@@ -130,7 +131,7 @@ export class NodeStore {
       existing.voltage = metrics.voltage ?? existing.voltage;
       existing.channelUtilization = metrics.channelUtilization ?? existing.channelUtilization;
       existing.airUtilTx = metrics.airUtilTx ?? existing.airUtilTx;
-      db.upsertNode(existing);
+      this.saveNode(existing);
       this.emit();
     }
   }
@@ -156,9 +157,25 @@ export class NodeStore {
   }
 
   private emit() {
-    const sorted = this.getSortedNodes();
-    for (const listener of this.listeners) {
-      listener(sorted);
-    }
+    // Throttle emits to avoid overwhelming UI
+    if (this.emitScheduled) return;
+    this.emitScheduled = true;
+    queueMicrotask(() => {
+      this.emitScheduled = false;
+      const sorted = this.getSortedNodes();
+      for (const listener of this.listeners) {
+        listener(sorted);
+      }
+    });
+  }
+
+  private saveNode(node: NodeData) {
+    queueMicrotask(() => {
+      try {
+        db.upsertNode(node);
+      } catch {
+        // Ignore DB errors
+      }
+    });
   }
 }

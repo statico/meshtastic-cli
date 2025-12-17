@@ -3,7 +3,7 @@ import { join } from "path";
 import { homedir } from "os";
 import { mkdirSync, existsSync } from "fs";
 
-const DB_DIR = join(homedir(), ".meshtastic-cli");
+const DB_DIR = join(homedir(), ".config", "meshtastic-cli");
 const DB_PATH = join(DB_DIR, "data.db");
 
 if (!existsSync(DB_DIR)) {
@@ -11,6 +11,10 @@ if (!existsSync(DB_DIR)) {
 }
 
 const db = new Database(DB_PATH);
+
+// Enable WAL mode for better concurrent access
+db.run("PRAGMA journal_mode = WAL");
+db.run("PRAGMA busy_timeout = 5000");
 
 db.run(`
   CREATE TABLE IF NOT EXISTS nodes (

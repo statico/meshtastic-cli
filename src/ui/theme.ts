@@ -2,7 +2,7 @@ export const theme = {
   bg: {
     primary: "#0a0e14",
     panel: "#0d1117",
-    selected: "#1a2332",
+    selected: "#2a3a50",
   },
   fg: {
     primary: "#c5c8c6",
@@ -20,6 +20,7 @@ export const theme = {
     encrypted: "#ff0040",
     unknown: "#404040",
     direct: "#00ff00",
+    config: "#8080ff",
   },
   border: {
     normal: "#2d333b",

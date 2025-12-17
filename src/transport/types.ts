@@ -12,4 +12,5 @@ export interface Transport {
   readonly fromDevice: AsyncIterable<DeviceOutput>;
   send(data: Uint8Array): Promise<void>;
   disconnect(): Promise<void>;
+  fetchOwner?(): Promise<{ id: string; longName: string; shortName: string; hwModel: string; myNodeNum: number } | null>;
 }

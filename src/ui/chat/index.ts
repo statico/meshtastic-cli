@@ -138,6 +138,10 @@ export class ChatPanel {
     this.input.focus();
   }
 
+  blurInput() {
+    this.input.blur();
+  }
+
   private updateChannelBar() {
     for (const child of this.channelBar.getChildren()) {
       this.channelBar.remove(child.id);

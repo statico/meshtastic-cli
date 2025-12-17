@@ -1,6 +1,6 @@
 import type { DeviceOutput, DeviceStatus, Transport } from "./types";
 
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 3000;
 const TIMEOUT_MS = 5000;
 
 export class HttpTransport implements Transport {
@@ -34,20 +34,32 @@ export class HttpTransport implements Transport {
   private async poll() {
     while (this.running) {
       try {
-        const response = await fetch(`${this.url}/api/v1/fromradio?all=false`, {
-          method: "GET",
-          headers: { Accept: "application/x-protobuf" },
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        });
+        // Drain available packets with a small delay between each
+        let gotPacket = true;
+        let batchCount = 0;
+        while (gotPacket && this.running && batchCount < 50) {
+          const response = await fetch(`${this.url}/api/v1/fromradio?all=false`, {
+            method: "GET",
+            headers: { Accept: "application/x-protobuf" },
+            signal: AbortSignal.timeout(TIMEOUT_MS),
+          });
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-        this.emit({ type: "status", status: "connected" });
+          this.emit({ type: "status", status: "connected" });
 
-        const buffer = await response.arrayBuffer();
-        if (buffer.byteLength > 0) {
-          const data = new Uint8Array(buffer);
-          this.emit({ type: "packet", data, raw: data });
+          const buffer = await response.arrayBuffer();
+          if (buffer.byteLength > 0) {
+            const data = new Uint8Array(buffer);
+            this.emit({ type: "packet", data, raw: data });
+            batchCount++;
+            // Small delay between packets to let UI breathe
+            if (batchCount % 10 === 0) {
+              await new Promise((r) => setTimeout(r, 50));
+            }
+          } else {
+            gotPacket = false;
+          }
         }
       } catch (e) {
         if (this.running) {
@@ -108,5 +120,45 @@ export class HttpTransport implements Transport {
       resolver({ value: undefined as any, done: true });
     }
     this.resolvers = [];
+  }
+
+  async fetchOwner(): Promise<{ id: string; longName: string; shortName: string; hwModel: string; myNodeNum: number } | null> {
+    // Try /json/nodes endpoint to find local node (node with hopsAway=0 or smallest num)
+    try {
+      const response = await fetch(`${this.url}/json/nodes`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      // nodes endpoint returns { nodes: { "!hex": {...}, ... } } or array
+      const nodes = data.nodes || data;
+      let localNode: any = null;
+
+      if (Array.isArray(nodes)) {
+        localNode = nodes.find((n: any) => n.hopsAway === 0) || nodes[0];
+      } else {
+        for (const key in nodes) {
+          const n = nodes[key];
+          if (n.hopsAway === 0) { localNode = n; break; }
+          if (!localNode) localNode = n;
+        }
+      }
+
+      if (localNode) {
+        const user = localNode.user || localNode;
+        return {
+          id: user.id || localNode.id || "",
+          longName: user.longName || localNode.longName || "",
+          shortName: user.shortName || localNode.shortName || "",
+          hwModel: user.hwModel || localNode.hwModel || "",
+          myNodeNum: localNode.num || parseInt(localNode.id?.replace("!", ""), 16) || 0,
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 }

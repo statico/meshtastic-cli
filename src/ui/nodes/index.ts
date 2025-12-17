@@ -39,7 +39,7 @@ export class NodesPanel {
       paddingLeft: 1,
     });
     header.add(new TextRenderable(renderer, {
-      content: t`${fg(theme.fg.muted)("NODE")}        ${fg(theme.fg.muted)("NAME")}              ${fg(theme.fg.muted)("HOPS")}  ${fg(theme.fg.muted)("SNR")}   ${fg(theme.fg.muted)("LAST SEEN")}        ${fg(theme.fg.muted)("BATTERY")}  ${fg(theme.fg.muted)("POSITION")}`,
+      content: t`${fg(theme.fg.muted)("NODE".padEnd(10))}  ${fg(theme.fg.muted)("NAME".padEnd(18))}  ${fg(theme.fg.muted)("HOPS".padStart(4))}   ${fg(theme.fg.muted)("SNR".padStart(5))}   ${fg(theme.fg.muted)("LAST SEEN".padEnd(16))}  ${fg(theme.fg.muted)("BATTERY".padEnd(8))}  ${fg(theme.fg.muted)("POSITION")}`,
     }));
 
     this.scrollBox = new ScrollBoxRenderable(renderer, {
@@ -125,8 +125,8 @@ export class NodesPanel {
   private formatNodeLine(node: NodeData) {
     const id = formatNodeId(node.num).padEnd(10);
     const name = (node.shortName || node.longName?.slice(0, 12) || "???").padEnd(18);
-    const hops = node.hopsAway !== undefined ? node.hopsAway.toString().padStart(2) : " ?";
-    const snr = node.snr !== undefined ? `${node.snr.toFixed(1)}`.padStart(5) : "    ?";
+    const hops = node.hopsAway != null ? node.hopsAway.toString().padStart(4) : "   ?";
+    const snr = node.snr != null ? `${node.snr.toFixed(1)}`.padStart(5) : "    ?";
     const lastSeen = this.formatTimeSince(node.lastHeard);
     const battery = this.formatBattery(node.batteryLevel);
     const position = this.formatPosition(node);
@@ -152,8 +152,8 @@ export class NodesPanel {
     return `${Math.floor(seconds / 86400)}d ago`.padEnd(16);
   }
 
-  private formatBattery(level?: number): string {
-    if (level === undefined) return "   ?".padEnd(8);
+  private formatBattery(level?: number | null): string {
+    if (level == null) return "   ?".padEnd(8);
     if (level > 100) return "  PWR".padEnd(8);
     return `${level.toString().padStart(3)}%`.padEnd(8);
   }

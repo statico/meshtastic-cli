@@ -41,18 +41,25 @@ export class PacketStore {
   }
 
   private saveToDb(packet: DecodedPacket) {
-    const mp = packet.meshPacket;
-    db.insertPacket({
-      packetId: mp?.id ?? 0,
-      fromNode: mp?.from ?? 0,
-      toNode: mp?.to ?? 0,
-      channel: mp?.channel ?? 0,
-      portnum: packet.portnum,
-      timestamp: packet.timestamp.getTime(),
-      rxTime: mp?.rxTime,
-      rxSnr: mp?.rxSnr,
-      rxRssi: mp?.rxRssi,
-      raw: packet.raw,
+    // Don't block on DB writes
+    queueMicrotask(() => {
+      try {
+        const mp = packet.meshPacket;
+        db.insertPacket({
+          packetId: mp?.id ?? 0,
+          fromNode: mp?.from ?? 0,
+          toNode: mp?.to ?? 0,
+          channel: mp?.channel ?? 0,
+          portnum: packet.portnum,
+          timestamp: packet.timestamp.getTime(),
+          rxTime: mp?.rxTime,
+          rxSnr: mp?.rxSnr,
+          rxRssi: mp?.rxRssi,
+          raw: packet.raw,
+        });
+      } catch {
+        // Ignore DB errors
+      }
     });
   }
 
