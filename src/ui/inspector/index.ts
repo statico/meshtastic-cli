@@ -77,7 +77,9 @@ export class PacketInspector {
   }
 
   private updateTabs() {
-    this.tabBar.clear();
+    for (const child of this.tabBar.getChildren()) {
+      this.tabBar.remove(child.id);
+    }
     const tabs: { key: InspectorTab; label: string }[] = [
       { key: "normalized", label: "Normalized" },
       { key: "protobuf", label: "Protobuf" },

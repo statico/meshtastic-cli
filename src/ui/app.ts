@@ -37,7 +37,13 @@ export class App {
   }
 
   async start() {
-    this.renderer = await createCliRenderer({ exitOnCtrlC: true, targetFps: 30 });
+    this.renderer = await createCliRenderer({
+      exitOnCtrlC: true,
+      targetFps: 30,
+      useKittyKeyboard: null,
+      useMouse: false,
+      useAlternateScreen: true,
+    });
     this.renderer.setBackgroundColor(theme.bg.primary);
     this.createLayout();
     this.setupKeyHandlers();
