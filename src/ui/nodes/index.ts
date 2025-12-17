@@ -70,14 +70,14 @@ export class NodesPanel {
     if (this.nodes.length === 0) return;
     this.selectedIndex = Math.min(this.selectedIndex + 1, this.nodes.length - 1);
     this.updateSelection();
-    this.scrollBox.scrollBy(0, 1);
+    this.scrollBox.scrollBy(1);
   }
 
   selectPrev() {
     if (this.nodes.length === 0) return;
     this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
     this.updateSelection();
-    this.scrollBox.scrollBy(0, -1);
+    this.scrollBox.scrollBy(-1);
   }
 
   getSelectedNode(): NodeData | undefined {

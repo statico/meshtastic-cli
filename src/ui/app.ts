@@ -287,14 +287,14 @@ export class App {
     if (packets.length === 0) return;
     this.selectedIndex = Math.min(this.selectedIndex + 1, packets.length - 1);
     this.updatePacketSelection();
-    this.packetList.scrollBy(0, 1);
+    this.packetList.scrollBy(1);
   }
 
   private selectPrevPacket() {
     if (this.selectedIndex <= 0) return;
     this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
     this.updatePacketSelection();
-    this.packetList.scrollBy(0, -1);
+    this.packetList.scrollBy(-1);
   }
 
   private updatePacketSelection() {
