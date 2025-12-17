@@ -17,7 +17,9 @@ import type { Transport, DeviceStatus } from "../transport/types";
 import { Mesh, Portnums, Telemetry } from "@meshtastic/protobufs";
 import { PacketInspector } from "./inspector";
 import { NodesPanel } from "./nodes";
+import { ChatPanel } from "./chat";
 import * as db from "../db";
+import { toBinary } from "@bufbuild/protobuf";
 
 type AppMode = "packets" | "nodes" | "chat";
 
@@ -35,9 +37,11 @@ export class App {
   private packetList!: ScrollBoxRenderable;
   private inspector!: PacketInspector;
   private nodesPanel!: NodesPanel;
+  private chatPanel!: ChatPanel;
   private statusBar!: BoxRenderable;
   private statusText!: TextRenderable;
   private modeText!: TextRenderable;
+  private myNodeNum = 0;
 
   private selectedIndex = 0;
   private packetRows: Map<number, BoxRenderable> = new Map();
@@ -103,6 +107,7 @@ export class App {
 
     this.createPacketsView();
     this.createNodesView();
+    this.createChatView();
     this.showCurrentMode();
 
     this.statusBar = new BoxRenderable(this.renderer, {
@@ -145,6 +150,11 @@ export class App {
     this.nodesPanel.setActionHandler((action, node) => this.handleNodeAction(action, node));
   }
 
+  private createChatView() {
+    this.chatPanel = new ChatPanel(this.renderer, this.nodeStore);
+    this.chatPanel.setSendHandler((channel, text) => this.sendMessage(channel, text));
+  }
+
   private showCurrentMode() {
     for (const child of this.modeContainer.getChildren()) {
       this.modeContainer.remove(child.id);
@@ -155,6 +165,9 @@ export class App {
       this.modeContainer.add(this.inspector.element);
     } else if (this.mode === "nodes") {
       this.modeContainer.add(this.nodesPanel.element);
+    } else if (this.mode === "chat") {
+      this.modeContainer.add(this.chatPanel.element);
+      this.chatPanel.focusInput();
     }
 
     this.modeText.content = this.getModeLabel();
@@ -197,8 +210,57 @@ export class App {
         if (key.name === "k" || key.name === "up") this.nodesPanel.selectPrev();
         if (key.name === "t") this.nodesPanel.triggerAction("traceroute");
         if (key.name === "l") this.nodesPanel.triggerAction("position");
+      } else if (this.mode === "chat") {
+        if (key.name === "return" || key.name === "enter") this.chatPanel.sendCurrentMessage();
+        if (key.name === "tab") this.chatPanel.nextChannel();
+        if (key.shift && key.name === "tab") this.chatPanel.prevChannel();
       }
     });
+  }
+
+  private async sendMessage(channel: number, text: string) {
+    if (!this.myNodeNum) return;
+
+    const data = new Mesh.Data({
+      portnum: Portnums.PortNum.TEXT_MESSAGE_APP,
+      payload: new TextEncoder().encode(text),
+    });
+
+    const meshPacket = new Mesh.MeshPacket({
+      from: this.myNodeNum,
+      to: 0xffffffff,
+      channel,
+      wantAck: true,
+      payloadVariant: { case: "decoded", value: data },
+    });
+
+    const toRadio = new Mesh.ToRadio({
+      payloadVariant: { case: "packet", value: meshPacket },
+    });
+
+    try {
+      const binary = toBinary(Mesh.ToRadioSchema, toRadio);
+      await this.transport.send(binary);
+
+      this.chatPanel.addMessage({
+        fromNode: this.myNodeNum,
+        toNode: 0xffffffff,
+        channel,
+        text,
+        timestamp: Math.floor(Date.now() / 1000),
+      });
+
+      db.insertMessage({
+        packetId: 0,
+        fromNode: this.myNodeNum,
+        toNode: 0xffffffff,
+        channel,
+        text,
+        timestamp: Math.floor(Date.now() / 1000),
+      });
+    } catch (e) {
+      // Send failed, ignore for now
+    }
   }
 
   private setMode(mode: AppMode) {
@@ -265,6 +327,10 @@ export class App {
     const fr = packet.fromRadio;
     if (!fr) return;
 
+    if (fr.payloadVariant.case === "myInfo") {
+      this.myNodeNum = fr.payloadVariant.value.myNodeNum;
+    }
+
     if (fr.payloadVariant.case === "nodeInfo") {
       this.nodeStore.updateFromNodeInfo(fr.payloadVariant.value);
     }
@@ -290,7 +356,7 @@ export class App {
       }
 
       if (packet.portnum === Portnums.PortNum.TEXT_MESSAGE_APP && typeof packet.payload === "string") {
-        db.insertMessage({
+        const msg = {
           packetId: mp.id,
           fromNode: mp.from,
           toNode: mp.to,
@@ -302,7 +368,9 @@ export class App {
           rxRssi: mp.rxRssi,
           hopLimit: mp.hopLimit,
           hopStart: mp.hopStart,
-        });
+        };
+        db.insertMessage(msg);
+        this.chatPanel.addMessage(msg);
       }
     }
   }
@@ -317,6 +385,8 @@ export class App {
       helpText = "[j/k] select [1-3] view | " + helpText;
     } else if (this.mode === "nodes") {
       helpText = "[j/k] select [t]raceroute | " + helpText;
+    } else if (this.mode === "chat") {
+      helpText = "[Tab] channel [Enter] send | " + helpText;
     }
 
     this.statusText.content = t`${fg(statusColor)(this.status.toUpperCase())} ${fg(theme.fg.muted)("|")} ${fg(theme.fg.secondary)(`${count} pkts`)} ${fg(theme.fg.muted)("|")} ${fg(theme.fg.secondary)(`${nodeCount} nodes`)} ${fg(theme.fg.muted)("|")} ${fg(theme.fg.muted)(helpText)}`;
@@ -357,7 +427,7 @@ export class App {
     if (variantCase === "packet" && packet.meshPacket) {
       const mp = packet.meshPacket;
       const fromName = this.nodeStore.getNodeName(mp.from);
-      const toName = mp.to === 0xffffffff ? "broadcast" : this.nodeStore.getNodeName(mp.to);
+      const toName = mp.to === 0xffffffff ? "^all" : this.nodeStore.getNodeName(mp.to);
       const portName = packet.portnum !== undefined
         ? Portnums.PortNum[packet.portnum]?.replace(/_APP$/, "") || `PORT_${packet.portnum}`
         : "ENCRYPTED";

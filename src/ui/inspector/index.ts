@@ -134,14 +134,15 @@ export class PacketInspector {
 
       lines.push(t`${fg(theme.fg.secondary)("Type:")} ${fg(theme.fg.primary)(portName)}`);
       lines.push(t`${fg(theme.fg.secondary)("From:")} ${fg(theme.fg.primary)(formatNodeId(mp.from))}`);
-      lines.push(t`${fg(theme.fg.secondary)("To:")} ${fg(theme.fg.primary)(mp.to === 0xffffffff ? "broadcast" : formatNodeId(mp.to))}`);
+      lines.push(t`${fg(theme.fg.secondary)("To:")} ${fg(theme.fg.primary)(mp.to === 0xffffffff ? "^all" : formatNodeId(mp.to))}`);
       lines.push(t`${fg(theme.fg.secondary)("Channel:")} ${fg(theme.fg.primary)(mp.channel.toString())}`);
       lines.push(t`${fg(theme.fg.secondary)("ID:")} ${fg(theme.fg.primary)(`#${mp.id}`)}`);
       lines.push(t`${fg(theme.fg.secondary)("Hop Limit:")} ${fg(theme.fg.primary)(mp.hopLimit.toString())}`);
+      if (mp.hopStart) lines.push(t`${fg(theme.fg.secondary)("Hop Start:")} ${fg(theme.fg.primary)(mp.hopStart.toString())}`);
 
       if (mp.rxTime) lines.push(t`${fg(theme.fg.secondary)("RX Time:")} ${fg(theme.fg.primary)(new Date(mp.rxTime * 1000).toLocaleTimeString())}`);
       if (mp.rxRssi) lines.push(t`${fg(theme.fg.secondary)("RSSI:")} ${fg(theme.fg.primary)(`${mp.rxRssi} dBm`)}`);
-      if (mp.rxSnr) lines.push(t`${fg(theme.fg.secondary)("SNR:")} ${fg(theme.fg.primary)(`${mp.rxSnr} dB`)}`);
+      if (mp.rxSnr !== undefined) lines.push(t`${fg(theme.fg.secondary)("SNR:")} ${fg(theme.fg.primary)(`${mp.rxSnr.toFixed(2)} dB`)}`);
 
       if (typeof p.payload === "string") {
         lines.push(t`${fg(theme.fg.secondary)("Payload:")} ${fg(theme.fg.accent)(`"${p.payload}"`)}`);
@@ -172,10 +173,13 @@ export class PacketInspector {
       const mp = p.meshPacket;
       lines.push(t`${fg(theme.fg.muted)("└─")} ${fg(theme.fg.secondary)("packet:")} ${fg(theme.fg.accent)("MeshPacket")}`);
       lines.push(t`   ${fg(theme.fg.muted)("├─")} ${fg(theme.fg.secondary)("from:")} ${fg(theme.fg.primary)(mp.from.toString())} ${fg(theme.fg.muted)(`(${formatNodeId(mp.from)})`)}`);
-      lines.push(t`   ${fg(theme.fg.muted)("├─")} ${fg(theme.fg.secondary)("to:")} ${fg(theme.fg.primary)(mp.to.toString())} ${fg(theme.fg.muted)(`(${mp.to === 0xffffffff ? "broadcast" : formatNodeId(mp.to)})`)}`);
+      lines.push(t`   ${fg(theme.fg.muted)("├─")} ${fg(theme.fg.secondary)("to:")} ${fg(theme.fg.primary)(mp.to.toString())} ${fg(theme.fg.muted)(`(${mp.to === 0xffffffff ? "^all" : formatNodeId(mp.to)})`)}`);
       lines.push(t`   ${fg(theme.fg.muted)("├─")} ${fg(theme.fg.secondary)("channel:")} ${fg(theme.fg.primary)(mp.channel.toString())}`);
       lines.push(t`   ${fg(theme.fg.muted)("├─")} ${fg(theme.fg.secondary)("id:")} ${fg(theme.fg.primary)(mp.id.toString())}`);
       lines.push(t`   ${fg(theme.fg.muted)("├─")} ${fg(theme.fg.secondary)("hop_limit:")} ${fg(theme.fg.primary)(mp.hopLimit.toString())}`);
+      if (mp.hopStart) lines.push(t`   ${fg(theme.fg.muted)("├─")} ${fg(theme.fg.secondary)("hop_start:")} ${fg(theme.fg.primary)(mp.hopStart.toString())}`);
+      if (mp.rxSnr !== undefined) lines.push(t`   ${fg(theme.fg.muted)("├─")} ${fg(theme.fg.secondary)("rx_snr:")} ${fg(theme.fg.primary)(mp.rxSnr.toFixed(2))}`);
+      if (mp.rxRssi) lines.push(t`   ${fg(theme.fg.muted)("├─")} ${fg(theme.fg.secondary)("rx_rssi:")} ${fg(theme.fg.primary)(mp.rxRssi.toString())}`);
 
       if (mp.payloadVariant.case === "decoded") {
         const decoded = mp.payloadVariant.value;
