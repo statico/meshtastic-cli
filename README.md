@@ -83,6 +83,9 @@ Options:
   --session, -s      Session name for database (default: default)
   --clear            Clear the database for the session and exit
   --skip-config      Skip loading device configuration on startup
+  --skip-nodes       Skip downloading node database (faster connect)
+  --brute-force, -b  Brute force depth for encrypted packets (0-4, default: 2)
+  --meshview, -m     MeshView URL for packet/node links
   --help, -h         Show help
 ```
 
@@ -107,7 +110,8 @@ Options:
 | Tab | Toggle pane sizes |
 | +/- | Resize inspector |
 | m | Open position in Maps |
-| Enter | Jump to sender node |
+| n/Enter | Jump to sender node |
+| u | Update node from MeshView |
 
 ### Nodes View
 
