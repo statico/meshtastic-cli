@@ -201,16 +201,16 @@ function NodeInspector({ node, height }: { node?: NodeData; height: number }) {
   }
 
   // Channel utilization
-  if (node.channelUtilization !== undefined || node.airUtilTx !== undefined) {
+  if (node.channelUtilization != null || node.airUtilTx != null) {
     lines.push(
       <Box key="util">
-        {node.channelUtilization !== undefined && (
+        {node.channelUtilization != null && (
           <>
             <Text color={theme.fg.muted}>Channel util: </Text>
             <Text color={theme.fg.primary}>{node.channelUtilization.toFixed(1)}%</Text>
           </>
         )}
-        {node.airUtilTx !== undefined && (
+        {node.airUtilTx != null && (
           <>
             <Text color={theme.fg.muted}>  TX util: </Text>
             <Text color={theme.fg.secondary}>{node.airUtilTx.toFixed(1)}%</Text>

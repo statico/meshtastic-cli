@@ -518,11 +518,15 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
       if ((key.ctrl && input === "u") || key.pageUp) {
         setSelectedPacketIndex((i) => Math.max(i - pageSize, 0));
       }
-      // Jump to first/last packet (vim-style g/G)
-      if (input === "g") {
+      // Jump to first/last packet (vim-style g/G or Home/End)
+      // Home key escape sequences: \x1b[H, \x1b[1~, \x1bOH
+      // End key escape sequences: \x1b[F, \x1b[4~, \x1bOF
+      const isHome = input === "g" || input === "\x1b[H" || input === "\x1b[1~" || input === "\x1bOH";
+      const isEnd = input === "G" || input === "\x1b[F" || input === "\x1b[4~" || input === "\x1bOF";
+      if (isHome) {
         setSelectedPacketIndex(0);
       }
-      if (input === "G") {
+      if (isEnd) {
         setSelectedPacketIndex(packets.length - 1);
       }
       // Tab switching with h/l or left/right arrows
@@ -582,6 +586,15 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
       if (input === "k" || key.upArrow) {
         setSelectedNodeIndex((i) => Math.max(i - 1, 0));
       }
+      // Home/End keys
+      const isNodeHome = input === "\x1b[H" || input === "\x1b[1~" || input === "\x1bOH";
+      const isNodeEnd = input === "\x1b[F" || input === "\x1b[4~" || input === "\x1bOF";
+      if (isNodeHome) {
+        setSelectedNodeIndex(0);
+      }
+      if (isNodeEnd) {
+        setSelectedNodeIndex(nodes.length - 1);
+      }
       if (input === "t" && nodes[selectedNodeIndex]) {
         sendTraceroute(nodes[selectedNodeIndex].num);
       }
@@ -607,6 +620,15 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
       }
       if (input === "k" || key.upArrow) {
         setSelectedLogIndex((i) => Math.max(i - 1, 0));
+      }
+      // Home/End keys
+      const isLogHome = input === "\x1b[H" || input === "\x1b[1~" || input === "\x1bOH";
+      const isLogEnd = input === "\x1b[F" || input === "\x1b[4~" || input === "\x1bOF";
+      if (isLogHome) {
+        setSelectedLogIndex(0);
+      }
+      if (isLogEnd) {
+        setSelectedLogIndex(logResponses.length - 1);
       }
     } else if (mode === "chat") {
       if (key.return) {
