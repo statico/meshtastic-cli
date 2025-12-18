@@ -36,18 +36,28 @@ const packetKeys = [
 const nodeKeys = [
   { key: "j / ↓", desc: "Next node" },
   { key: "k / ↑", desc: "Previous node" },
+  { key: "Ctrl+d/PgDn", desc: "Page down" },
+  { key: "Ctrl+u/PgUp", desc: "Page up" },
+  { key: "g / G", desc: "First / Last node" },
   { key: "t", desc: "Traceroute to node" },
   { key: "p", desc: "Request position" },
   { key: "e", desc: "Request telemetry" },
   { key: "d", desc: "Direct ping (hop=0)" },
   { key: "m", desc: "Open position in Maps" },
-  { key: "g", desc: "Google hardware model" },
+  { key: "l", desc: "Lookup hardware model" },
 ];
 
 const chatKeys = [
-  { key: "Tab", desc: "Next channel" },
-  { key: "Enter", desc: "Send message" },
-  { key: "Escape", desc: "Exit to packets" },
+  { key: "j / ↓", desc: "Next message" },
+  { key: "k / ↑", desc: "Previous message" },
+  { key: "Ctrl+d/PgDn", desc: "Page down" },
+  { key: "Ctrl+u/PgUp", desc: "Page up" },
+  { key: "g / G", desc: "First / Last message" },
+  { key: "Tab/S-Tab", desc: "Next/Prev channel" },
+  { key: "n", desc: "Go to sender node" },
+  { key: "Enter", desc: "Focus input" },
+  { key: "Escape", desc: "Unfocus / Exit chat" },
+  { key: "Ctrl+E", desc: "Emoji selector (in input)" },
 ];
 
 const logKeys = [

@@ -6,7 +6,7 @@ import type { PacketStore } from "../protocol/packet-store";
 import type { NodeStore, NodeData } from "../protocol/node-store";
 import type { Transport, DeviceStatus } from "../transport/types";
 import { HttpTransport } from "../transport";
-import { Mesh, Portnums, Telemetry } from "@meshtastic/protobufs";
+import { Mesh, Portnums, Telemetry, Channel } from "@meshtastic/protobufs";
 import { PacketList } from "./components/PacketList";
 import { PacketInspector, InspectorTab } from "./components/PacketInspector";
 import { NodesPanel } from "./components/NodesPanel";
@@ -21,6 +21,13 @@ import { formatNodeId } from "../utils/hex";
 import { exec } from "child_process";
 
 type AppMode = "packets" | "nodes" | "chat" | "log";
+
+export interface ChannelInfo {
+  index: number;
+  name: string;
+  role: number;
+  psk: Uint8Array | null;
+}
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
@@ -56,6 +63,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
   const [selectedLogIndex, setSelectedLogIndex] = useState(0);
   const [inspectorExpanded, setInspectorExpanded] = useState(false);
   const [terminalHeight, setTerminalHeight] = useState(stdout?.rows || 24);
+  const [terminalWidth, setTerminalWidth] = useState(stdout?.columns || 80);
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [connectError, setConnectError] = useState<string | null>(null);
 
@@ -92,6 +100,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
   useEffect(() => {
     const updateSize = () => {
       setTerminalHeight(stdout?.rows || 24);
+      setTerminalWidth(stdout?.columns || 80);
     };
     stdout?.on("resize", updateSize);
     return () => {
@@ -109,6 +118,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
   const [messages, setMessages] = useState<db.DbMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatChannel, setChatChannel] = useState(0);
+  const [chatInputFocused, setChatInputFocused] = useState(false);
+  const [selectedChatMessageIndex, setSelectedChatMessageIndex] = useState(-1);
+  const [showEmojiSelector, setShowEmojiSelector] = useState(false);
+  const [emojiSelectorIndex, setEmojiSelectorIndex] = useState(0);
+  const [channels, setChannels] = useState<Map<number, ChannelInfo>>(new Map());
   const [notification, setNotification] = useState("");
 
   // Load initial data
@@ -145,6 +159,20 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
     if (fr.payloadVariant.case === "nodeInfo") {
       const nodeInfo = fr.payloadVariant.value;
       nodeStore.updateFromNodeInfo(nodeInfo);
+    }
+
+    if (fr.payloadVariant.case === "channel") {
+      const channel = fr.payloadVariant.value as Mesh.Channel;
+      setChannels((prev) => {
+        const next = new Map(prev);
+        next.set(channel.index, {
+          index: channel.index,
+          name: channel.settings?.name || "",
+          role: channel.role,
+          psk: channel.settings?.psk && channel.settings.psk.length > 0 ? channel.settings.psk : null,
+        });
+        return next;
+      });
     }
 
     if (fr.payloadVariant.case === "packet" && packet.meshPacket) {
@@ -473,8 +501,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
       return;
     }
 
-    // Quit - show confirmation dialog
-    if ((input === "q" || input === "Q") && mode !== "chat") {
+    // Quit - show confirmation dialog (allow in chat when input not focused)
+    if ((input === "q" || input === "Q") && (mode !== "chat" || !chatInputFocused)) {
       setShowQuitDialog(true);
       return;
     }
@@ -495,15 +523,16 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
       return;
     }
 
-    // Mode switching
-    if (mode !== "chat") {
-      if (input === "1") { setMode("packets"); return; }
-      if (input === "2") { setMode("nodes"); return; }
+    // Mode switching (allow in chat only when input not focused)
+    if (mode !== "chat" || !chatInputFocused) {
+      if (input === "1") { setMode("packets"); setChatInputFocused(false); return; }
+      if (input === "2") { setMode("nodes"); setChatInputFocused(false); return; }
       if (input === "3") { setMode("chat"); return; }
-      if (input === "4") { setMode("log"); return; }
-    } else {
-      // In chat mode, Escape or Ctrl+C exits to packets
-      if (key.escape) { setMode("packets"); return; }
+      if (input === "4") { setMode("log"); setChatInputFocused(false); return; }
+    }
+    if (mode === "chat" && key.escape && !chatInputFocused && !showEmojiSelector) {
+      setMode("packets");
+      return;
     }
 
     // Mode-specific keys
@@ -653,20 +682,123 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
         setSelectedLogIndex(logResponses.length - 1);
       }
     } else if (mode === "chat") {
-      if (key.return) {
-        sendMessage(chatInput);
+      const channelMessages = messages.filter((m) => m.channel === chatChannel);
+      const emojiCount = 15; // FIRMWARE_EMOJIS.length
+
+      // Emoji selector mode
+      if (showEmojiSelector) {
+        if (key.escape) {
+          setShowEmojiSelector(false);
+          return;
+        }
+        if (key.leftArrow) {
+          setEmojiSelectorIndex((i) => Math.max(i - 1, 0));
+          return;
+        }
+        if (key.rightArrow) {
+          setEmojiSelectorIndex((i) => Math.min(i + 1, emojiCount - 1));
+          return;
+        }
+        if (key.return) {
+          // Import emoji and insert - need to get from ChatPanel
+          const emojis = ["👋", "👍", "👎", "❓", "‼️", "💩", "🤣", "🤠", "🐭", "☀️", "☔", "☁️", "🌫️", "😈", "♥️"];
+          setChatInput((s) => s + emojis[emojiSelectorIndex]);
+          setShowEmojiSelector(false);
+          return;
+        }
         return;
       }
-      if (key.tab) {
-        setChatChannel((c) => (c + 1) % 8);
-        return;
-      }
-      if (key.backspace || key.delete) {
-        setChatInput((s) => s.slice(0, -1));
-        return;
-      }
-      if (input && !key.ctrl && !key.meta) {
-        setChatInput((s) => s + input);
+
+      if (chatInputFocused) {
+        if (key.escape) {
+          setChatInputFocused(false);
+          setSelectedChatMessageIndex(-1); // Clear selection when blurring
+          return;
+        }
+        if (key.return) {
+          if (chatInput.trim()) {
+            sendMessage(chatInput);
+          }
+          return;
+        }
+        if (key.backspace || key.delete) {
+          setChatInput((s) => s.slice(0, -1));
+          return;
+        }
+        // Ctrl+E for emoji selector
+        if (key.ctrl && input === "e") {
+          setShowEmojiSelector(true);
+          setEmojiSelectorIndex(0);
+          return;
+        }
+        if (input && !key.ctrl && !key.meta) {
+          setChatInput((s) => s + input);
+        }
+      } else {
+        // Message navigation
+        if (input === "j" || key.downArrow) {
+          setSelectedChatMessageIndex((i) => {
+            if (i < 0) return channelMessages.length - 1; // Start at bottom
+            return Math.min(i + 1, channelMessages.length - 1);
+          });
+          return;
+        }
+        if (input === "k" || key.upArrow) {
+          setSelectedChatMessageIndex((i) => {
+            if (i < 0) return channelMessages.length - 1; // Start at bottom
+            return Math.max(i - 1, 0);
+          });
+          return;
+        }
+        // Page up/down
+        const chatPageSize = Math.max(1, terminalHeight - 12);
+        if ((key.ctrl && input === "d") || key.pageDown) {
+          setSelectedChatMessageIndex((i) => Math.min(i + chatPageSize, channelMessages.length - 1));
+          return;
+        }
+        if ((key.ctrl && input === "u") || key.pageUp) {
+          setSelectedChatMessageIndex((i) => Math.max(i - chatPageSize, 0));
+          return;
+        }
+        // Home/End
+        const isChatHome = input === "g" || input === "\x1b[H" || input === "\x1b[1~" || input === "\x1bOH";
+        const isChatEnd = input === "G" || input === "\x1b[F" || input === "\x1b[4~" || input === "\x1bOF";
+        if (isChatHome) {
+          setSelectedChatMessageIndex(0);
+          return;
+        }
+        if (isChatEnd) {
+          setSelectedChatMessageIndex(Math.max(0, channelMessages.length - 1));
+          return;
+        }
+        // 'n' to go to sender node
+        if (input === "n") {
+          const selectedMsg = channelMessages[selectedChatMessageIndex];
+          if (selectedMsg) {
+            const nodeIndex = nodes.findIndex((n) => n.num === selectedMsg.fromNode);
+            if (nodeIndex >= 0) {
+              setMode("nodes");
+              setSelectedNodeIndex(nodeIndex);
+            }
+          }
+          return;
+        }
+        // Enter to focus input
+        if (key.return) {
+          setChatInputFocused(true);
+          setSelectedChatMessageIndex(-1); // Clear selection when focusing
+          return;
+        }
+        // Tab/Shift+Tab to switch channels
+        if (key.tab) {
+          if (key.shift) {
+            setChatChannel((c) => (c + 7) % 8); // Go backwards
+          } else {
+            setChatChannel((c) => (c + 1) % 8);
+          }
+          setSelectedChatMessageIndex(-1);
+          return;
+        }
       }
     }
   });
@@ -777,13 +909,20 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
         )}
 
         {mode === "chat" && (
-          <Box flexGrow={1} flexDirection="column" borderStyle="single" borderColor={theme.border.normal}>
+          <Box flexGrow={1} flexDirection="column">
             <ChatPanel
               messages={messages}
               channel={chatChannel}
+              channels={channels}
               input={chatInput}
+              inputFocused={chatInputFocused}
               nodeStore={nodeStore}
               myNodeNum={myNodeNum}
+              height={terminalHeight - 4}
+              width={terminalWidth}
+              selectedMessageIndex={selectedChatMessageIndex}
+              showEmojiSelector={showEmojiSelector}
+              emojiSelectorIndex={emojiSelectorIndex}
             />
           </Box>
         )}
