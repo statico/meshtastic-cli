@@ -133,63 +133,6 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
     });
   }, []);
 
-  // Subscribe to new packets with smart autoscroll
-  const selectedPacketIndexRef = useRef(selectedPacketIndex);
-  selectedPacketIndexRef.current = selectedPacketIndex;
-
-  // Keep a ref to processPacketForNodes so the subscription always uses the latest
-  const processPacketRef = useRef(processPacketForNodes);
-  processPacketRef.current = processPacketForNodes;
-
-  useEffect(() => {
-    const unsubscribe = packetStore.onPacket((packet) => {
-      processPacketRef.current(packet);
-      setPackets((prev) => {
-        const next = [...prev, packet].slice(-5000);
-        // Auto-scroll only if exactly at the last packet (not just near it)
-        const lastIndex = prev.length - 1;
-        const wasAtEnd = prev.length > 0 && selectedPacketIndexRef.current === lastIndex;
-        if (wasAtEnd) {
-          setSelectedPacketIndex(next.length - 1);
-        }
-        return next;
-      });
-    });
-    return unsubscribe;
-  }, []);
-
-  // Start transport
-  useEffect(() => {
-    if (!transport) return;
-
-    let running = true;
-    let configRequested = false;
-
-    (async () => {
-      for await (const output of transport.fromDevice) {
-        if (!running) break;
-        if (output.type === "status") {
-          setStatus(output.status);
-          if (output.status === "connected" && !configRequested) {
-            configRequested = true;
-            if (!skipConfig) {
-              requestConfig();
-            }
-            fetchOwnerFallback();
-          }
-        } else if (output.type === "packet") {
-          const { decodeFromRadio } = await import("../protocol/decoder");
-          const decoded = decodeFromRadio(output.data);
-          packetStore.add(decoded);
-        }
-      }
-    })();
-
-    return () => {
-      running = false;
-    };
-  }, [transport]);
-
   const processPacketForNodes = useCallback((packet: DecodedPacket) => {
     const fr = packet.fromRadio;
     if (!fr) return;
@@ -297,6 +240,63 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
       }
     }
   }, [nodeStore, myNodeNum]);
+
+  // Subscribe to new packets with smart autoscroll
+  const selectedPacketIndexRef = useRef(selectedPacketIndex);
+  selectedPacketIndexRef.current = selectedPacketIndex;
+
+  // Keep a ref to processPacketForNodes so the subscription always uses the latest
+  const processPacketRef = useRef(processPacketForNodes);
+  processPacketRef.current = processPacketForNodes;
+
+  useEffect(() => {
+    const unsubscribe = packetStore.onPacket((packet) => {
+      processPacketRef.current(packet);
+      setPackets((prev) => {
+        const next = [...prev, packet].slice(-5000);
+        // Auto-scroll only if exactly at the last packet (not just near it)
+        const lastIndex = prev.length - 1;
+        const wasAtEnd = prev.length > 0 && selectedPacketIndexRef.current === lastIndex;
+        if (wasAtEnd) {
+          setSelectedPacketIndex(next.length - 1);
+        }
+        return next;
+      });
+    });
+    return unsubscribe;
+  }, []);
+
+  // Start transport
+  useEffect(() => {
+    if (!transport) return;
+
+    let running = true;
+    let configRequested = false;
+
+    (async () => {
+      for await (const output of transport.fromDevice) {
+        if (!running) break;
+        if (output.type === "status") {
+          setStatus(output.status);
+          if (output.status === "connected" && !configRequested) {
+            configRequested = true;
+            if (!skipConfig) {
+              requestConfig();
+            }
+            fetchOwnerFallback();
+          }
+        } else if (output.type === "packet") {
+          const { decodeFromRadio } = await import("../protocol/decoder");
+          const decoded = decodeFromRadio(output.data);
+          packetStore.add(decoded);
+        }
+      }
+    })();
+
+    return () => {
+      running = false;
+    };
+  }, [transport]);
 
   const requestConfig = useCallback(async () => {
     if (!transport) return;
