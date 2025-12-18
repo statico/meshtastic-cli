@@ -118,14 +118,15 @@ export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight 
       <Box height={listHeight} flexDirection="column">
         {/* Header */}
         <Box paddingX={1}>
-          <Text color={theme.fg.muted}>{"NAME".padEnd(10)}</Text>
-          <Text color={theme.fg.muted}>{"ID".padEnd(12)}</Text>
-          <Text color={theme.fg.muted}>{"FAV"}{"  "}</Text>
-          <Text color={theme.fg.muted}>{"ROLE".padEnd(8)}</Text>
-          <Text color={theme.fg.muted}>{"HOPS".padEnd(6)}</Text>
+          <Text color={theme.fg.muted}>{"NAME".padEnd(8)}</Text>
+          <Text color={theme.fg.muted}>{"ID".padEnd(11)}</Text>
+          <Text color={theme.fg.muted}>{"★ "}</Text>
+          <Text color={theme.fg.muted}>{"R "}</Text>
+          <Text color={theme.fg.muted}>{"HOP".padEnd(4)}</Text>
           <Text color={theme.fg.muted}>{"SNR".padEnd(8)}</Text>
-          <Text color={theme.fg.muted}>{"BATT".padEnd(7)}</Text>
-          <Text color={theme.fg.muted}>{"HEARD".padEnd(10)}</Text>
+          <Text color={theme.fg.muted}>{"BAT".padEnd(5)}</Text>
+          <Text color={theme.fg.muted}>{"HEARD".padEnd(6)}</Text>
+          <Text color={theme.fg.muted}>{" "}</Text>
           <Box flexGrow={1}><Text color={theme.fg.muted}>LONG NAME</Text></Box>
           <Box width={16}><Text color={theme.fg.muted}>MODEL</Text></Box>
         </Box>
@@ -169,14 +170,14 @@ function NodeRow({ node, isSelected }: NodeRowProps) {
 
   const nameColor = node.hopsAway === 0 ? theme.fg.accent : theme.fg.primary;
 
-  // Truncate name to ~8 visual chars
+  // Truncate name to ~6 visual chars
   let displayName = name;
-  if (stringWidth(name) > 8) {
+  if (stringWidth(name) > 6) {
     let truncated = "";
     let w = 0;
     for (const char of name) {
       const cw = stringWidth(char);
-      if (w + cw > 8) break;
+      if (w + cw > 6) break;
       truncated += char;
       w += cw;
     }
@@ -187,18 +188,19 @@ function NodeRow({ node, isSelected }: NodeRowProps) {
   const hwModel = node.hwModel !== undefined
     ? (Mesh.HardwareModel[node.hwModel] || `HW_${node.hwModel}`).replace("_", " ")
     : "";
-  const role = formatRole(node.role);
+  const role = formatRoleChar(node.role);
 
   return (
     <Box backgroundColor={bgColor} paddingX={1}>
-      <Text color={nameColor}>{padEndVisual(displayName, 10)}</Text>
-      <Text color={theme.fg.muted}>{nodeId.padEnd(12)}</Text>
-      <Text color="#ffcc00">{favStar}</Text><Text>{"    "}</Text>
-      <Text color={getRoleColor(node.role)}>{role.padEnd(8)}</Text>
-      <Text color={getHopsColor(node.hopsAway)}>{hops.padEnd(6)}</Text>
+      <Text color={nameColor}>{padEndVisual(displayName, 8)}</Text>
+      <Text color={theme.fg.muted}>{nodeId.padEnd(11)}</Text>
+      <Text color="#ffcc00">{favStar}</Text><Text>{" "}</Text>
+      <Text color={getRoleColor(node.role)}>{role} </Text>
+      <Text color={getHopsColor(node.hopsAway)}>{hops.padEnd(4)}</Text>
       <Text color={getSnrColor(node.snr)}>{snr.padStart(7)} </Text>
-      <Text color={getBatteryColor(node.batteryLevel, node.voltage)}>{battery.padEnd(7)}</Text>
-      <Text color={theme.fg.secondary}>{lastHeard.padEnd(10)}</Text>
+      <Text color={getBatteryColor(node.batteryLevel, node.voltage)}>{battery.padEnd(5)}</Text>
+      <Text color={theme.fg.secondary}>{lastHeard.padEnd(6)}</Text>
+      <Text color={theme.fg.muted}>{" "}</Text>
       <Box flexGrow={1}><Text color={theme.fg.primary} wrap="truncate">{longName}</Text></Box>
       <Box width={16}><Text color={theme.data.hardware} wrap="truncate">{hwModel}</Text></Box>
     </Box>
@@ -350,15 +352,15 @@ function getBatteryDisplay(level?: number, voltage?: number): string {
 }
 
 function formatLastHeard(timestamp: number): string {
-  if (!timestamp) return "never";
+  if (!timestamp) return "-";
 
   const now = Date.now() / 1000;
   const diff = now - timestamp;
 
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 60) return "now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
 }
 
 function getHopsColor(hops?: number): string {
@@ -405,9 +407,29 @@ const ROLE_NAMES: Record<number, string> = {
   10: "TAK_TRK",
 };
 
+// Single character role codes for compact display
+const ROLE_CHARS: Record<number, string> = {
+  0: "C",  // Client
+  1: "M",  // Mute
+  2: "R",  // Router
+  3: "r",  // Router_Client
+  4: "P",  // Repeater
+  5: "T",  // Tracker
+  6: "S",  // Sensor
+  7: "K",  // TAK
+  8: "H",  // Hidden
+  9: "L",  // Lost & Found
+  10: "t", // TAK_Tracker
+};
+
 function formatRole(role?: number | null): string {
   if (role == null) return "-";
   return ROLE_NAMES[role] || `R${role}`;
+}
+
+function formatRoleChar(role?: number | null): string {
+  if (role == null) return "-";
+  return ROLE_CHARS[role] || `${role}`;
 }
 
 function getRoleColor(role?: number | null): string {
