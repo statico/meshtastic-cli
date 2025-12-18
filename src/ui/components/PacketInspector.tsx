@@ -134,6 +134,21 @@ function InfoView({ packet, nodeStore, height, scrollOffset }: { packet: Decoded
           </Text>
         </Box>
       );
+    } else if (mp.payloadVariant.case === "encrypted") {
+      const encrypted = mp.payloadVariant.value as Uint8Array;
+      const hex = Array.from(encrypted, (b) => b.toString(16).padStart(2, "0")).join("");
+      lines.push(
+        <Box key="encrypted-label">
+          <Text color={theme.fg.muted}>Encrypted: </Text>
+          <Text color={theme.fg.secondary}>{encrypted.length} bytes</Text>
+        </Box>
+      );
+      lines.push(
+        <Box key="encrypted-data">
+          <Text color={theme.fg.muted}>Data: </Text>
+          <Text color={theme.packet.encrypted}>0x{hex}</Text>
+        </Box>
+      );
     }
 
     // Payload-specific details
@@ -736,9 +751,20 @@ function formatPacketJson(packet: DecodedPacket): string {
   return JSON.stringify(data, replacer, 2);
 }
 
+function bytesToHex(bytes: Uint8Array): string {
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  if (bytes.length <= 8) {
+    return `0x${hex}`;
+  }
+  // Show first 8 and last 4 bytes for longer arrays
+  const first = hex.slice(0, 16);
+  const last = hex.slice(-8);
+  return `0x${first}...${last} (${bytes.length} bytes)`;
+}
+
 function replacer(_key: string, value: unknown): unknown {
   if (value instanceof Uint8Array) {
-    return `<${value.length} bytes>`;
+    return bytesToHex(value);
   }
   if (typeof value === "bigint") {
     return value.toString();
