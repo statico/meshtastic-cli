@@ -9,6 +9,7 @@ export interface DecodedPacket {
   meshPacket?: Mesh.MeshPacket;
   portnum?: Portnums.PortNum;
   payload?: unknown;
+  requestId?: number;
   decodeError?: string;
 }
 
@@ -29,6 +30,9 @@ export function decodeFromRadio(raw: Uint8Array): DecodedPacket {
         const decoded = packet.meshPacket.payloadVariant.value;
         packet.portnum = decoded.portnum;
         packet.payload = decodePayload(decoded.portnum, decoded.payload);
+        if (decoded.requestId) {
+          packet.requestId = decoded.requestId;
+        }
       }
     }
   } catch (e) {

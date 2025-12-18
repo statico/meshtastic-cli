@@ -53,9 +53,17 @@ db.run(`
     rx_snr REAL,
     rx_rssi INTEGER,
     hop_limit INTEGER,
-    hop_start INTEGER
+    hop_start INTEGER,
+    status TEXT DEFAULT 'received'
   )
 `);
+
+// Add status column if it doesn't exist (migration)
+try {
+  db.run(`ALTER TABLE messages ADD COLUMN status TEXT DEFAULT 'received'`);
+} catch {
+  // Column already exists
+}
 
 db.run(`
   CREATE TABLE IF NOT EXISTS packets (
@@ -129,6 +137,8 @@ export interface DbNode {
   isFavorite?: boolean;
 }
 
+export type MessageStatus = "pending" | "acked" | "delivered" | "error" | "received";
+
 export interface DbMessage {
   id?: number;
   packetId: number;
@@ -142,6 +152,7 @@ export interface DbMessage {
   rxRssi?: number;
   hopLimit?: number;
   hopStart?: number;
+  status?: MessageStatus;
 }
 
 export function upsertNode(node: DbNode) {
@@ -247,8 +258,8 @@ export function getNodeName(num: number): string | null {
 
 export function insertMessage(msg: DbMessage) {
   db.run(`
-    INSERT INTO messages (packet_id, from_node, to_node, channel, text, timestamp, rx_time, rx_snr, rx_rssi, hop_limit, hop_start)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO messages (packet_id, from_node, to_node, channel, text, timestamp, rx_time, rx_snr, rx_rssi, hop_limit, hop_start, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     msg.packetId,
     msg.fromNode,
@@ -261,7 +272,12 @@ export function insertMessage(msg: DbMessage) {
     msg.rxRssi ?? null,
     msg.hopLimit ?? null,
     msg.hopStart ?? null,
+    msg.status ?? "received",
   ]);
+}
+
+export function updateMessageStatus(packetId: number, status: MessageStatus) {
+  db.run(`UPDATE messages SET status = ? WHERE packet_id = ?`, [status, packetId]);
 }
 
 export function getMessages(channel?: number, limit = 100): DbMessage[] {
@@ -282,6 +298,7 @@ export function getMessages(channel?: number, limit = 100): DbMessage[] {
     rxRssi: row.rx_rssi,
     hopLimit: row.hop_limit,
     hopStart: row.hop_start,
+    status: row.status as MessageStatus,
   }));
 }
 

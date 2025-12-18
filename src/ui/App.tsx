@@ -271,12 +271,28 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
           rxRssi: mp.rxRssi,
           hopLimit: mp.hopLimit,
           hopStart: mp.hopStart,
+          status: "received",
         };
         db.insertMessage(msg);
         setMessages((prev) => [...prev, msg].slice(-100));
       }
+
+      // Handle routing ACK/NAK for our sent messages
+      if (packet.portnum === Portnums.PortNum.ROUTING_APP && packet.requestId && mp.to === myNodeNum) {
+        const routing = packet.payload as { variant?: { case?: string; value?: number } };
+        if (routing.variant?.case === "errorReason" && routing.variant.value !== undefined) {
+          const isAck = routing.variant.value === Mesh.Routing_Error.NONE;
+          const newStatus: db.MessageStatus = isAck ? "acked" : "error";
+          db.updateMessageStatus(packet.requestId, newStatus);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.packetId === packet.requestId ? { ...m, status: newStatus } : m
+            )
+          );
+        }
+      }
     }
-  }, [nodeStore]);
+  }, [nodeStore, myNodeNum]);
 
   const requestConfig = useCallback(async () => {
     if (!transport) return;
@@ -338,6 +354,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
         channel: chatChannel,
         text,
         timestamp: Math.floor(Date.now() / 1000),
+        status: "pending",
       };
       db.insertMessage(msg);
       setMessages((prev) => [...prev, msg].slice(-100));

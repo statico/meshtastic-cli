@@ -66,11 +66,26 @@ function MessageRow({ message, nodeStore, isOwn }: MessageRowProps) {
   const time = new Date(message.timestamp * 1000).toLocaleTimeString("en-US", { hour12: false });
   const nameColor = isOwn ? theme.fg.accent : theme.packet.position;
 
+  const getStatusIndicator = () => {
+    if (!isOwn) return null;
+    switch (message.status) {
+      case "pending":
+        return <Text color={theme.fg.muted}> ...</Text>;
+      case "acked":
+        return <Text color={theme.status.online}> ✓</Text>;
+      case "error":
+        return <Text color={theme.status.offline}> ✗</Text>;
+      default:
+        return null;
+    }
+  };
+
   return (
     <Box>
       <Text color={theme.fg.muted}>[{time}] </Text>
       <Text color={nameColor}>{fromName.padEnd(10)}</Text>
       <Text color={theme.fg.primary}>{message.text}</Text>
+      {getStatusIndicator()}
     </Box>
   );
 }
