@@ -118,17 +118,15 @@ export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight 
       <Box height={listHeight} flexDirection="column">
         {/* Header */}
         <Box paddingX={1}>
-          <Text color={theme.fg.muted}>
-            {"NAME".padEnd(10)}
-            {"ID".padEnd(12)}
-            {"FAV"}{"  "}
-            {"HOPS".padEnd(6)}
-            {"SNR".padEnd(8)}
-            {"BATT".padEnd(7)}
-            {"HEARD".padEnd(10)}
-            {"LONG NAME".padEnd(20)}
-            {"MODEL"}
-          </Text>
+          <Text color={theme.fg.muted}>{"NAME".padEnd(10)}</Text>
+          <Text color={theme.fg.muted}>{"ID".padEnd(12)}</Text>
+          <Text color={theme.fg.muted}>{"FAV"}{"  "}</Text>
+          <Text color={theme.fg.muted}>{"HOPS".padEnd(6)}</Text>
+          <Text color={theme.fg.muted}>{"SNR".padEnd(8)}</Text>
+          <Text color={theme.fg.muted}>{"BATT".padEnd(7)}</Text>
+          <Text color={theme.fg.muted}>{"HEARD".padEnd(10)}</Text>
+          <Box flexGrow={1}><Text color={theme.fg.muted}>LONG NAME</Text></Box>
+          <Box width={16}><Text color={theme.fg.muted}>MODEL</Text></Box>
         </Box>
 
         {/* Node rows */}
@@ -191,17 +189,15 @@ function NodeRow({ node, isSelected }: NodeRowProps) {
 
   return (
     <Box backgroundColor={bgColor} paddingX={1}>
-      <Text wrap="truncate">
-        <Text color={nameColor}>{padEndVisual(displayName, 10)}</Text>
-        <Text color={theme.fg.muted}>{nodeId.padEnd(12)}</Text>
-        <Text color="#ffcc00">{favStar}</Text>{"    "}
-        <Text color={getHopsColor(node.hopsAway)}>{hops.padEnd(6)}</Text>
-        <Text color={getSnrColor(node.snr)}>{snr.padEnd(8)}</Text>
-        <Text color={getBatteryColor(node.batteryLevel)}>{battery.padEnd(7)}</Text>
-        <Text color={theme.fg.secondary}>{lastHeard.padEnd(10)}</Text>
-        <Text color={theme.fg.primary}>{longName.slice(0, 18).padEnd(20)}</Text>
-        <Text color={theme.data.hardware}>{hwModel}</Text>
-      </Text>
+      <Text color={nameColor}>{padEndVisual(displayName, 10)}</Text>
+      <Text color={theme.fg.muted}>{nodeId.padEnd(12)}</Text>
+      <Text color="#ffcc00">{favStar}</Text><Text>{"    "}</Text>
+      <Text color={getHopsColor(node.hopsAway)}>{hops.padEnd(6)}</Text>
+      <Text color={getSnrColor(node.snr)}>{snr.padEnd(8)}</Text>
+      <Text color={getBatteryColor(node.batteryLevel)}>{battery.padEnd(7)}</Text>
+      <Text color={theme.fg.secondary}>{lastHeard.padEnd(10)}</Text>
+      <Box flexGrow={1}><Text color={theme.fg.primary} wrap="truncate">{longName}</Text></Box>
+      <Box width={16}><Text color={theme.data.hardware} wrap="truncate">{hwModel}</Text></Box>
     </Box>
   );
 }
