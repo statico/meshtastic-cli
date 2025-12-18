@@ -118,6 +118,46 @@ export function parseAdminResponse(data: Uint8Array): Admin.AdminMessage | null 
   }
 }
 
+export function createSetOwnerRequest(
+  owner: Mesh.User,
+  opts: AdminRequestOptions
+): Uint8Array {
+  const admin = create(Admin.AdminMessageSchema, {
+    payloadVariant: { case: "setOwner", value: owner },
+  });
+  return createAdminPacket(admin, { ...opts, wantResponse: false });
+}
+
+export function createSetConfigRequest(
+  config: Config.Config,
+  opts: AdminRequestOptions
+): Uint8Array {
+  const admin = create(Admin.AdminMessageSchema, {
+    payloadVariant: { case: "setConfig", value: config },
+  });
+  return createAdminPacket(admin, { ...opts, wantResponse: false });
+}
+
+export function createSetModuleConfigRequest(
+  config: ModuleConfig.ModuleConfig,
+  opts: AdminRequestOptions
+): Uint8Array {
+  const admin = create(Admin.AdminMessageSchema, {
+    payloadVariant: { case: "setModuleConfig", value: config },
+  });
+  return createAdminPacket(admin, { ...opts, wantResponse: false });
+}
+
+export function createSetChannelRequest(
+  channel: Mesh.Channel,
+  opts: AdminRequestOptions
+): Uint8Array {
+  const admin = create(Admin.AdminMessageSchema, {
+    payloadVariant: { case: "setChannel", value: channel },
+  });
+  return createAdminPacket(admin, { ...opts, wantResponse: false });
+}
+
 // Config type labels for display
 export const CONFIG_TYPE_LABELS: Record<ConfigType, string> = {
   [ConfigType.DEVICE_CONFIG]: "Device",

@@ -81,6 +81,7 @@ const configKeys = [
   { key: "g / G", desc: "First / Last option" },
   { key: "Enter", desc: "Select / Refresh" },
   { key: "Escape", desc: "Back to menu" },
+  { key: "e / E", desc: "Edit field (User config)" },
   { key: "r", desc: "Reboot device" },
 ];
 

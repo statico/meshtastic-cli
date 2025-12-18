@@ -166,6 +166,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
   const [paxcounterConfig, setPaxcounterConfig] = useState<ModuleConfig.ModuleConfig_PaxcounterConfig>();
   const [configChannels, setConfigChannels] = useState<Mesh.Channel[]>([]);
   const [configOwner, setConfigOwner] = useState<Mesh.User>();
+  const [configEditing, setConfigEditing] = useState<string | null>(null);
+  const [configEditValue, setConfigEditValue] = useState("");
 
   // Filter state
   const [nodesFilter, setNodesFilter] = useState("");
@@ -844,6 +846,22 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
     }
   }, [myNodeNum, transport, showNotification]);
 
+  const saveOwner = useCallback(async (field: string, value: string) => {
+    if (!transport || !myNodeNum || !configOwner) return;
+    try {
+      const updatedOwner = create(Mesh.UserSchema, {
+        ...configOwner,
+        [field]: value,
+      });
+      const binary = adminHelper.createSetOwnerRequest(updatedOwner, { myNodeNum });
+      await transport.send(binary);
+      setConfigOwner(updatedOwner);
+      showNotification(`Saved ${field}. Device may reboot.`);
+    } catch {
+      showNotification("Failed to save owner config");
+    }
+  }, [myNodeNum, transport, configOwner, showNotification]);
+
   // Key input handling
   useInput((input, key) => {
     // If quit dialog is showing, it handles its own input
@@ -1409,6 +1427,33 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
           return;
         }
       } else {
+        // Handle config editing mode
+        if (configEditing) {
+          if (key.escape) {
+            setConfigEditing(null);
+            setConfigEditValue("");
+            return;
+          }
+          if (key.return) {
+            // Save the edit
+            if (configSection === "user" && configOwner) {
+              saveOwner(configEditing, configEditValue);
+            }
+            setConfigEditing(null);
+            setConfigEditValue("");
+            return;
+          }
+          if (key.backspace || key.delete) {
+            setConfigEditValue(s => s.slice(0, -1));
+            return;
+          }
+          if (input && !key.ctrl && !key.meta) {
+            setConfigEditValue(s => s + input);
+            return;
+          }
+          return;
+        }
+
         // In a config section - Escape to go back to menu
         if (key.escape) {
           setConfigSection("menu");
@@ -1417,6 +1462,19 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
         // Enter to refresh the config
         if (key.return) {
           requestConfigSection(configSection);
+          return;
+        }
+        // 'e' to enter edit mode for user config
+        if (input === "e" && configSection === "user" && configOwner) {
+          // Start editing long name
+          setConfigEditing("longName");
+          setConfigEditValue(configOwner.longName || "");
+          return;
+        }
+        // 'E' (shift+e) for short name
+        if (input === "E" && configSection === "user" && configOwner) {
+          setConfigEditing("shortName");
+          setConfigEditValue(configOwner.shortName || "");
           return;
         }
       }
@@ -1616,6 +1674,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
               paxcounterConfig={paxcounterConfig}
               channels={configChannels}
               owner={configOwner}
+              editingField={configEditing}
+              editValue={configEditValue}
             />
           </Box>
         )}

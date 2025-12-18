@@ -61,6 +61,9 @@ interface ConfigPanelProps {
   channels?: Mesh.Channel[];
   owner?: Mesh.User;
   loading?: boolean;
+  // Editing state
+  editingField?: string | null;
+  editValue?: string;
 }
 
 interface MenuItem {
@@ -316,7 +319,7 @@ function ConfigSectionView(props: Omit<ConfigPanelProps, "section" | "selectedMe
     case "channels":
       return <ChannelsConfigView channels={props.channels} />;
     case "user":
-      return <UserConfigView owner={props.owner} />;
+      return <UserConfigView owner={props.owner} editingField={props.editingField} editValue={props.editValue} />;
     default:
       return <Text color={theme.fg.muted}>Section not implemented</Text>;
   }
@@ -689,12 +692,42 @@ function ChannelsConfigView({ channels }: { channels?: Mesh.Channel[] }) {
   );
 }
 
-function UserConfigView({ owner }: { owner?: Mesh.User }) {
+interface EditableConfigRowProps {
+  label: string;
+  value: string | undefined;
+  fieldKey: string;
+  editingField?: string | null;
+  editValue?: string;
+  hint?: string;
+}
+
+function EditableConfigRow({ label, value, fieldKey, editingField, editValue, hint }: EditableConfigRowProps) {
+  const isEditing = editingField === fieldKey;
+  return (
+    <Box>
+      <Text color={theme.fg.muted}>{label.padEnd(24)}</Text>
+      {isEditing ? (
+        <>
+          <Text color={theme.fg.accent}>{editValue}</Text>
+          <Text color={theme.fg.accent}>█</Text>
+          <Text color={theme.fg.muted}> (Enter=save, Esc=cancel)</Text>
+        </>
+      ) : (
+        <>
+          <Text color={theme.fg.accent}>{value || "-"}</Text>
+          {hint && <Text color={theme.fg.muted}> {hint}</Text>}
+        </>
+      )}
+    </Box>
+  );
+}
+
+function UserConfigView({ owner, editingField, editValue }: { owner?: Mesh.User; editingField?: string | null; editValue?: string }) {
   if (!owner) return <NoConfigLoaded />;
   return (
     <Box flexDirection="column">
-      <ConfigRow label="Long Name" value={owner.longName} valueColor={theme.fg.accent} />
-      <ConfigRow label="Short Name" value={owner.shortName} valueColor={theme.fg.accent} />
+      <EditableConfigRow label="Long Name" value={owner.longName} fieldKey="longName" editingField={editingField} editValue={editValue} hint="(e to edit)" />
+      <EditableConfigRow label="Short Name" value={owner.shortName} fieldKey="shortName" editingField={editingField} editValue={editValue} hint="(E to edit)" />
       <ConfigRow label="ID" value={owner.id} />
       <ConfigRow label="Hardware Model" value={owner.hwModel !== undefined ? Mesh.HardwareModel[owner.hwModel] : "Unknown"} valueColor={theme.data.hardware} />
       <ConfigRow label="Is Licensed" value={owner.isLicensed} />
