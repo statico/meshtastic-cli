@@ -181,11 +181,15 @@ export function ConfigPanel({
 
   return (
     <Box flexDirection="column" height={height} width="100%">
-      <Box paddingX={1} borderBottom borderColor={theme.border.normal}>
-        <Text color={theme.fg.muted}>CONFIG</Text>
-        <Text color={theme.fg.muted}> {">"} </Text>
-        <Text color={theme.fg.accent} bold>{sectionLabel}</Text>
-        <Text color={theme.fg.secondary}>  Esc=back Enter=refresh</Text>
+      <Box flexDirection="column">
+        <Box paddingX={1}>
+          <Text color={theme.fg.muted}>CONFIG</Text>
+          <Text color={theme.fg.muted}> {">"} </Text>
+          <Text color={theme.fg.accent} bold>{sectionLabel}</Text>
+        </Box>
+        <Box paddingX={1} borderStyle="single" borderColor={theme.border.normal} borderTop borderBottom={false} borderLeft={false} borderRight={false}>
+          <Text color={theme.fg.muted}>[Esc] Back | [Enter] Refresh</Text>
+        </Box>
       </Box>
       <Box flexDirection="column" paddingX={1} flexGrow={1}>
         {loading ? (
