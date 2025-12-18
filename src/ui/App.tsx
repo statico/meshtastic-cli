@@ -695,7 +695,15 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   }, [myNodeNum, transport, showNotification]);
 
   const sendDM = useCallback(async (text: string, toNode: number) => {
-    if (!transport || !myNodeNum || !text.trim()) return;
+    if (!transport) {
+      showNotification("Not connected");
+      return;
+    }
+    if (!myNodeNum) {
+      showNotification("Waiting for node info...");
+      return;
+    }
+    if (!text.trim()) return;
 
     const packetId = Math.floor(Math.random() * 0xffffffff);
     const data = create(Mesh.DataSchema, {
