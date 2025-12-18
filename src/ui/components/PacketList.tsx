@@ -324,7 +324,7 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.packet.encrypted}>ERROR </Text>
           <Text color={theme.fg.muted}>{packet.decodeError}</Text>
         </Text>
@@ -337,7 +337,7 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.packet.unknown}>EMPTY</Text>
         </Text>
       </Box>
@@ -379,9 +379,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.data.arrow}>{"<"} </Text>
-          <Text color={color}>{portName.padEnd(14)}</Text>
+          <Text color={color}>{portName.padEnd(14)} </Text>
           <Text color={theme.data.nodeFrom}>{fromName.padEnd(10)}</Text>
           <Text color={theme.data.arrow}>{" -> "}</Text>
           <Text color={theme.data.nodeTo}>{toName.padEnd(10)}</Text>
@@ -404,9 +404,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.data.arrow}>{"*"} </Text>
-          <Text color={theme.packet.nodeinfo}>{"NODEINFO".padEnd(14)}</Text>
+          <Text color={theme.packet.nodeinfo}>{"NODEINFO".padEnd(14)} </Text>
           <Text color={theme.data.nodeFrom}>{shortName.padEnd(6)}</Text>
           <Text color={theme.fg.muted}>{id} </Text>
           {longName && <Text color={theme.fg.primary}>{longName} </Text>}
@@ -422,9 +422,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.data.arrow}>{"*"} </Text>
-          <Text color={theme.packet.direct}>{"MY_INFO".padEnd(14)}</Text>
+          <Text color={theme.packet.direct}>{"MY_INFO".padEnd(14)} </Text>
           <Text color={theme.data.nodeFrom}>{id}</Text>
           {myInfo.rebootCount > 0 && <Text color={theme.fg.muted}> reboots:{myInfo.rebootCount}</Text>}
           {myInfo.pioEnv && <Text color={theme.data.hardware}> | {myInfo.pioEnv}</Text>}
@@ -456,9 +456,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.data.arrow}>{"*"} </Text>
-          <Text color={theme.packet.config}>{"CONFIG".padEnd(14)}</Text>
+          <Text color={theme.packet.config}>{"CONFIG".padEnd(14)} </Text>
           <Text color={theme.data.channel}>{configType}</Text>
           <Text color={theme.fg.muted}>{configSummary}</Text>
         </Text>
@@ -477,9 +477,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.data.arrow}>{"*"} </Text>
-          <Text color={theme.packet.config}>{"MODULE_CONFIG".padEnd(14)}</Text>
+          <Text color={theme.packet.config}>{"MODULE_CONFIG".padEnd(14)} </Text>
           <Text color={theme.data.channel}>{configType}</Text>
           <Text color={moduleSummary.includes("enabled") ? theme.status.online : theme.fg.muted}>{moduleSummary}</Text>
         </Text>
@@ -495,9 +495,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.data.arrow}>{"*"} </Text>
-          <Text color={theme.packet.config}>{"CHANNEL".padEnd(14)}</Text>
+          <Text color={theme.packet.config}>{"CHANNEL".padEnd(14)} </Text>
           <Text color={theme.data.channel}>#{channel.index} </Text>
           <Text color={theme.fg.primary}>{name} </Text>
           <Text color={role === "PRIMARY" ? theme.status.online : role === "DISABLED" ? theme.fg.muted : theme.fg.secondary}>{role}</Text>
@@ -511,9 +511,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.data.arrow}>{"*"} </Text>
-          <Text color={theme.packet.direct}>{"CONFIG_COMPLETE".padEnd(14)}</Text>
+          <Text color={theme.packet.direct}>{"CONFIG_COMPLETE".padEnd(14)} </Text>
         </Text>
       </Box>
     );
@@ -527,9 +527,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.data.arrow}>{"!"} </Text>
-          <Text color={levelColor}>{"NOTIFICATION".padEnd(14)}</Text>
+          <Text color={levelColor}>{"NOTIFICATION".padEnd(14)} </Text>
           <Text color={theme.fg.primary}>{notif.message || ""}</Text>
         </Text>
       </Box>
@@ -542,9 +542,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.data.arrow}>{"*"} </Text>
-          <Text color={theme.packet.telemetry}>{"METADATA".padEnd(14)}</Text>
+          <Text color={theme.packet.telemetry}>{"METADATA".padEnd(14)} </Text>
           <Text color={theme.fg.primary}>{meta.firmwareVersion || "?"}</Text>
           {hw && <Text color={theme.data.hardware}> | {hw}</Text>}
           {meta.hasPKC && <Text color={theme.status.online}> PKC</Text>}
@@ -558,9 +558,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.data.arrow}>{"*"} </Text>
-          <Text color={theme.packet.config}>{"DEVICE_UI".padEnd(14)}</Text>
+          <Text color={theme.packet.config}>{"DEVICE_UI".padEnd(14)} </Text>
           {ui.screenBrightness !== undefined && <Text color={theme.fg.primary}>bright:{ui.screenBrightness} </Text>}
           {ui.screenTimeout !== undefined && <Text color={theme.fg.muted}>timeout:{ui.screenTimeout}s</Text>}
         </Text>
@@ -574,9 +574,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.data.arrow}>{"*"} </Text>
-          <Text color={theme.packet.config}>{"FILE_INFO".padEnd(14)}</Text>
+          <Text color={theme.packet.config}>{"FILE_INFO".padEnd(14)} </Text>
           <Text color={theme.fg.primary}>{name}</Text>
           {file.sizeBytes !== undefined && <Text color={theme.fg.muted}> {file.sizeBytes}B</Text>}
         </Text>
@@ -589,9 +589,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.data.arrow}>{"*"} </Text>
-          <Text color={theme.packet.routing}>{"QUEUE_STATUS".padEnd(14)}</Text>
+          <Text color={theme.packet.routing}>{"QUEUE_STATUS".padEnd(14)} </Text>
           <Text color={theme.fg.primary}>{qs.free ?? "?"}/{qs.maxlen ?? "?"} free</Text>
           {qs.res !== undefined && qs.res !== 0 && <Text color={theme.packet.encrypted}> res:{qs.res}</Text>}
         </Text>
@@ -603,9 +603,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
-          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.time}>[{time}]  </Text>
           <Text color={theme.data.arrow}>{"*"} </Text>
-          <Text color={theme.packet.unknown}>{variantCase.toUpperCase().padEnd(14)}</Text>
+          <Text color={theme.packet.unknown}>{variantCase.toUpperCase().padEnd(14)} </Text>
         </Text>
       </Box>
     );
@@ -614,9 +614,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
   return (
     <Box backgroundColor={bgColor}>
       <Text wrap="truncate">
-        <Text color={theme.data.time}>[{time}] </Text>
+        <Text color={theme.data.time}>[{time}]  </Text>
         <Text color={theme.fg.secondary}>{"?"} </Text>
-        <Text color={theme.packet.unknown}>{"UNKNOWN".padEnd(14)}</Text>
+        <Text color={theme.packet.unknown}>{"UNKNOWN".padEnd(14)} </Text>
       </Text>
     </Box>
   );
