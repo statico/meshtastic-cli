@@ -2,18 +2,18 @@ import React from "react";
 import { Box, Text } from "ink";
 import { theme } from "../theme";
 
-type AppMode = "packets" | "nodes" | "chat";
+type AppMode = "packets" | "nodes" | "chat" | "log";
 
 interface HelpDialogProps {
   mode: AppMode;
 }
 
 const globalKeys = [
-  { key: "1 / p", desc: "Packets view" },
-  { key: "2 / n", desc: "Nodes view" },
-  { key: "3 / c", desc: "Chat view" },
+  { key: "1", desc: "Packets view" },
+  { key: "2", desc: "Nodes view" },
+  { key: "3", desc: "Chat view" },
+  { key: "4 / l", desc: "Log view" },
   { key: "q / Q", desc: "Quit" },
-  { key: "Ctrl+C", desc: "Quit" },
   { key: "?", desc: "Toggle help" },
 ];
 
@@ -23,19 +23,24 @@ const packetKeys = [
   { key: "Ctrl+d/PgDn", desc: "Page down" },
   { key: "Ctrl+u/PgUp", desc: "Page up" },
   { key: "g", desc: "First packet" },
-  { key: "G", desc: "Last packet (resume autoscroll)" },
+  { key: "G", desc: "Last packet" },
   { key: "h / ←", desc: "Previous inspector tab" },
   { key: "l / →", desc: "Next inspector tab" },
-  { key: "Space", desc: "Scroll inspector down" },
-  { key: "b", desc: "Scroll inspector up" },
-  { key: "+", desc: "Expand inspector pane" },
-  { key: "-", desc: "Shrink inspector pane" },
+  { key: "Tab", desc: "Toggle pane sizes" },
+  { key: "Space / b", desc: "Scroll inspector" },
+  { key: "+ / -", desc: "Resize inspector" },
+  { key: "m", desc: "Open position in Maps" },
+  { key: "Enter", desc: "Jump to node" },
 ];
 
 const nodeKeys = [
   { key: "j / ↓", desc: "Next node" },
   { key: "k / ↑", desc: "Previous node" },
-  { key: "t", desc: "Traceroute to selected node" },
+  { key: "t", desc: "Traceroute to node" },
+  { key: "p", desc: "Request position" },
+  { key: "e", desc: "Request telemetry" },
+  { key: "d", desc: "Direct ping (hop=0)" },
+  { key: "g", desc: "Google hardware model" },
 ];
 
 const chatKeys = [
@@ -44,13 +49,20 @@ const chatKeys = [
   { key: "Escape", desc: "Exit to packets" },
 ];
 
+const logKeys = [
+  { key: "j / ↓", desc: "Next response" },
+  { key: "k / ↑", desc: "Previous response" },
+];
+
 export function HelpDialog({ mode }: HelpDialogProps) {
   const modeKeys = mode === "packets" ? packetKeys
     : mode === "nodes" ? nodeKeys
+    : mode === "log" ? logKeys
     : chatKeys;
 
   const modeTitle = mode === "packets" ? "PACKETS"
     : mode === "nodes" ? "NODES"
+    : mode === "log" ? "LOG"
     : "CHAT";
 
   return (

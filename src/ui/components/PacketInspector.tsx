@@ -36,7 +36,7 @@ export function PacketInspector({ packet, activeTab, height = 12, nodeStore, scr
   );
 }
 
-function TabBar({ activeTab, scrollOffset }: { activeTab: InspectorTab; scrollOffset: number }) {
+function TabBar({ activeTab, scrollOffset = 0 }: { activeTab: InspectorTab; scrollOffset?: number }) {
   const tabs: { key: InspectorTab; label: string }[] = [
     { key: "info", label: "INFO" },
     { key: "json", label: "JSON" },

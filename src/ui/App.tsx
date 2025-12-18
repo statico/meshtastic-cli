@@ -13,11 +13,14 @@ import { NodesPanel } from "./components/NodesPanel";
 import { ChatPanel } from "./components/ChatPanel";
 import { HelpDialog } from "./components/HelpDialog";
 import { QuitDialog } from "./components/QuitDialog";
+import { ResponseModal } from "./components/ResponseModal";
+import { LogPanel } from "./components/LogPanel";
 import * as db from "../db";
 import { toBinary, create } from "@bufbuild/protobuf";
 import { formatNodeId } from "../utils/hex";
+import { exec } from "child_process";
 
-type AppMode = "packets" | "nodes" | "chat";
+type AppMode = "packets" | "nodes" | "chat" | "log";
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
@@ -43,6 +46,15 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
   const [inspectorScrollOffset, setInspectorScrollOffset] = useState(0);
   const [showHelp, setShowHelp] = useState(false);
   const [showQuitDialog, setShowQuitDialog] = useState(false);
+  const [showResponseModal, setShowResponseModal] = useState(false);
+  const [responseModalData, setResponseModalData] = useState<{
+    type: "position" | "traceroute";
+    fromNode: number;
+    data: unknown;
+  } | null>(null);
+  const [logResponses, setLogResponses] = useState<db.LogResponse[]>([]);
+  const [selectedLogIndex, setSelectedLogIndex] = useState(0);
+  const [inspectorExpanded, setInspectorExpanded] = useState(false);
   const [terminalHeight, setTerminalHeight] = useState(stdout?.rows || 24);
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -109,6 +121,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
 
     const initialMessages = db.getMessages(undefined, 100);
     setMessages(initialMessages);
+
+    const initialLogs = db.getLogResponses(100);
+    setLogResponses(initialLogs);
+    if (initialLogs.length > 0) {
+      setSelectedLogIndex(initialLogs.length - 1);
+    }
 
     nodeStore.onUpdate((updatedNodes) => {
       setNodes(updatedNodes);
@@ -202,6 +220,44 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
         }
       }
 
+      // Detect position responses directed to us
+      if (packet.portnum === Portnums.PortNum.POSITION_APP && packet.payload && mp.to === myNodeNum) {
+        const pos = packet.payload as Mesh.Position;
+        const posResponse: db.DbPositionResponse = {
+          packetId: mp.id,
+          fromNode: mp.from,
+          requestedBy: myNodeNum,
+          latitudeI: pos.latitudeI,
+          longitudeI: pos.longitudeI,
+          altitude: pos.altitude,
+          satsInView: pos.satsInView,
+          timestamp: Math.floor(Date.now() / 1000),
+        };
+        db.insertPositionResponse(posResponse);
+        setLogResponses(prev => [...prev, posResponse].slice(-100));
+        setResponseModalData({ type: "position", fromNode: mp.from, data: pos });
+        setShowResponseModal(true);
+      }
+
+      // Detect traceroute responses directed to us
+      if (packet.portnum === Portnums.PortNum.TRACEROUTE_APP && packet.payload && mp.to === myNodeNum) {
+        const route = packet.payload as Mesh.RouteDiscovery;
+        const trResponse: db.DbTracerouteResponse = {
+          packetId: mp.id,
+          fromNode: mp.from,
+          requestedBy: myNodeNum,
+          route: route.route ? [...route.route] : [],
+          snrTowards: route.snrTowards ? [...route.snrTowards] : [],
+          snrBack: route.snrBack ? [...route.snrBack] : [],
+          hopLimit: mp.hopLimit ?? 0,
+          timestamp: Math.floor(Date.now() / 1000),
+        };
+        db.insertTracerouteResponse(trResponse);
+        setLogResponses(prev => [...prev, trResponse].slice(-100));
+        setResponseModalData({ type: "traceroute", fromNode: mp.from, data: route });
+        setShowResponseModal(true);
+      }
+
       if (packet.portnum === Portnums.PortNum.TEXT_MESSAGE_APP && typeof packet.payload === "string") {
         const msg: db.DbMessage = {
           packetId: mp.id,
@@ -291,7 +347,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
     }
   }, [myNodeNum, chatChannel, transport, showNotification]);
 
-  const sendTraceroute = useCallback(async (destNode: number) => {
+  const sendTraceroute = useCallback(async (destNode: number, hopLimit?: number) => {
     if (!transport || !myNodeNum) return;
 
     const routeDiscovery = create(Mesh.RouteDiscoverySchema, { route: [] });
@@ -299,6 +355,40 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
 
     const data = create(Mesh.DataSchema, {
       portnum: Portnums.PortNum.TRACEROUTE_APP,
+      payload,
+      wantResponse: true,
+    });
+
+    const meshPacket = create(Mesh.MeshPacketSchema, {
+      from: myNodeNum,
+      to: destNode,
+      wantAck: true,
+      hopLimit: hopLimit ?? 7,
+      payloadVariant: { case: "decoded", value: data },
+    });
+
+    const toRadio = create(Mesh.ToRadioSchema, {
+      payloadVariant: { case: "packet", value: meshPacket },
+    });
+
+    try {
+      const binary = toBinary(Mesh.ToRadioSchema, toRadio);
+      await transport.send(binary);
+      const action = hopLimit === 0 ? "Direct ping" : "Traceroute";
+      showNotification(`${action} sent to ${nodeStore.getNodeName(destNode)}`);
+    } catch {
+      showNotification("Failed to send traceroute");
+    }
+  }, [myNodeNum, transport, nodeStore, showNotification]);
+
+  const sendPositionRequest = useCallback(async (destNode: number) => {
+    if (!transport || !myNodeNum) return;
+
+    const position = create(Mesh.PositionSchema, {});
+    const payload = toBinary(Mesh.PositionSchema, position);
+
+    const data = create(Mesh.DataSchema, {
+      portnum: Portnums.PortNum.POSITION_APP,
       payload,
       wantResponse: true,
     });
@@ -317,9 +407,41 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
     try {
       const binary = toBinary(Mesh.ToRadioSchema, toRadio);
       await transport.send(binary);
-      showNotification(`Traceroute sent to ${nodeStore.getNodeName(destNode)}`);
+      showNotification(`Position request sent to ${nodeStore.getNodeName(destNode)}`);
     } catch {
-      showNotification("Failed to send traceroute");
+      showNotification("Failed to send position request");
+    }
+  }, [myNodeNum, transport, nodeStore, showNotification]);
+
+  const sendTelemetryRequest = useCallback(async (destNode: number) => {
+    if (!transport || !myNodeNum) return;
+
+    const telemetry = create(Telemetry.TelemetrySchema, {});
+    const payload = toBinary(Telemetry.TelemetrySchema, telemetry);
+
+    const data = create(Mesh.DataSchema, {
+      portnum: Portnums.PortNum.TELEMETRY_APP,
+      payload,
+      wantResponse: true,
+    });
+
+    const meshPacket = create(Mesh.MeshPacketSchema, {
+      from: myNodeNum,
+      to: destNode,
+      wantAck: true,
+      payloadVariant: { case: "decoded", value: data },
+    });
+
+    const toRadio = create(Mesh.ToRadioSchema, {
+      payloadVariant: { case: "packet", value: meshPacket },
+    });
+
+    try {
+      const binary = toBinary(Mesh.ToRadioSchema, toRadio);
+      await transport.send(binary);
+      showNotification(`Telemetry request sent to ${nodeStore.getNodeName(destNode)}`);
+    } catch {
+      showNotification("Failed to send telemetry request");
     }
   }, [myNodeNum, transport, nodeStore, showNotification]);
 
@@ -354,9 +476,10 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
 
     // Mode switching
     if (mode !== "chat") {
-      if (input === "1" || input === "p") { setMode("packets"); return; }
-      if (input === "2" || input === "n") { setMode("nodes"); return; }
-      if (input === "3" || input === "c") { setMode("chat"); return; }
+      if (input === "1") { setMode("packets"); return; }
+      if (input === "2") { setMode("nodes"); return; }
+      if (input === "3") { setMode("chat"); return; }
+      if (input === "4" || input === "l") { setMode("log"); return; }
     } else {
       // In chat mode, Escape or Ctrl+C exits to packets
       if (key.escape) { setMode("packets"); return; }
@@ -413,6 +536,28 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
       if (input === "b") {
         setInspectorScrollOffset((o) => Math.max(0, o - 3));
       }
+      // Toggle pane sizes
+      if (key.tab) {
+        setInspectorExpanded(e => !e);
+      }
+      // Open Google Maps for position packets
+      if (input === "m" && selectedPacket?.portnum === Portnums.PortNum.POSITION_APP && selectedPacket?.payload) {
+        const pos = selectedPacket.payload as Mesh.Position;
+        if (pos.latitudeI && pos.longitudeI) {
+          const lat = pos.latitudeI / 1e7;
+          const lon = pos.longitudeI / 1e7;
+          exec(`open "https://www.google.com/maps?q=${lat},${lon}"`);
+        }
+      }
+      // Jump to node from packet
+      if (key.return && selectedPacket?.meshPacket) {
+        const fromNode = selectedPacket.meshPacket.from;
+        const nodeIndex = nodes.findIndex(n => n.num === fromNode);
+        if (nodeIndex >= 0) {
+          setSelectedNodeIndex(nodeIndex);
+        }
+        setMode("nodes");
+      }
     } else if (mode === "nodes") {
       if (input === "j" || key.downArrow) {
         setSelectedNodeIndex((i) => Math.min(i + 1, nodes.length - 1));
@@ -422,6 +567,29 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
       }
       if (input === "t" && nodes[selectedNodeIndex]) {
         sendTraceroute(nodes[selectedNodeIndex].num);
+      }
+      if (input === "p" && nodes[selectedNodeIndex]) {
+        sendPositionRequest(nodes[selectedNodeIndex].num);
+      }
+      if (input === "e" && nodes[selectedNodeIndex]) {
+        sendTelemetryRequest(nodes[selectedNodeIndex].num);
+      }
+      if (input === "d" && nodes[selectedNodeIndex]) {
+        sendTraceroute(nodes[selectedNodeIndex].num, 0);
+      }
+      if (input === "g" && nodes[selectedNodeIndex]?.hwModel) {
+        const hwName = Mesh.HardwareModel[nodes[selectedNodeIndex].hwModel!];
+        if (hwName) {
+          const query = encodeURIComponent(`Meshtastic ${hwName}`);
+          exec(`open "https://www.google.com/search?q=${query}"`);
+        }
+      }
+    } else if (mode === "log") {
+      if (input === "j" || key.downArrow) {
+        setSelectedLogIndex((i) => Math.min(i + 1, logResponses.length - 1));
+      }
+      if (input === "k" || key.upArrow) {
+        setSelectedLogIndex((i) => Math.max(i - 1, 0));
       }
     } else if (mode === "chat") {
       if (key.return) {
@@ -449,6 +617,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
     const p = mode === "packets";
     const n = mode === "nodes";
     const c = mode === "chat";
+    const l = mode === "log";
     return (
       <Text>
         <Text color={p ? theme.fg.accent : theme.fg.muted} bold={p}>[PACKETS]</Text>
@@ -456,6 +625,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
         <Text color={n ? theme.fg.accent : theme.fg.muted} bold={n}>[NODES]</Text>
         {" "}
         <Text color={c ? theme.fg.accent : theme.fg.muted} bold={c}>[CHAT]</Text>
+        {" "}
+        <Text color={l ? theme.fg.accent : theme.fg.muted} bold={l}>[LOG]</Text>
       </Text>
     );
   };
@@ -509,21 +680,29 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
 
       {/* Main content */}
       <Box flexGrow={1} flexDirection="column">
-        {mode === "packets" && (
-          <>
-            <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
-              <PacketList
-                packets={packets}
-                selectedIndex={selectedPacketIndex}
-                nodeStore={nodeStore}
-                height={terminalHeight - inspectorHeight - 7}
-              />
-            </Box>
-            <Box height={inspectorHeight} borderStyle="single" borderColor={theme.border.normal}>
-              <PacketInspector packet={selectedPacket} activeTab={inspectorTab} height={inspectorHeight - 2} nodeStore={nodeStore} scrollOffset={inspectorScrollOffset} />
-            </Box>
-          </>
-        )}
+        {mode === "packets" && (() => {
+          const listHeight = inspectorExpanded
+            ? Math.floor((terminalHeight - 7) * 0.2)
+            : terminalHeight - inspectorHeight - 7;
+          const detailHeight = inspectorExpanded
+            ? Math.floor((terminalHeight - 7) * 0.8)
+            : inspectorHeight;
+          return (
+            <>
+              <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
+                <PacketList
+                  packets={packets}
+                  selectedIndex={selectedPacketIndex}
+                  nodeStore={nodeStore}
+                  height={listHeight}
+                />
+              </Box>
+              <Box height={detailHeight} borderStyle="single" borderColor={theme.border.normal}>
+                <PacketInspector packet={selectedPacket} activeTab={inspectorTab} height={detailHeight - 2} nodeStore={nodeStore} scrollOffset={inspectorScrollOffset} />
+              </Box>
+            </>
+          );
+        })()}
 
         {mode === "nodes" && (
           <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
@@ -543,6 +722,17 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
               input={chatInput}
               nodeStore={nodeStore}
               myNodeNum={myNodeNum}
+            />
+          </Box>
+        )}
+
+        {mode === "log" && (
+          <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
+            <LogPanel
+              responses={logResponses}
+              selectedIndex={selectedLogIndex}
+              height={terminalHeight - 6}
+              nodeStore={nodeStore}
             />
           </Box>
         )}
@@ -591,6 +781,29 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
               process.exit(0);
             }}
             onCancel={() => setShowQuitDialog(false)}
+          />
+        </Box>
+      )}
+
+      {/* Response modal overlay */}
+      {showResponseModal && responseModalData && (
+        <Box
+          position="absolute"
+          flexDirection="column"
+          justifyContent="center"
+          alignItems="center"
+          width="100%"
+          height="100%"
+        >
+          <ResponseModal
+            type={responseModalData.type}
+            fromNode={responseModalData.fromNode}
+            data={responseModalData.data}
+            nodeStore={nodeStore}
+            onDismiss={() => {
+              setShowResponseModal(false);
+              setResponseModalData(null);
+            }}
           />
         </Box>
       )}
