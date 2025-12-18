@@ -909,8 +909,14 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
         return;
       }
 
-      const nodes = await response.json();
+      const data = await response.json();
+      const nodes = data.nodes || data; // Handle both { nodes: [...] } and direct array
       const nodeHex = `!${nodeNum.toString(16).padStart(8, "0")}`;
+
+      if (!Array.isArray(nodes)) {
+        showNotification("Invalid MeshView response format");
+        return;
+      }
 
       const found = nodes.find((n: { id?: string; node_id?: number }) =>
         n.id === nodeHex || n.node_id === nodeNum
