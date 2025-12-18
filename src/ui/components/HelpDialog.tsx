@@ -2,7 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import { theme } from "../theme";
 
-type AppMode = "packets" | "nodes" | "chat" | "log";
+type AppMode = "packets" | "nodes" | "chat" | "dm" | "config" | "log";
 
 interface HelpDialogProps {
   mode: AppMode;
@@ -12,7 +12,9 @@ const globalKeys = [
   { key: "1", desc: "Packets view" },
   { key: "2", desc: "Nodes view" },
   { key: "3", desc: "Chat view" },
-  { key: "4", desc: "Log view" },
+  { key: "4", desc: "DM view" },
+  { key: "5", desc: "Config view" },
+  { key: "6", desc: "Log view" },
   { key: "q / Q", desc: "Quit" },
   { key: "?", desc: "Toggle help" },
 ];
@@ -42,7 +44,8 @@ const nodeKeys = [
   { key: "t", desc: "Traceroute to node" },
   { key: "p", desc: "Request position" },
   { key: "e", desc: "Request telemetry" },
-  { key: "d", desc: "Direct ping (hop=0)" },
+  { key: "d", desc: "Start DM with node" },
+  { key: "D", desc: "Direct ping (hop=0)" },
   { key: "m", desc: "Open position in Maps" },
   { key: "l", desc: "Lookup hardware model" },
 ];
@@ -55,9 +58,28 @@ const chatKeys = [
   { key: "g / G", desc: "First / Last message" },
   { key: "Tab/S-Tab", desc: "Next/Prev channel" },
   { key: "n", desc: "Go to sender node" },
+  { key: "d", desc: "DM the sender" },
   { key: "Enter", desc: "Focus input" },
   { key: "Escape", desc: "Unfocus / Exit chat" },
   { key: "Ctrl+E", desc: "Emoji selector (in input)" },
+];
+
+const dmKeys = [
+  { key: "j / ↓", desc: "Next conversation/message" },
+  { key: "k / ↑", desc: "Previous conversation/message" },
+  { key: "g / G", desc: "First / Last" },
+  { key: "n", desc: "Go to node" },
+  { key: "Enter", desc: "Select / Focus input" },
+  { key: "Escape", desc: "Back / Unfocus" },
+];
+
+const configKeys = [
+  { key: "j / ↓", desc: "Next option" },
+  { key: "k / ↑", desc: "Previous option" },
+  { key: "g / G", desc: "First / Last option" },
+  { key: "Enter", desc: "Select / Refresh" },
+  { key: "Escape", desc: "Back to menu" },
+  { key: "r", desc: "Reboot device" },
 ];
 
 const logKeys = [
@@ -68,13 +90,17 @@ const logKeys = [
 export function HelpDialog({ mode }: HelpDialogProps) {
   const modeKeys = mode === "packets" ? packetKeys
     : mode === "nodes" ? nodeKeys
-    : mode === "log" ? logKeys
-    : chatKeys;
+    : mode === "chat" ? chatKeys
+    : mode === "dm" ? dmKeys
+    : mode === "config" ? configKeys
+    : logKeys;
 
   const modeTitle = mode === "packets" ? "PACKETS"
     : mode === "nodes" ? "NODES"
-    : mode === "log" ? "LOG"
-    : "CHAT";
+    : mode === "chat" ? "CHAT"
+    : mode === "dm" ? "DM"
+    : mode === "config" ? "CONFIG"
+    : "LOG";
 
   return (
     <Box

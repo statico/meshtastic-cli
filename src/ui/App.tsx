@@ -6,11 +6,14 @@ import type { PacketStore } from "../protocol/packet-store";
 import type { NodeStore, NodeData } from "../protocol/node-store";
 import type { Transport, DeviceStatus } from "../transport/types";
 import { HttpTransport } from "../transport";
-import { Mesh, Portnums, Telemetry, Channel } from "@meshtastic/protobufs";
+import { Mesh, Portnums, Telemetry, Channel, Admin, Config, ModuleConfig } from "@meshtastic/protobufs";
 import { PacketList } from "./components/PacketList";
 import { PacketInspector, InspectorTab } from "./components/PacketInspector";
 import { NodesPanel } from "./components/NodesPanel";
 import { ChatPanel } from "./components/ChatPanel";
+import { DMPanel } from "./components/DMPanel";
+import { ConfigPanel, ConfigSection, getMenuItemByIndex, getMenuItemCount } from "./components/ConfigPanel";
+import * as adminHelper from "../protocol/admin";
 import { HelpDialog } from "./components/HelpDialog";
 import { QuitDialog } from "./components/QuitDialog";
 import { ResponseModal } from "./components/ResponseModal";
@@ -20,7 +23,7 @@ import { toBinary, create } from "@bufbuild/protobuf";
 import { formatNodeId } from "../utils/hex";
 import { exec } from "child_process";
 
-type AppMode = "packets" | "nodes" | "chat" | "log";
+type AppMode = "packets" | "nodes" | "chat" | "dm" | "config" | "log";
 
 export interface ChannelInfo {
   index: number;
@@ -126,6 +129,42 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
   const [channels, setChannels] = useState<Map<number, ChannelInfo>>(new Map());
   const [notification, setNotification] = useState("");
 
+  // DM state
+  const [dmConversations, setDmConversations] = useState<db.DMConversation[]>([]);
+  const [dmMessages, setDmMessages] = useState<db.DbMessage[]>([]);
+  const [selectedDMConvoIndex, setSelectedDMConvoIndex] = useState(0);
+  const [selectedDMMessageIndex, setSelectedDMMessageIndex] = useState(-1);
+  const [dmInputFocused, setDmInputFocused] = useState(false);
+  const [dmInput, setDmInput] = useState("");
+
+  // Config state
+  const [configSection, setConfigSection] = useState<ConfigSection>("menu");
+  const [configMenuIndex, setConfigMenuIndex] = useState(0);
+  const [configLoading, setConfigLoading] = useState(false);
+  const [deviceConfig, setDeviceConfig] = useState<Config.Config_DeviceConfig>();
+  const [positionConfig, setPositionConfig] = useState<Config.Config_PositionConfig>();
+  const [powerConfig, setPowerConfig] = useState<Config.Config_PowerConfig>();
+  const [networkConfig, setNetworkConfig] = useState<Config.Config_NetworkConfig>();
+  const [displayConfig, setDisplayConfig] = useState<Config.Config_DisplayConfig>();
+  const [loraConfig, setLoraConfig] = useState<Config.Config_LoRaConfig>();
+  const [bluetoothConfig, setBluetoothConfig] = useState<Config.Config_BluetoothConfig>();
+  const [securityConfig, setSecurityConfig] = useState<Config.Config_SecurityConfig>();
+  const [mqttConfig, setMqttConfig] = useState<ModuleConfig.ModuleConfig_MQTTConfig>();
+  const [serialConfig, setSerialConfig] = useState<ModuleConfig.ModuleConfig_SerialConfig>();
+  const [extNotifConfig, setExtNotifConfig] = useState<ModuleConfig.ModuleConfig_ExternalNotificationConfig>();
+  const [storeForwardConfig, setStoreForwardConfig] = useState<ModuleConfig.ModuleConfig_StoreForwardConfig>();
+  const [rangeTestConfig, setRangeTestConfig] = useState<ModuleConfig.ModuleConfig_RangeTestConfig>();
+  const [telemetryConfig, setTelemetryConfig] = useState<ModuleConfig.ModuleConfig_TelemetryConfig>();
+  const [cannedMsgConfig, setCannedMsgConfig] = useState<ModuleConfig.ModuleConfig_CannedMessageConfig>();
+  const [audioConfig, setAudioConfig] = useState<ModuleConfig.ModuleConfig_AudioConfig>();
+  const [remoteHwConfig, setRemoteHwConfig] = useState<ModuleConfig.ModuleConfig_RemoteHardwareConfig>();
+  const [neighborInfoConfig, setNeighborInfoConfig] = useState<ModuleConfig.ModuleConfig_NeighborInfoConfig>();
+  const [ambientLightConfig, setAmbientLightConfig] = useState<ModuleConfig.ModuleConfig_AmbientLightingConfig>();
+  const [detectionSensorConfig, setDetectionSensorConfig] = useState<ModuleConfig.ModuleConfig_DetectionSensorConfig>();
+  const [paxcounterConfig, setPaxcounterConfig] = useState<ModuleConfig.ModuleConfig_PaxcounterConfig>();
+  const [configChannels, setConfigChannels] = useState<Mesh.Channel[]>([]);
+  const [configOwner, setConfigOwner] = useState<Mesh.User>();
+
   // Load initial data
   useEffect(() => {
     const initialPackets = packetStore.getAll();
@@ -147,6 +186,25 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
       setNodes(updatedNodes);
     });
   }, []);
+
+  // Load DM conversations when myNodeNum is known
+  useEffect(() => {
+    if (myNodeNum) {
+      const convos = db.getDMConversations(myNodeNum);
+      setDmConversations(convos);
+    }
+  }, [myNodeNum, messages]); // Re-fetch when messages change
+
+  // Load DM messages when selected conversation changes
+  useEffect(() => {
+    if (myNodeNum && dmConversations[selectedDMConvoIndex]) {
+      const otherNode = dmConversations[selectedDMConvoIndex].nodeNum;
+      const msgs = db.getDMMessages(myNodeNum, otherNode, 100);
+      setDmMessages(msgs);
+    } else {
+      setDmMessages([]);
+    }
+  }, [myNodeNum, dmConversations, selectedDMConvoIndex]);
 
   const processPacketForNodes = useCallback((packet: DecodedPacket) => {
     const fr = packet.fromRadio;
@@ -265,6 +323,104 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
               m.packetId === packet.requestId ? { ...m, status: newStatus } : m
             )
           );
+        }
+      }
+
+      // Handle admin responses for config
+      if (packet.portnum === Portnums.PortNum.ADMIN_APP && mp.to === myNodeNum && packet.payload) {
+        const adminMsg = packet.payload as Admin.AdminMessage;
+        setConfigLoading(false);
+
+        switch (adminMsg.payloadVariant.case) {
+          case "getConfigResponse": {
+            const config = adminMsg.payloadVariant.value;
+            switch (config.payloadVariant.case) {
+              case "device":
+                setDeviceConfig(config.payloadVariant.value);
+                break;
+              case "position":
+                setPositionConfig(config.payloadVariant.value);
+                break;
+              case "power":
+                setPowerConfig(config.payloadVariant.value);
+                break;
+              case "network":
+                setNetworkConfig(config.payloadVariant.value);
+                break;
+              case "display":
+                setDisplayConfig(config.payloadVariant.value);
+                break;
+              case "lora":
+                setLoraConfig(config.payloadVariant.value);
+                break;
+              case "bluetooth":
+                setBluetoothConfig(config.payloadVariant.value);
+                break;
+              case "security":
+                setSecurityConfig(config.payloadVariant.value);
+                break;
+            }
+            break;
+          }
+          case "getModuleConfigResponse": {
+            const moduleConfig = adminMsg.payloadVariant.value;
+            switch (moduleConfig.payloadVariant.case) {
+              case "mqtt":
+                setMqttConfig(moduleConfig.payloadVariant.value);
+                break;
+              case "serial":
+                setSerialConfig(moduleConfig.payloadVariant.value);
+                break;
+              case "externalNotification":
+                setExtNotifConfig(moduleConfig.payloadVariant.value);
+                break;
+              case "storeForward":
+                setStoreForwardConfig(moduleConfig.payloadVariant.value);
+                break;
+              case "rangeTest":
+                setRangeTestConfig(moduleConfig.payloadVariant.value);
+                break;
+              case "telemetry":
+                setTelemetryConfig(moduleConfig.payloadVariant.value);
+                break;
+              case "cannedMessage":
+                setCannedMsgConfig(moduleConfig.payloadVariant.value);
+                break;
+              case "audio":
+                setAudioConfig(moduleConfig.payloadVariant.value);
+                break;
+              case "remoteHardware":
+                setRemoteHwConfig(moduleConfig.payloadVariant.value);
+                break;
+              case "neighborInfo":
+                setNeighborInfoConfig(moduleConfig.payloadVariant.value);
+                break;
+              case "ambientLighting":
+                setAmbientLightConfig(moduleConfig.payloadVariant.value);
+                break;
+              case "detectionSensor":
+                setDetectionSensorConfig(moduleConfig.payloadVariant.value);
+                break;
+              case "paxcounter":
+                setPaxcounterConfig(moduleConfig.payloadVariant.value);
+                break;
+            }
+            break;
+          }
+          case "getChannelResponse": {
+            const channel = adminMsg.payloadVariant.value;
+            setConfigChannels((prev) => {
+              const next = [...prev];
+              const idx = channel.index;
+              next[idx] = channel;
+              return next;
+            });
+            break;
+          }
+          case "getOwnerResponse": {
+            setConfigOwner(adminMsg.payloadVariant.value);
+            break;
+          }
         }
       }
     }
@@ -397,6 +553,71 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
     }
   }, [myNodeNum, chatChannel, transport, showNotification]);
 
+  const sendDM = useCallback(async (text: string, toNode: number) => {
+    if (!transport || !myNodeNum || !text.trim()) return;
+
+    const packetId = Math.floor(Math.random() * 0xffffffff);
+    const data = create(Mesh.DataSchema, {
+      portnum: Portnums.PortNum.TEXT_MESSAGE_APP,
+      payload: new TextEncoder().encode(text),
+    });
+
+    const meshPacket = create(Mesh.MeshPacketSchema, {
+      id: packetId,
+      from: myNodeNum,
+      to: toNode,
+      channel: 0, // DMs typically use primary channel
+      wantAck: true,
+      payloadVariant: { case: "decoded", value: data },
+    });
+
+    const toRadio = create(Mesh.ToRadioSchema, {
+      payloadVariant: { case: "packet", value: meshPacket },
+    });
+
+    try {
+      const binary = toBinary(Mesh.ToRadioSchema, toRadio);
+      await transport.send(binary);
+
+      const msg: db.DbMessage = {
+        packetId,
+        fromNode: myNodeNum,
+        toNode,
+        channel: 0,
+        text,
+        timestamp: Math.floor(Date.now() / 1000),
+        status: "pending",
+      };
+      db.insertMessage(msg);
+      setMessages((prev) => [...prev, msg].slice(-100));
+      setDmInput("");
+    } catch {
+      showNotification("Failed to send DM");
+    }
+  }, [myNodeNum, transport, showNotification]);
+
+  // Start a DM conversation with a node (navigates to DM tab)
+  const startDMWith = useCallback((nodeNum: number) => {
+    // Check if conversation already exists
+    const existingIndex = dmConversations.findIndex(c => c.nodeNum === nodeNum);
+    if (existingIndex >= 0) {
+      setSelectedDMConvoIndex(existingIndex);
+    } else {
+      // Will be created when first message is sent
+      // For now, add a placeholder conversation
+      setDmConversations(prev => [{
+        nodeNum,
+        lastMessage: "",
+        lastTimestamp: Math.floor(Date.now() / 1000),
+        unreadCount: 0,
+      }, ...prev]);
+      setSelectedDMConvoIndex(0);
+    }
+    setSelectedDMMessageIndex(-1);
+    setDmInputFocused(true);
+    setMode("dm");
+  }, [dmConversations]);
+
   const sendTraceroute = useCallback(async (destNode: number, hopLimit?: number) => {
     if (!transport || !myNodeNum) return;
 
@@ -495,6 +716,114 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
     }
   }, [myNodeNum, transport, nodeStore, showNotification]);
 
+  const requestConfigSection = useCallback(async (section: ConfigSection) => {
+    if (!transport || !myNodeNum) return;
+    setConfigLoading(true);
+
+    const opts = { myNodeNum };
+
+    try {
+      let binary: Uint8Array | null = null;
+
+      switch (section) {
+        case "device":
+          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.DEVICE_CONFIG, opts);
+          break;
+        case "position":
+          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.POSITION_CONFIG, opts);
+          break;
+        case "power":
+          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.POWER_CONFIG, opts);
+          break;
+        case "network":
+          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.NETWORK_CONFIG, opts);
+          break;
+        case "display":
+          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.DISPLAY_CONFIG, opts);
+          break;
+        case "lora":
+          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.LORA_CONFIG, opts);
+          break;
+        case "bluetooth":
+          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.BLUETOOTH_CONFIG, opts);
+          break;
+        case "security":
+          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.SECURITY_CONFIG, opts);
+          break;
+        case "mqtt":
+          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.MQTT_CONFIG, opts);
+          break;
+        case "serial":
+          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.SERIAL_CONFIG, opts);
+          break;
+        case "extnotif":
+          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.EXTNOTIF_CONFIG, opts);
+          break;
+        case "storeforward":
+          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.STOREFORWARD_CONFIG, opts);
+          break;
+        case "rangetest":
+          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.RANGETEST_CONFIG, opts);
+          break;
+        case "telemetry":
+          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.TELEMETRY_CONFIG, opts);
+          break;
+        case "cannedmsg":
+          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.CANNEDMSG_CONFIG, opts);
+          break;
+        case "audio":
+          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.AUDIO_CONFIG, opts);
+          break;
+        case "remotehw":
+          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.REMOTEHARDWARE_CONFIG, opts);
+          break;
+        case "neighborinfo":
+          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.NEIGHBORINFO_CONFIG, opts);
+          break;
+        case "ambientlight":
+          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.AMBIENTLIGHTING_CONFIG, opts);
+          break;
+        case "detectionsensor":
+          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.DETECTIONSENSOR_CONFIG, opts);
+          break;
+        case "paxcounter":
+          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.PAXCOUNTER_CONFIG, opts);
+          break;
+        case "channels":
+          // Request all 8 channels
+          for (let i = 0; i < 8; i++) {
+            const chBinary = adminHelper.createGetChannelRequest(i, opts);
+            await transport.send(chBinary);
+          }
+          return;
+        case "user":
+          binary = adminHelper.createGetOwnerRequest(opts);
+          break;
+        default:
+          setConfigLoading(false);
+          return;
+      }
+
+      if (binary) {
+        await transport.send(binary);
+      }
+    } catch {
+      showNotification("Failed to request config");
+      setConfigLoading(false);
+    }
+  }, [myNodeNum, transport, showNotification]);
+
+  const sendRebootRequest = useCallback(async (seconds: number = 2) => {
+    if (!transport || !myNodeNum) return;
+    try {
+      const binary = adminHelper.createRebootRequest(seconds, { myNodeNum });
+      await transport.send(binary);
+      showNotification(`Rebooting device in ${seconds}s...`);
+    } catch {
+      showNotification("Failed to send reboot request");
+    }
+  }, [myNodeNum, transport, showNotification]);
+
   // Key input handling
   useInput((input, key) => {
     // If quit dialog is showing, it handles its own input
@@ -524,16 +853,23 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
       return;
     }
 
-    // Mode switching (allow in chat only when input not focused)
-    if (mode !== "chat" || !chatInputFocused) {
-      if (input === "1") { setMode("packets"); setChatInputFocused(false); return; }
-      if (input === "2") { setMode("nodes"); setChatInputFocused(false); return; }
+    // Mode switching (allow in chat/dm only when input not focused)
+    const inputFocused = (mode === "chat" && chatInputFocused) || (mode === "dm" && dmInputFocused);
+    if (!inputFocused) {
+      if (input === "1") { setMode("packets"); setChatInputFocused(false); setDmInputFocused(false); return; }
+      if (input === "2") { setMode("nodes"); setChatInputFocused(false); setDmInputFocused(false); return; }
       if (input === "3") { setMode("chat"); return; }
-      if (input === "4") { setMode("log"); setChatInputFocused(false); return; }
+      if (input === "4") { setMode("dm"); return; }
+      if (input === "5") { setMode("config"); setChatInputFocused(false); setDmInputFocused(false); return; }
+      if (input === "6") { setMode("log"); setChatInputFocused(false); setDmInputFocused(false); return; }
     }
     // Only treat bare escape (not escape sequences like Home/End) as tab switch
     const isBareEscape = key.escape && (input === "" || input === "\x1b");
     if (mode === "chat" && isBareEscape && !chatInputFocused && !showEmojiSelector) {
+      setMode("packets");
+      return;
+    }
+    if (mode === "dm" && isBareEscape && !dmInputFocused) {
       setMode("packets");
       return;
     }
@@ -649,7 +985,10 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
         sendTelemetryRequest(nodes[selectedNodeIndex].num);
       }
       if (input === "d" && nodes[selectedNodeIndex]) {
-        sendTraceroute(nodes[selectedNodeIndex].num, 0);
+        startDMWith(nodes[selectedNodeIndex].num);
+      }
+      if (input === "D" && nodes[selectedNodeIndex]) {
+        sendTraceroute(nodes[selectedNodeIndex].num, 0); // Direct ping
       }
       if (input === "l" && nodes[selectedNodeIndex]?.hwModel) {
         const hwName = Mesh.HardwareModel[nodes[selectedNodeIndex].hwModel!];
@@ -802,6 +1141,168 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
           setSelectedChatMessageIndex(-1);
           return;
         }
+        // 'd' to start DM with message sender
+        if (input === "d" && channelMessages[selectedChatMessageIndex]) {
+          const msg = channelMessages[selectedChatMessageIndex];
+          if (msg.fromNode !== myNodeNum) {
+            startDMWith(msg.fromNode);
+          }
+          return;
+        }
+      }
+    } else if (mode === "dm") {
+      const selectedConvo = dmConversations[selectedDMConvoIndex];
+
+      if (dmInputFocused) {
+        if (key.escape) {
+          setDmInputFocused(false);
+          return;
+        }
+        if (key.return && dmInput.trim() && selectedConvo) {
+          sendDM(dmInput, selectedConvo.nodeNum);
+          return;
+        }
+        if (key.backspace || key.delete) {
+          setDmInput((s) => s.slice(0, -1));
+          return;
+        }
+        if (input && !key.ctrl && !key.meta) {
+          setDmInput((s) => s + input);
+          return;
+        }
+        return;
+      }
+
+      // Message view navigation (when message selected)
+      if (selectedDMMessageIndex >= 0) {
+        if (input === "j" || key.downArrow) {
+          setSelectedDMMessageIndex((i) => Math.min(i + 1, dmMessages.length - 1));
+          return;
+        }
+        if (input === "k" || key.upArrow) {
+          setSelectedDMMessageIndex((i) => Math.max(i - 1, 0));
+          return;
+        }
+        if (key.escape) {
+          setSelectedDMMessageIndex(-1);
+          return;
+        }
+        if (key.return) {
+          setDmInputFocused(true);
+          setSelectedDMMessageIndex(-1);
+          return;
+        }
+        // Home/End
+        const isDmMsgHome = input === "g" || input === "\x1b[H" || input === "\x1b[1~" || input === "\x1bOH";
+        const isDmMsgEnd = input === "G" || input === "\x1b[F" || input === "\x1b[4~" || input === "\x1bOF";
+        if (isDmMsgHome) {
+          setSelectedDMMessageIndex(0);
+          return;
+        }
+        if (isDmMsgEnd) {
+          setSelectedDMMessageIndex(dmMessages.length - 1);
+          return;
+        }
+        // 'n' to go to node
+        if (input === "n" && dmMessages[selectedDMMessageIndex]) {
+          const msg = dmMessages[selectedDMMessageIndex];
+          const nodeIndex = nodes.findIndex((n) => n.num === msg.fromNode);
+          if (nodeIndex >= 0) {
+            setMode("nodes");
+            setSelectedNodeIndex(nodeIndex);
+          }
+          return;
+        }
+        return;
+      }
+
+      // Conversation list navigation
+      if (input === "j" || key.downArrow) {
+        setSelectedDMConvoIndex((i) => Math.min(i + 1, dmConversations.length - 1));
+        return;
+      }
+      if (input === "k" || key.upArrow) {
+        setSelectedDMConvoIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      // Home/End for conversation list
+      const isDmConvoHome = input === "g" || input === "\x1b[H" || input === "\x1b[1~" || input === "\x1bOH";
+      const isDmConvoEnd = input === "G" || input === "\x1b[F" || input === "\x1b[4~" || input === "\x1bOF";
+      if (isDmConvoHome) {
+        setSelectedDMConvoIndex(0);
+        return;
+      }
+      if (isDmConvoEnd) {
+        setSelectedDMConvoIndex(dmConversations.length - 1);
+        return;
+      }
+      // Enter to focus messages or input
+      if (key.return && selectedConvo) {
+        if (dmMessages.length > 0) {
+          setSelectedDMMessageIndex(dmMessages.length - 1);
+        } else {
+          setDmInputFocused(true);
+        }
+        return;
+      }
+      // 'n' to go to selected conversation's node
+      if (input === "n" && selectedConvo) {
+        const nodeIndex = nodes.findIndex((n) => n.num === selectedConvo.nodeNum);
+        if (nodeIndex >= 0) {
+          setMode("nodes");
+          setSelectedNodeIndex(nodeIndex);
+        }
+        return;
+      }
+    } else if (mode === "config") {
+      const menuCount = getMenuItemCount();
+
+      if (configSection === "menu") {
+        // Menu navigation
+        if (input === "j" || key.downArrow) {
+          setConfigMenuIndex((i) => Math.min(i + 1, menuCount - 1));
+          return;
+        }
+        if (input === "k" || key.upArrow) {
+          setConfigMenuIndex((i) => Math.max(i - 1, 0));
+          return;
+        }
+        // Home/End
+        const isConfigHome = input === "g" || input === "\x1b[H" || input === "\x1b[1~" || input === "\x1bOH";
+        const isConfigEnd = input === "G" || input === "\x1b[F" || input === "\x1b[4~" || input === "\x1bOF";
+        if (isConfigHome) {
+          setConfigMenuIndex(0);
+          return;
+        }
+        if (isConfigEnd) {
+          setConfigMenuIndex(menuCount - 1);
+          return;
+        }
+        // Enter to select section
+        if (key.return) {
+          const item = getMenuItemByIndex(configMenuIndex);
+          if (item) {
+            setConfigSection(item.key);
+            requestConfigSection(item.key);
+          }
+          return;
+        }
+        // 'r' for reboot
+        if (input === "r") {
+          sendRebootRequest(2);
+          return;
+        }
+      } else {
+        // In a config section - Escape to go back to menu
+        if (key.escape) {
+          setConfigSection("menu");
+          return;
+        }
+        // Enter to refresh the config
+        if (key.return) {
+          requestConfigSection(configSection);
+          return;
+        }
       }
     }
   });
@@ -813,6 +1314,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
     const p = mode === "packets";
     const n = mode === "nodes";
     const c = mode === "chat";
+    const d = mode === "dm";
+    const cfg = mode === "config";
     const l = mode === "log";
     return (
       <Text>
@@ -821,6 +1324,10 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
         <Text color={n ? theme.fg.accent : theme.fg.muted} bold={n}>[NODES]</Text>
         {" "}
         <Text color={c ? theme.fg.accent : theme.fg.muted} bold={c}>[CHAT]</Text>
+        {" "}
+        <Text color={d ? theme.fg.accent : theme.fg.muted} bold={d}>[DM]</Text>
+        {" "}
+        <Text color={cfg ? theme.fg.accent : theme.fg.muted} bold={cfg}>[CONFIG]</Text>
         {" "}
         <Text color={l ? theme.fg.accent : theme.fg.muted} bold={l}>[LOG]</Text>
       </Text>
@@ -926,6 +1433,60 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
               selectedMessageIndex={selectedChatMessageIndex}
               showEmojiSelector={showEmojiSelector}
               emojiSelectorIndex={emojiSelectorIndex}
+            />
+          </Box>
+        )}
+
+        {mode === "dm" && (() => {
+          const contentHeight = terminalHeight - 4;
+          return (
+            <Box height={contentHeight} borderStyle="single" borderColor={theme.border.normal}>
+              <DMPanel
+                conversations={dmConversations}
+                messages={dmMessages}
+                selectedConvoIndex={selectedDMConvoIndex}
+                selectedMessageIndex={selectedDMMessageIndex}
+                inputFocused={dmInputFocused}
+                input={dmInput}
+                nodeStore={nodeStore}
+                myNodeNum={myNodeNum}
+                height={contentHeight - 2}
+                width={terminalWidth}
+              />
+            </Box>
+          );
+        })()}
+
+        {mode === "config" && (
+          <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
+            <ConfigPanel
+              section={configSection}
+              selectedMenuIndex={configMenuIndex}
+              height={terminalHeight - 6}
+              loading={configLoading}
+              deviceConfig={deviceConfig}
+              positionConfig={positionConfig}
+              powerConfig={powerConfig}
+              networkConfig={networkConfig}
+              displayConfig={displayConfig}
+              loraConfig={loraConfig}
+              bluetoothConfig={bluetoothConfig}
+              securityConfig={securityConfig}
+              mqttConfig={mqttConfig}
+              serialConfig={serialConfig}
+              extNotifConfig={extNotifConfig}
+              storeForwardConfig={storeForwardConfig}
+              rangeTestConfig={rangeTestConfig}
+              telemetryConfig={telemetryConfig}
+              cannedMsgConfig={cannedMsgConfig}
+              audioConfig={audioConfig}
+              remoteHwConfig={remoteHwConfig}
+              neighborInfoConfig={neighborInfoConfig}
+              ambientLightConfig={ambientLightConfig}
+              detectionSensorConfig={detectionSensorConfig}
+              paxcounterConfig={paxcounterConfig}
+              channels={configChannels}
+              owner={configOwner}
             />
           </Box>
         )}

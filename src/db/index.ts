@@ -4,6 +4,7 @@ import { homedir } from "os";
 import { mkdirSync, existsSync, unlinkSync } from "fs";
 
 const DB_DIR = join(homedir(), ".config", "meshtastic-cli");
+const BROADCAST_ADDR = 0xFFFFFFFF;
 
 let db: Database;
 let currentSession = "default";
@@ -312,10 +313,11 @@ export function updateMessageStatus(packetId: number, status: MessageStatus) {
 }
 
 export function getMessages(channel?: number, limit = 100): DbMessage[] {
+  // Only get broadcast messages (channel chat), exclude DMs
   const query = channel !== undefined
-    ? db.query(`SELECT * FROM messages WHERE channel = ? ORDER BY timestamp DESC LIMIT ?`)
-    : db.query(`SELECT * FROM messages ORDER BY timestamp DESC LIMIT ?`);
-  const rows = (channel !== undefined ? query.all(channel, limit) : query.all(limit)) as any[];
+    ? db.query(`SELECT * FROM messages WHERE channel = ? AND to_node = ? ORDER BY timestamp DESC LIMIT ?`)
+    : db.query(`SELECT * FROM messages WHERE to_node = ? ORDER BY timestamp DESC LIMIT ?`);
+  const rows = (channel !== undefined ? query.all(channel, BROADCAST_ADDR, limit) : query.all(BROADCAST_ADDR, limit)) as any[];
   return rows.reverse().map((row) => ({
     id: row.id,
     packetId: row.packet_id,
@@ -491,4 +493,73 @@ export function getLogResponses(limit = 100): LogResponse[] {
   const all = [...positions, ...traceroutes];
   all.sort((a, b) => a.timestamp - b.timestamp);
   return all.slice(-limit);
+}
+
+// DM (Direct Message) queries
+// DMs are messages where to_node is NOT broadcast (0xFFFFFFFF)
+
+export interface DMConversation {
+  nodeNum: number;
+  lastMessage: string;
+  lastTimestamp: number;
+  unreadCount: number;
+}
+
+export function getDMConversations(myNodeNum: number): DMConversation[] {
+  // Get all unique nodes we've had DM conversations with
+  // A DM is either: to_node = myNodeNum (received) or from_node = myNodeNum AND to_node != broadcast (sent)
+  const rows = db.query(`
+    SELECT
+      CASE
+        WHEN from_node = ? THEN to_node
+        ELSE from_node
+      END as other_node,
+      text as last_message,
+      MAX(timestamp) as last_timestamp,
+      SUM(CASE WHEN from_node != ? AND status = 'received' THEN 1 ELSE 0 END) as unread_count
+    FROM messages
+    WHERE to_node != ?
+      AND (from_node = ? OR to_node = ?)
+    GROUP BY other_node
+    ORDER BY last_timestamp DESC
+  `).all(myNodeNum, myNodeNum, BROADCAST_ADDR, myNodeNum, myNodeNum) as any[];
+
+  return rows.map((row) => ({
+    nodeNum: row.other_node,
+    lastMessage: row.last_message,
+    lastTimestamp: row.last_timestamp,
+    unreadCount: row.unread_count,
+  }));
+}
+
+export function getDMMessages(myNodeNum: number, otherNodeNum: number, limit = 100): DbMessage[] {
+  // Get messages between myNodeNum and otherNodeNum (excluding broadcast)
+  const rows = db.query(`
+    SELECT * FROM messages
+    WHERE to_node != ?
+      AND ((from_node = ? AND to_node = ?) OR (from_node = ? AND to_node = ?))
+    ORDER BY timestamp DESC
+    LIMIT ?
+  `).all(BROADCAST_ADDR, myNodeNum, otherNodeNum, otherNodeNum, myNodeNum, limit) as any[];
+
+  return rows.reverse().map((row) => ({
+    id: row.id,
+    packetId: row.packet_id,
+    fromNode: row.from_node,
+    toNode: row.to_node,
+    channel: row.channel,
+    text: row.text,
+    timestamp: row.timestamp,
+    rxTime: row.rx_time,
+    rxSnr: row.rx_snr,
+    rxRssi: row.rx_rssi,
+    hopLimit: row.hop_limit,
+    hopStart: row.hop_start,
+    status: row.status as MessageStatus,
+  }));
+}
+
+export function markDMsAsRead(myNodeNum: number, otherNodeNum: number) {
+  // Mark received DMs from otherNodeNum as read (could add a 'read' status later)
+  // For now, we don't track read status separately from received
 }
