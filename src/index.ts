@@ -1,9 +1,43 @@
 import React from "react";
 import { render } from "ink";
+import { appendFileSync, mkdirSync, existsSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
 import { PacketStore, NodeStore } from "./protocol";
 import { App } from "./ui/App";
 import { initDb, clearDb, getDbPath } from "./db";
 import { getSetting, DEFAULT_MESHVIEW_URL } from "./settings";
+
+// Global error handler - append errors to log file
+const ERROR_LOG_DIR = join(homedir(), ".config", "meshtastic-cli");
+const ERROR_LOG_PATH = join(ERROR_LOG_DIR, "error.log");
+
+function logError(type: string, error: Error | unknown) {
+  try {
+    if (!existsSync(ERROR_LOG_DIR)) {
+      mkdirSync(ERROR_LOG_DIR, { recursive: true });
+    }
+    const timestamp = new Date().toISOString();
+    const message = error instanceof Error
+      ? `${error.message}\n${error.stack || ""}`
+      : String(error);
+    const entry = `\n[${timestamp}] ${type}\n${message}\n${"─".repeat(60)}\n`;
+    appendFileSync(ERROR_LOG_PATH, entry);
+  } catch {
+    // Ignore logging errors
+  }
+}
+
+process.on("uncaughtException", (error) => {
+  logError("UNCAUGHT EXCEPTION", error);
+  console.error("Fatal error:", error.message);
+  console.error(`Stack trace saved to ${ERROR_LOG_PATH}`);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  logError("UNHANDLED REJECTION", reason);
+});
 
 // Parse CLI arguments
 const args = process.argv.slice(2);
