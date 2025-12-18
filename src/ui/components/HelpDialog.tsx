@@ -80,15 +80,15 @@ const dmKeys = [
 ];
 
 const configKeys = [
+  { key: "h / l", desc: "Previous / Next column" },
   { key: "j / ↓", desc: "Next option" },
   { key: "k / ↑", desc: "Previous option" },
   { key: "g / G", desc: "First / Last option" },
   { key: "Enter", desc: "Select / Refresh" },
   { key: "Escape", desc: "Back to menu" },
   { key: "e / E", desc: "Edit field (User config)" },
-  { key: "b", desc: "Start batch edit mode" },
-  { key: "c", desc: "Commit batch edits" },
-  { key: "C", desc: "Cancel batch edits" },
+  { key: "c", desc: "Commit changes" },
+  { key: "C", desc: "Discard changes" },
   { key: "r", desc: "Reboot device" },
 ];
 
