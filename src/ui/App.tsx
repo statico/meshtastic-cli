@@ -137,9 +137,13 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
   const selectedPacketIndexRef = useRef(selectedPacketIndex);
   selectedPacketIndexRef.current = selectedPacketIndex;
 
+  // Keep a ref to processPacketForNodes so the subscription always uses the latest
+  const processPacketRef = useRef(processPacketForNodes);
+  processPacketRef.current = processPacketForNodes;
+
   useEffect(() => {
     const unsubscribe = packetStore.onPacket((packet) => {
-      processPacketForNodes(packet);
+      processPacketRef.current(packet);
       setPackets((prev) => {
         const next = [...prev, packet].slice(-5000);
         // Auto-scroll only if exactly at the last packet (not just near it)
