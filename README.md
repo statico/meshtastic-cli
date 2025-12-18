@@ -1,5 +1,10 @@
 # Meshtastic CLI
 
+[![Build](https://github.com/statico/meshtastic-cli/actions/workflows/build.yml/badge.svg)](https://github.com/statico/meshtastic-cli/actions/workflows/build.yml)
+[![Docker](https://github.com/statico/meshtastic-cli/actions/workflows/docker.yml/badge.svg)](https://github.com/statico/meshtastic-cli/actions/workflows/docker.yml)
+[![Release](https://img.shields.io/github/v/release/statico/meshtastic-cli)](https://github.com/statico/meshtastic-cli/releases)
+[![License](https://img.shields.io/github/license/statico/meshtastic-cli)](LICENSE)
+
 <table>
   <tr>
     <td>
