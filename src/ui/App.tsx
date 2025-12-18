@@ -44,11 +44,12 @@ interface AppProps {
   packetStore: PacketStore;
   nodeStore: NodeStore;
   skipConfig?: boolean;
+  skipNodes?: boolean;
   bruteForceDepth?: number;
   meshViewUrl?: string;
 }
 
-export function App({ address, packetStore, nodeStore, skipConfig = false, bruteForceDepth = 2, meshViewUrl }: AppProps) {
+export function App({ address, packetStore, nodeStore, skipConfig = false, skipNodes = false, bruteForceDepth = 2, meshViewUrl }: AppProps) {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const [transport, setTransport] = useState<Transport | null>(null);
@@ -551,7 +552,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
           if (output.status === "connected" && !configRequested) {
             configRequested = true;
             if (!skipConfig) {
-              requestConfig();
+              requestConfig(skipNodes);
             }
             fetchOwnerFallback();
           }
@@ -568,10 +569,17 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
     };
   }, [transport]);
 
-  const requestConfig = useCallback(async () => {
+  // Special nonce values from Meshtastic firmware (PhoneAPI.h)
+  // SPECIAL_NONCE_ONLY_CONFIG = 69420 - Skips node database, gets config only
+  // SPECIAL_NONCE_ONLY_NODES = 69421 - Gets only nodes, skips other config
+  const SPECIAL_NONCE_ONLY_CONFIG = 69420;
+
+  const requestConfig = useCallback(async (skipNodes: boolean = false) => {
     if (!transport) return;
+    // Use special nonce to skip node database if requested
+    const nonce = skipNodes ? SPECIAL_NONCE_ONLY_CONFIG : Math.floor(Math.random() * 0xffffffff);
     const toRadio = create(Mesh.ToRadioSchema, {
-      payloadVariant: { case: "wantConfigId", value: Math.floor(Math.random() * 0xffffffff) },
+      payloadVariant: { case: "wantConfigId", value: nonce },
     });
     try {
       const binary = toBinary(Mesh.ToRadioSchema, toRadio);

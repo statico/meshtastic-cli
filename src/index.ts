@@ -64,6 +64,7 @@ process.on("unhandledRejection", (reason) => {
 const args = process.argv.slice(2);
 let address = "192.168.0.123";
 let skipConfig = false;
+let skipNodes = false;
 let session = "default";
 let clearSession = false;
 let bruteForceDepth = 2;
@@ -73,6 +74,8 @@ for (let i = 0; i < args.length; i++) {
   const arg = args[i];
   if (arg === "--skip-config") {
     skipConfig = true;
+  } else if (arg === "--skip-nodes") {
+    skipNodes = true;
   } else if (arg === "--session" || arg === "-s") {
     session = args[++i] || "default";
   } else if (arg === "--clear") {
@@ -97,6 +100,8 @@ Options:
   --session, -s      Session name for database (default: default)
   --clear            Clear the database for the session and exit
   --skip-config      Skip loading device configuration on startup (faster connect)
+  --skip-nodes       Skip downloading node database on startup (much faster connect)
+                     Uses magic nonce 69420 to request config without nodes
   --brute-force, -b  Brute force depth for encrypted packets (0-4, default: 2)
                      0=disabled, 1=256 keys, 2=65K keys, 3=16M keys, 4=4B keys
   --meshview, -m     MeshView URL for packet/node links (default: from settings or disabled)
@@ -139,6 +144,7 @@ const { waitUntilExit } = render(
     packetStore,
     nodeStore,
     skipConfig,
+    skipNodes,
     bruteForceDepth,
     meshViewUrl: resolvedMeshViewUrl,
   })
