@@ -347,8 +347,8 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
       : "ENCRYPTED";
     const color = getPortColor(packet.portnum);
 
-    // Hop info
-    const hops = mp.hopStart != null && mp.hopLimit != null
+    // Hop info (only show for received packets with valid hop data)
+    const hops = mp.hopStart != null && mp.hopLimit != null && mp.hopStart > 0
       ? `(${mp.hopStart - mp.hopLimit}/${mp.hopStart})`
       : null;
 
