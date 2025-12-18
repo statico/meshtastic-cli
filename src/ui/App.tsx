@@ -1186,7 +1186,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     }
   }, [myNodeNum, transport, configOwner, showNotification, batchEditMode, batchEditCount]);
 
-  const saveChannel = useCallback(async (channelIndex: number, updates: { name?: string; role?: number }) => {
+  const saveChannel = useCallback(async (channelIndex: number, updates: { name?: string; role?: number; psk?: Uint8Array; uplinkEnabled?: boolean; downlinkEnabled?: boolean }) => {
     if (!transport || !myNodeNum) return;
     const channel = configChannels.find(c => c.index === channelIndex);
     if (!channel) return;
@@ -1198,6 +1198,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         settings: create(Mesh.ChannelSettingsSchema, {
           ...channel.settings,
           name: updates.name !== undefined ? updates.name : channel.settings?.name,
+          psk: updates.psk !== undefined ? updates.psk : channel.settings?.psk,
+          uplinkEnabled: updates.uplinkEnabled !== undefined ? updates.uplinkEnabled : channel.settings?.uplinkEnabled,
+          downlinkEnabled: updates.downlinkEnabled !== undefined ? updates.downlinkEnabled : channel.settings?.downlinkEnabled,
         }),
       });
       const binary = adminHelper.createSetChannelRequest(updatedChannel, { myNodeNum });
@@ -2000,11 +2003,35 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               setLocalMeshViewUrl(newUrl);
               showNotification(newUrl ? `MeshView URL set to ${newUrl}` : "MeshView URL cleared");
             } else if (configSection === "channels" && configEditing?.startsWith("channel")) {
-              // Save channel name - parse channel index from field key like "channel0_name"
-              const match = configEditing.match(/^channel(\d+)_name$/);
-              if (match) {
-                const channelIndex = parseInt(match[1], 10);
+              // Save channel settings - parse channel index from field key like "channel0_name" or "channel0_psk"
+              const nameMatch = configEditing.match(/^channel(\d+)_name$/);
+              const pskMatch = configEditing.match(/^channel(\d+)_psk$/);
+              if (nameMatch) {
+                const channelIndex = parseInt(nameMatch[1], 10);
                 saveChannel(channelIndex, { name: configEditValue });
+              } else if (pskMatch) {
+                const channelIndex = parseInt(pskMatch[1], 10);
+                // Parse base64 PSK
+                try {
+                  const trimmed = configEditValue.trim();
+                  if (trimmed === "" || trimmed === "0") {
+                    // Empty or "0" means unencrypted
+                    saveChannel(channelIndex, { psk: new Uint8Array([0]) });
+                  } else if (trimmed === "1" || trimmed.toLowerCase() === "default") {
+                    // "1" or "default" means default key
+                    saveChannel(channelIndex, { psk: new Uint8Array([1]) });
+                  } else {
+                    // Try to decode as base64
+                    const decoded = atob(trimmed);
+                    const psk = new Uint8Array(decoded.length);
+                    for (let i = 0; i < decoded.length; i++) {
+                      psk[i] = decoded.charCodeAt(i);
+                    }
+                    saveChannel(channelIndex, { psk });
+                  }
+                } catch {
+                  showNotification("Invalid base64 key");
+                }
               }
             }
             setConfigEditing(null);
@@ -2079,6 +2106,44 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               // Cycle: DISABLED(0) -> PRIMARY(1) -> SECONDARY(2) -> DISABLED(0)
               const nextRole = (channel.role + 1) % 3;
               saveChannel(channel.index, { role: nextRole });
+            }
+            return;
+          }
+          // 'p' to edit PSK
+          if (input === "p") {
+            const channel = validChannels[selectedChannelIndex];
+            if (channel) {
+              setConfigEditing(`channel${channel.index}_psk`);
+              // Show current PSK as base64
+              const psk = channel.settings?.psk;
+              if (psk && psk.length > 0 && !(psk.length === 1 && psk[0] === 0)) {
+                const binary = String.fromCharCode(...psk);
+                try {
+                  setConfigEditValue(btoa(binary));
+                } catch {
+                  setConfigEditValue("");
+                }
+              } else {
+                setConfigEditValue("");
+              }
+            }
+            return;
+          }
+          // 'u' to toggle uplink
+          if (input === "u") {
+            const channel = validChannels[selectedChannelIndex];
+            if (channel) {
+              const newValue = !channel.settings?.uplinkEnabled;
+              saveChannel(channel.index, { uplinkEnabled: newValue });
+            }
+            return;
+          }
+          // 'D' to toggle downlink (capital to avoid conflict with DM shortcut)
+          if (input === "D") {
+            const channel = validChannels[selectedChannelIndex];
+            if (channel) {
+              const newValue = !channel.settings?.downlinkEnabled;
+              saveChannel(channel.index, { downlinkEnabled: newValue });
             }
             return;
           }

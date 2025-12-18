@@ -800,7 +800,7 @@ function ChannelsConfigView({ channels, selectedIndex = 0, editingField, editVal
         <Box flexDirection="column" marginTop={1} borderStyle="single" borderColor={theme.border.normal} borderTop borderBottom={false} borderLeft={false} borderRight={false}>
           <Box marginBottom={1}>
             <Text color={theme.fg.accent} bold>Channel {selectedChannel.index}</Text>
-            <Text color={theme.fg.muted}> j/k=navigate e=edit name r=cycle role</Text>
+            <Text color={theme.fg.muted}> [e]name [r]role [p]psk [u]up [D]down</Text>
           </Box>
           <EditableConfigRow
             label="Name"
@@ -816,10 +816,14 @@ function ChannelsConfigView({ channels, selectedIndex = 0, editingField, editVal
               {Channel.Channel_Role[selectedChannel.role]}
             </Text>
           </Box>
-          <Box>
-            <Text color={theme.fg.muted}>{"Encryption".padEnd(24)}</Text>
-            <Text color={theme.packet.encrypted}>{formatPsk(selectedChannel.settings?.psk)}</Text>
-          </Box>
+          <EditableConfigRow
+            label="Encryption (base64)"
+            value={formatPsk(selectedChannel.settings?.psk)}
+            fieldKey={`channel${selectedChannel.index}_psk`}
+            editingField={editingField}
+            editValue={editValue}
+            hint=""
+          />
           <Box>
             <Text color={theme.fg.muted}>{"Uplink Enabled".padEnd(24)}</Text>
             <Text color={selectedChannel.settings?.uplinkEnabled ? theme.status.online : theme.fg.muted}>
