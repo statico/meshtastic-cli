@@ -288,6 +288,10 @@ export function getNodeName(num: number): string | null {
   return row.short_name || row.long_name || null;
 }
 
+export function deleteNode(num: number) {
+  db.run(`DELETE FROM nodes WHERE num = ?`, [num]);
+}
+
 export function insertMessage(msg: DbMessage) {
   db.run(`
     INSERT INTO messages (packet_id, from_node, to_node, channel, text, timestamp, rx_time, rx_snr, rx_rssi, hop_limit, hop_start, status)

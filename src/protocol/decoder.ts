@@ -1,5 +1,5 @@
 import { fromBinary } from "@bufbuild/protobuf";
-import { Mesh, Portnums, Telemetry, StoreForward } from "@meshtastic/protobufs";
+import { Mesh, Portnums, Telemetry, StoreForward, Admin } from "@meshtastic/protobufs";
 
 export interface DecodedPacket {
   id: number;
@@ -59,6 +59,12 @@ function decodePayload(portnum: Portnums.PortNum, payload: Uint8Array): unknown 
         return fromBinary(Mesh.RouteDiscoverySchema, payload);
       case Portnums.PortNum.STORE_FORWARD_APP:
         return fromBinary(StoreForward.StoreAndForwardSchema, payload);
+      case Portnums.PortNum.ADMIN_APP:
+        return fromBinary(Admin.AdminMessageSchema, payload);
+      case Portnums.PortNum.WAYPOINT_APP:
+        return fromBinary(Mesh.WaypointSchema, payload);
+      case Portnums.PortNum.NEIGHBORINFO_APP:
+        return fromBinary(Mesh.NeighborInfoSchema, payload);
       default:
         return payload;
     }

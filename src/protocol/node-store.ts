@@ -20,6 +20,7 @@ export interface NodeData {
   viaMqtt?: boolean;
   hopsAway?: number;
   isFavorite?: boolean;
+  isIgnored?: boolean;
 }
 
 type NodeListener = (nodes: NodeData[]) => void;
@@ -138,6 +139,18 @@ export class NodeStore {
 
   getNode(num: number): NodeData | undefined {
     return this.nodes.get(num);
+  }
+
+  removeNode(num: number) {
+    this.nodes.delete(num);
+    queueMicrotask(() => {
+      try {
+        db.deleteNode(num);
+      } catch {
+        // Ignore DB errors
+      }
+    });
+    this.emit();
   }
 
   getNodeName(num: number): string {

@@ -43,9 +43,10 @@ interface AppProps {
   nodeStore: NodeStore;
   skipConfig?: boolean;
   bruteForceDepth?: number;
+  meshViewUrl?: string;
 }
 
-export function App({ address, packetStore, nodeStore, skipConfig = false, bruteForceDepth = 2 }: AppProps) {
+export function App({ address, packetStore, nodeStore, skipConfig = false, bruteForceDepth = 2, meshViewUrl }: AppProps) {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const [transport, setTransport] = useState<Transport | null>(null);
@@ -762,6 +763,56 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
     }
   }, [myNodeNum, transport, nodeStore, showNotification]);
 
+  const removeNode = useCallback(async (nodeNum: number) => {
+    if (!transport || !myNodeNum) return;
+    try {
+      const binary = adminHelper.createRemoveNodeRequest(nodeNum, { myNodeNum });
+      await transport.send(binary);
+      // Remove from local state
+      setNodes((prev) => prev.filter((n) => n.num !== nodeNum));
+      nodeStore.removeNode(nodeNum);
+      showNotification(`Removed node ${nodeStore.getNodeName(nodeNum)}`);
+    } catch {
+      showNotification("Failed to remove node");
+    }
+  }, [myNodeNum, transport, nodeStore, showNotification]);
+
+  const toggleFavoriteNode = useCallback(async (nodeNum: number) => {
+    if (!transport || !myNodeNum) return;
+    const node = nodes.find((n) => n.num === nodeNum);
+    const isFavorite = node?.isFavorite;
+    try {
+      const binary = isFavorite
+        ? adminHelper.createRemoveFavoriteNodeRequest(nodeNum, { myNodeNum })
+        : adminHelper.createSetFavoriteNodeRequest(nodeNum, { myNodeNum });
+      await transport.send(binary);
+      setNodes((prev) =>
+        prev.map((n) => (n.num === nodeNum ? { ...n, isFavorite: !isFavorite } : n))
+      );
+      showNotification(`${isFavorite ? "Unfavorited" : "Favorited"} ${nodeStore.getNodeName(nodeNum)}`);
+    } catch {
+      showNotification("Failed to update favorite status");
+    }
+  }, [myNodeNum, transport, nodes, nodeStore, showNotification]);
+
+  const toggleIgnoredNode = useCallback(async (nodeNum: number) => {
+    if (!transport || !myNodeNum) return;
+    const node = nodes.find((n) => n.num === nodeNum);
+    const isIgnored = node?.isIgnored;
+    try {
+      const binary = isIgnored
+        ? adminHelper.createRemoveIgnoredNodeRequest(nodeNum, { myNodeNum })
+        : adminHelper.createSetIgnoredNodeRequest(nodeNum, { myNodeNum });
+      await transport.send(binary);
+      setNodes((prev) =>
+        prev.map((n) => (n.num === nodeNum ? { ...n, isIgnored: !isIgnored } : n))
+      );
+      showNotification(`${isIgnored ? "Unignored" : "Ignored"} ${nodeStore.getNodeName(nodeNum)}`);
+    } catch {
+      showNotification("Failed to update ignored status");
+    }
+  }, [myNodeNum, transport, nodes, nodeStore, showNotification]);
+
   const requestConfigSection = useCallback(async (section: ConfigSection) => {
     if (!transport || !myNodeNum) return;
     setConfigLoading(true);
@@ -1126,6 +1177,16 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
         } else {
           showNotification("No position data for this node");
         }
+      }
+      // Node management shortcuts
+      if (input === "x" && selectedNode && selectedNode.num !== myNodeNum) {
+        removeNode(selectedNode.num);
+      }
+      if (input === "f" && selectedNode) {
+        toggleFavoriteNode(selectedNode.num);
+      }
+      if (input === "i" && selectedNode && selectedNode.num !== myNodeNum) {
+        toggleIgnoredNode(selectedNode.num);
       }
     } else if (mode === "log") {
       if (input === "j" || key.downArrow) {
@@ -1610,7 +1671,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
                 />
               </Box>
               <Box height={detailHeight} borderStyle="single" borderColor={theme.border.normal}>
-                <PacketInspector packet={selectedPacket} activeTab={inspectorTab} height={detailHeight - 2} nodeStore={nodeStore} scrollOffset={inspectorScrollOffset} bruteForceDepth={bruteForceDepth} />
+                <PacketInspector packet={selectedPacket} activeTab={inspectorTab} height={detailHeight - 2} nodeStore={nodeStore} scrollOffset={inspectorScrollOffset} bruteForceDepth={bruteForceDepth} meshViewUrl={meshViewUrl} />
               </Box>
             </>
           );

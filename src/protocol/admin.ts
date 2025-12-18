@@ -158,6 +158,57 @@ export function createSetChannelRequest(
   return createAdminPacket(admin, { ...opts, wantResponse: false });
 }
 
+// Node management
+export function createRemoveNodeRequest(
+  nodeNum: number,
+  opts: AdminRequestOptions
+): Uint8Array {
+  const admin = create(Admin.AdminMessageSchema, {
+    payloadVariant: { case: "removeByNodenum", value: nodeNum },
+  });
+  return createAdminPacket(admin, { ...opts, wantResponse: false });
+}
+
+export function createSetFavoriteNodeRequest(
+  nodeNum: number,
+  opts: AdminRequestOptions
+): Uint8Array {
+  const admin = create(Admin.AdminMessageSchema, {
+    payloadVariant: { case: "setFavoriteNode", value: nodeNum },
+  });
+  return createAdminPacket(admin, { ...opts, wantResponse: false });
+}
+
+export function createRemoveFavoriteNodeRequest(
+  nodeNum: number,
+  opts: AdminRequestOptions
+): Uint8Array {
+  const admin = create(Admin.AdminMessageSchema, {
+    payloadVariant: { case: "removeFavoriteNode", value: nodeNum },
+  });
+  return createAdminPacket(admin, { ...opts, wantResponse: false });
+}
+
+export function createSetIgnoredNodeRequest(
+  nodeNum: number,
+  opts: AdminRequestOptions
+): Uint8Array {
+  const admin = create(Admin.AdminMessageSchema, {
+    payloadVariant: { case: "setIgnoredNode", value: nodeNum },
+  });
+  return createAdminPacket(admin, { ...opts, wantResponse: false });
+}
+
+export function createRemoveIgnoredNodeRequest(
+  nodeNum: number,
+  opts: AdminRequestOptions
+): Uint8Array {
+  const admin = create(Admin.AdminMessageSchema, {
+    payloadVariant: { case: "removeIgnoredNode", value: nodeNum },
+  });
+  return createAdminPacket(admin, { ...opts, wantResponse: false });
+}
+
 // Config type labels for display
 export const CONFIG_TYPE_LABELS: Record<ConfigType, string> = {
   [ConfigType.DEVICE_CONFIG]: "Device",

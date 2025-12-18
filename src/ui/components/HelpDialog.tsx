@@ -49,6 +49,9 @@ const nodeKeys = [
   { key: "D", desc: "Direct ping (hop=0)" },
   { key: "m", desc: "Open position in Maps" },
   { key: "l", desc: "Lookup hardware model" },
+  { key: "f", desc: "Toggle favorite" },
+  { key: "i", desc: "Toggle ignored" },
+  { key: "x", desc: "Remove node from DB" },
 ];
 
 const chatKeys = [

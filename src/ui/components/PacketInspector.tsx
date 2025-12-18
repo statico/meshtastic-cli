@@ -37,6 +37,7 @@ interface PacketInspectorProps {
   nodeStore: NodeStore;
   scrollOffset?: number;
   bruteForceDepth?: number;
+  meshViewUrl?: string;
 }
 
 type BruteForceStatus = "idle" | "running" | "found" | "not_found";
@@ -47,7 +48,7 @@ interface BruteForceState {
   result: DecryptResult | null;
 }
 
-export function PacketInspector({ packet, activeTab, height = 12, nodeStore, scrollOffset = 0, bruteForceDepth = 2 }: PacketInspectorProps) {
+export function PacketInspector({ packet, activeTab, height = 12, nodeStore, scrollOffset = 0, bruteForceDepth = 2, meshViewUrl }: PacketInspectorProps) {
   const [bruteForce, setBruteForce] = useState<BruteForceState>({
     status: "idle",
     progress: null,
@@ -150,6 +151,7 @@ export function PacketInspector({ packet, activeTab, height = 12, nodeStore, scr
           scrollOffset={scrollOffset}
           bruteForce={bruteForce}
           spinnerFrame={spinnerFrame}
+          meshViewUrl={meshViewUrl}
         />
       )}
       {activeTab === "json" && <JsonView packet={packet} height={height - 2} scrollOffset={scrollOffset} />}
@@ -185,27 +187,43 @@ function TabBar({ activeTab, scrollOffset = 0 }: { activeTab: InspectorTab; scro
 }
 
 // === INFO VIEW ===
-function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinnerFrame }: {
+function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinnerFrame, meshViewUrl }: {
   packet: DecodedPacket;
   nodeStore: NodeStore;
   height: number;
   scrollOffset: number;
   bruteForce?: BruteForceState;
   spinnerFrame?: number;
+  meshViewUrl?: string;
 }) {
   const mp = packet.meshPacket;
   const fr = packet.fromRadio;
   const lines: React.ReactNode[] = [];
 
-  // Header line
+  // Header line with global packet ID
+  const globalId = mp?.id;
   lines.push(
     <Box key="header">
       <Text color={theme.fg.muted}>Time: </Text>
       <Text color={theme.fg.primary}>{packet.timestamp.toLocaleTimeString()}</Text>
-      <Text color={theme.fg.muted}>  ID: </Text>
-      <Text color={theme.fg.secondary}>{packet.id}</Text>
+      {globalId !== undefined && globalId !== 0 && (
+        <>
+          <Text color={theme.fg.muted}>  Packet ID: </Text>
+          <Text color={theme.data.channel}>{globalId}</Text>
+        </>
+      )}
     </Box>
   );
+
+  // MeshView link if configured and we have a global ID
+  if (meshViewUrl && globalId && globalId !== 0) {
+    lines.push(
+      <Box key="meshview">
+        <Text color={theme.fg.muted}>MeshView: </Text>
+        <Text color={theme.fg.accent}>{meshViewUrl}/packet/{globalId}</Text>
+      </Box>
+    );
+  }
 
   // MeshPacket info
   if (mp) {
@@ -591,6 +609,64 @@ function renderPayloadDetails(packet: DecodedPacket, nodeStore: NodeStore): Reac
     return lines.length > 0 ? lines : null;
   }
 
+  // Waypoint
+  if (packet.portnum === Portnums.PortNum.WAYPOINT_APP) {
+    const wp = packet.payload as {
+      id?: number;
+      name?: string;
+      description?: string;
+      latitudeI?: number;
+      longitudeI?: number;
+      expire?: number;
+      icon?: number;
+      lockedTo?: number;
+    };
+    if (wp.name) {
+      lines.push(
+        <Box key="wp-name">
+          <Text color={theme.fg.muted}>Waypoint: </Text>
+          <Text color={theme.fg.accent} bold>{wp.name}</Text>
+        </Box>
+      );
+    }
+    if (wp.description) {
+      lines.push(
+        <Box key="wp-desc">
+          <Text color={theme.fg.muted}>Description: </Text>
+          <Text color={theme.fg.primary}>{wp.description}</Text>
+        </Box>
+      );
+    }
+    if (wp.latitudeI != null && wp.longitudeI != null) {
+      const lat = wp.latitudeI / 1e7;
+      const lon = wp.longitudeI / 1e7;
+      lines.push(
+        <Box key="wp-pos">
+          <Text color={theme.fg.muted}>Position: </Text>
+          <Text color={theme.data.coords}>{lat.toFixed(6)}, {lon.toFixed(6)}</Text>
+        </Box>
+      );
+    }
+    if (wp.expire) {
+      const expireDate = new Date(wp.expire * 1000);
+      lines.push(
+        <Box key="wp-expire">
+          <Text color={theme.fg.muted}>Expires: </Text>
+          <Text color={theme.fg.secondary}>{expireDate.toLocaleString()}</Text>
+        </Box>
+      );
+    }
+    if (wp.icon) {
+      lines.push(
+        <Box key="wp-icon">
+          <Text color={theme.fg.muted}>Icon: </Text>
+          <Text color={theme.fg.primary}>{wp.icon}</Text>
+        </Box>
+      );
+    }
+    return lines.length > 0 ? lines : null;
+  }
+
   // Neighbor info
   if (packet.portnum === Portnums.PortNum.NEIGHBORINFO_APP) {
     const ni = packet.payload as { nodeId?: number; neighbors?: { nodeId?: number; snr?: number }[] };
@@ -803,9 +879,9 @@ function renderFromRadioDetails(fr: Mesh.FromRadio): React.ReactNode[] | null {
               <Text color={configValue.gpsEnabled ? theme.status.online : theme.fg.muted}>
                 {configValue.gpsEnabled ? "enabled" : "disabled"}
               </Text>
-              {"fixedPosition" in configValue && configValue.fixedPosition && (
+              {"fixedPosition" in configValue && configValue.fixedPosition ? (
                 <Text color={theme.fg.secondary}> [fixed]</Text>
-              )}
+              ) : null}
             </Box>
           );
         }
@@ -841,12 +917,12 @@ function renderFromRadioDetails(fr: Mesh.FromRadio): React.ReactNode[] | null {
         if (configCase === "mqtt" && isEnabled) {
           lines.push(
             <Box key="mqtt">
-              {"address" in moduleValue && moduleValue.address && (
+              {"address" in moduleValue && moduleValue.address ? (
                 <>
                   <Text color={theme.fg.muted}>Server: </Text>
                   <Text color={theme.fg.primary}>{moduleValue.address as string}</Text>
                 </>
-              )}
+              ) : null}
             </Box>
           );
         } else if (configCase === "serial" && isEnabled) {
