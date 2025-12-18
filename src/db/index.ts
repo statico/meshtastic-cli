@@ -77,6 +77,37 @@ db.run(`CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel)`);
 db.run(`CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp)`);
 db.run(`CREATE INDEX IF NOT EXISTS idx_packets_timestamp ON packets(timestamp)`);
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS position_responses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    packet_id INTEGER,
+    from_node INTEGER,
+    requested_by INTEGER,
+    latitude_i INTEGER,
+    longitude_i INTEGER,
+    altitude INTEGER,
+    sats_in_view INTEGER,
+    timestamp INTEGER
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS traceroute_responses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    packet_id INTEGER,
+    from_node INTEGER,
+    requested_by INTEGER,
+    route TEXT,
+    snr_towards TEXT,
+    snr_back TEXT,
+    hop_limit INTEGER,
+    timestamp INTEGER
+  )
+`);
+
+db.run(`CREATE INDEX IF NOT EXISTS idx_position_responses_timestamp ON position_responses(timestamp)`);
+db.run(`CREATE INDEX IF NOT EXISTS idx_traceroute_responses_timestamp ON traceroute_responses(timestamp)`);
+
 export interface DbNode {
   num: number;
   userId?: string;
@@ -313,6 +344,105 @@ export function prunePackets(maxPackets = 1000) {
 
 export function getPacketCount(): number {
   return (db.query(`SELECT COUNT(*) as count FROM packets`).get() as any).count;
+}
+
+// Position and Traceroute response types
+
+export interface DbPositionResponse {
+  id?: number;
+  packetId: number;
+  fromNode: number;
+  requestedBy: number;
+  latitudeI?: number;
+  longitudeI?: number;
+  altitude?: number;
+  satsInView?: number;
+  timestamp: number;
+}
+
+export interface DbTracerouteResponse {
+  id?: number;
+  packetId: number;
+  fromNode: number;
+  requestedBy: number;
+  route: number[];
+  snrTowards?: number[];
+  snrBack?: number[];
+  hopLimit: number;
+  timestamp: number;
+}
+
+export type LogResponse = DbPositionResponse | DbTracerouteResponse;
+
+export function insertPositionResponse(response: DbPositionResponse) {
+  db.run(`
+    INSERT INTO position_responses (packet_id, from_node, requested_by, latitude_i, longitude_i, altitude, sats_in_view, timestamp)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    response.packetId,
+    response.fromNode,
+    response.requestedBy,
+    response.latitudeI ?? null,
+    response.longitudeI ?? null,
+    response.altitude ?? null,
+    response.satsInView ?? null,
+    response.timestamp,
+  ]);
+}
+
+export function insertTracerouteResponse(response: DbTracerouteResponse) {
+  db.run(`
+    INSERT INTO traceroute_responses (packet_id, from_node, requested_by, route, snr_towards, snr_back, hop_limit, timestamp)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    response.packetId,
+    response.fromNode,
+    response.requestedBy,
+    JSON.stringify(response.route),
+    response.snrTowards ? JSON.stringify(response.snrTowards) : null,
+    response.snrBack ? JSON.stringify(response.snrBack) : null,
+    response.hopLimit,
+    response.timestamp,
+  ]);
+}
+
+export function getPositionResponses(limit = 100): DbPositionResponse[] {
+  const rows = db.query(`SELECT * FROM position_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as any[];
+  return rows.reverse().map((row) => ({
+    id: row.id,
+    packetId: row.packet_id,
+    fromNode: row.from_node,
+    requestedBy: row.requested_by,
+    latitudeI: row.latitude_i,
+    longitudeI: row.longitude_i,
+    altitude: row.altitude,
+    satsInView: row.sats_in_view,
+    timestamp: row.timestamp,
+  }));
+}
+
+export function getTracerouteResponses(limit = 100): DbTracerouteResponse[] {
+  const rows = db.query(`SELECT * FROM traceroute_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as any[];
+  return rows.reverse().map((row) => ({
+    id: row.id,
+    packetId: row.packet_id,
+    fromNode: row.from_node,
+    requestedBy: row.requested_by,
+    route: JSON.parse(row.route || "[]"),
+    snrTowards: row.snr_towards ? JSON.parse(row.snr_towards) : undefined,
+    snrBack: row.snr_back ? JSON.parse(row.snr_back) : undefined,
+    hopLimit: row.hop_limit,
+    timestamp: row.timestamp,
+  }));
+}
+
+export function getLogResponses(limit = 100): LogResponse[] {
+  const positions = getPositionResponses(limit);
+  const traceroutes = getTracerouteResponses(limit);
+  // Merge and sort by timestamp
+  const all = [...positions, ...traceroutes];
+  all.sort((a, b) => a.timestamp - b.timestamp);
+  return all.slice(-limit);
 }
 
 export { db };
