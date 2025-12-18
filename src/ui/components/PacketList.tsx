@@ -358,8 +358,8 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
           const encrypted = mp.payloadVariant.value as Uint8Array;
           return (
             <>
-              <Text color={theme.fg.muted}> ch:{mp.channel}</Text>
-              <Text color={theme.fg.muted}> {encrypted.length}B</Text>
+              <Text color={theme.data.channel}> ch:{mp.channel}</Text>
+              <Text color={theme.fg.secondary}> {encrypted.length}B</Text>
             </>
           );
         })()
