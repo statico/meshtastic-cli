@@ -116,9 +116,8 @@ export function DMPanel({
 
         {/* Conversation list */}
         {conversations.length === 0 ? (
-          <Box paddingX={1} flexDirection="column">
-            <Text color={theme.fg.muted}>No DMs</Text>
-            <Text color={theme.fg.secondary}>'d' on node</Text>
+          <Box paddingX={1}>
+            <Text color={theme.fg.muted}>-</Text>
           </Box>
         ) : (
           visibleConvos.map((convo, i) => {
