@@ -1317,6 +1317,19 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
         }
         setMode("nodes");
       }
+      // 'n' to jump to sender node without leaving packet view
+      if (input === "n" && selectedPacket?.meshPacket) {
+        const fromNode = selectedPacket.meshPacket.from;
+        const nodeIndex = nodes.findIndex(n => n.num === fromNode);
+        if (nodeIndex >= 0) {
+          setSelectedNodeIndex(nodeIndex);
+        }
+        setMode("nodes");
+      }
+      // 'u' to update sender node from MeshView
+      if (input === "u" && selectedPacket?.meshPacket) {
+        fetchNodeFromMeshView(selectedPacket.meshPacket.from);
+      }
     } else if (mode === "nodes") {
       // Compute filtered nodes for length checks
       const filteredNodes = nodesFilter
@@ -1843,6 +1856,10 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
           const item = getMenuItemByIndex(configMenuIndex);
           if (item) {
             setConfigSection(item.key);
+            // Reset channel index when entering channels section
+            if (item.key === "channels") {
+              setSelectedChannelIndex(0);
+            }
             requestConfigSection(item.key);
           }
           return;

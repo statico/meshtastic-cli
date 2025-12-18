@@ -28,7 +28,8 @@ const packetKeys = [
   { key: "Space / b", desc: "Scroll inspector" },
   { key: "+ / -", desc: "Resize inspector" },
   { key: "m", desc: "Open position in Maps" },
-  { key: "Enter", desc: "Jump to node" },
+  { key: "n / Enter", desc: "Jump to sender node" },
+  { key: "u", desc: "Update node from MeshView" },
 ];
 
 const nodeKeys = [

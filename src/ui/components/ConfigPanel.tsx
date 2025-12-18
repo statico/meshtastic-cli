@@ -732,32 +732,62 @@ function ChannelsConfigView({ channels, selectedIndex = 0, editingField, editVal
 
   if (validChannels.length === 0) return <NoConfigLoaded />;
 
-  const selectedChannel = validChannels[selectedIndex];
+  // Clamp selectedIndex to valid range
+  const clampedIndex = Math.min(selectedIndex, validChannels.length - 1);
+  const selectedChannel = validChannels[clampedIndex];
   const roleNames = ["DISABLED", "PRIMARY", "SECONDARY"];
+
+  // Format PSK for display
+  const formatPsk = (psk?: Uint8Array): string => {
+    if (!psk || psk.length === 0) return "None (unencrypted)";
+    if (psk.length === 1) {
+      if (psk[0] === 0) return "None (unencrypted)";
+      if (psk[0] === 1) return "Default key";
+      if (psk[0] >= 2 && psk[0] <= 10) return `Simple key ${psk[0] - 1}`;
+    }
+    // Show hex for custom keys
+    const hex = Array.from(psk).map(b => b.toString(16).padStart(2, "0")).join("");
+    if (hex.length > 32) return hex.slice(0, 32) + "...";
+    return hex;
+  };
+
+  // Format PSK as base64 for QR codes
+  const formatPskBase64 = (psk?: Uint8Array): string => {
+    if (!psk || psk.length === 0) return "";
+    // Use btoa-compatible encoding
+    const binary = String.fromCharCode(...psk);
+    try {
+      return btoa(binary);
+    } catch {
+      return "";
+    }
+  };
 
   return (
     <Box flexDirection="column">
       {/* Channel list */}
       {validChannels.map((ch, i) => {
-        const isSelected = i === selectedIndex;
+        const isSelected = i === clampedIndex;
         const roleName = Channel.Channel_Role[ch.role] || "UNKNOWN";
-        const name = ch.settings?.name || (ch.index === 0 ? "Primary" : `Channel ${ch.index}`);
+        const name = ch.settings?.name || (ch.index === 0 ? "Primary" : `Ch ${ch.index}`);
+        const roleColor = ch.role === 0 ? theme.fg.muted : ch.role === 1 ? theme.status.online : theme.packet.telemetry;
         return (
           <Box key={ch.index} backgroundColor={isSelected ? theme.bg.selected : undefined}>
             <Text color={isSelected ? theme.fg.accent : theme.fg.muted}>{isSelected ? "► " : "  "}</Text>
             <Text color={theme.fg.accent} bold>{`${ch.index}`.padEnd(3)}</Text>
-            <Text color={theme.fg.primary}>{name.padEnd(16)}</Text>
-            <Text color={theme.fg.muted}>{roleName}</Text>
+            <Text color={ch.role === 0 ? theme.fg.muted : theme.fg.primary}>{name.padEnd(16)}</Text>
+            <Text color={roleColor}>{roleName.padEnd(12)}</Text>
+            <Text color={theme.fg.muted}>{ch.settings?.psk?.length ? `${ch.settings.psk.length}B key` : "default"}</Text>
           </Box>
         );
       })}
 
       {/* Selected channel details */}
       {selectedChannel && (
-        <Box flexDirection="column" marginTop={1} paddingLeft={2} borderStyle="single" borderColor={theme.border.normal} borderTop borderBottom={false} borderLeft={false} borderRight={false}>
+        <Box flexDirection="column" marginTop={1} borderStyle="single" borderColor={theme.border.normal} borderTop borderBottom={false} borderLeft={false} borderRight={false}>
           <Box marginBottom={1}>
-            <Text color={theme.fg.accent} bold>Channel {selectedChannel.index} Settings</Text>
-            <Text color={theme.fg.muted}> (j/k to select, e to edit name, r to change role)</Text>
+            <Text color={theme.fg.accent} bold>Channel {selectedChannel.index}</Text>
+            <Text color={theme.fg.muted}> j/k=navigate e=edit name r=cycle role</Text>
           </Box>
           <EditableConfigRow
             label="Name"
@@ -765,17 +795,36 @@ function ChannelsConfigView({ channels, selectedIndex = 0, editingField, editVal
             fieldKey={`channel${selectedChannel.index}_name`}
             editingField={editingField}
             editValue={editValue}
-            hint="(e to edit)"
+            hint=""
           />
           <Box>
             <Text color={theme.fg.muted}>{"Role".padEnd(24)}</Text>
-            <Text color={theme.fg.accent}>{Channel.Channel_Role[selectedChannel.role]}</Text>
-            <Text color={theme.fg.muted}> (r to cycle: {roleNames.join(" → ")})</Text>
+            <Text color={selectedChannel.role === 0 ? theme.fg.muted : selectedChannel.role === 1 ? theme.status.online : theme.packet.telemetry}>
+              {Channel.Channel_Role[selectedChannel.role]}
+            </Text>
           </Box>
-          <ConfigRow
-            label="PSK"
-            value={selectedChannel.settings?.psk?.length ? `${selectedChannel.settings.psk.length} bytes` : "Default (AQ==)"}
-          />
+          <Box>
+            <Text color={theme.fg.muted}>{"Encryption".padEnd(24)}</Text>
+            <Text color={theme.packet.encrypted}>{formatPsk(selectedChannel.settings?.psk)}</Text>
+          </Box>
+          {selectedChannel.settings?.psk && selectedChannel.settings.psk.length > 1 && (
+            <Box>
+              <Text color={theme.fg.muted}>{"PSK (base64)".padEnd(24)}</Text>
+              <Text color={theme.fg.secondary}>{formatPskBase64(selectedChannel.settings.psk)}</Text>
+            </Box>
+          )}
+          <Box>
+            <Text color={theme.fg.muted}>{"Uplink Enabled".padEnd(24)}</Text>
+            <Text color={selectedChannel.settings?.uplinkEnabled ? theme.status.online : theme.fg.muted}>
+              {selectedChannel.settings?.uplinkEnabled ? "Yes" : "No"}
+            </Text>
+          </Box>
+          <Box>
+            <Text color={theme.fg.muted}>{"Downlink Enabled".padEnd(24)}</Text>
+            <Text color={selectedChannel.settings?.downlinkEnabled ? theme.status.online : theme.fg.muted}>
+              {selectedChannel.settings?.downlinkEnabled ? "Yes" : "No"}
+            </Text>
+          </Box>
         </Box>
       )}
     </Box>
