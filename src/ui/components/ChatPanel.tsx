@@ -99,7 +99,8 @@ export function ChatPanel({
   const filterRowHeight = (hasFilter || filterInputActive) ? 1 : 0;
 
   // Filter messages by text content or sender name
-  const channelMessages = messages.filter((m) => m.channel === channel);
+  // Filter for channel messages (broadcast, not DMs)
+  const channelMessages = messages.filter((m) => m.channel === channel && m.toNode === 0xffffffff);
   const filteredMessages = hasFilter
     ? channelMessages.filter(m => {
         const senderName = nodeStore.getNodeName(m.fromNode).toLowerCase();
