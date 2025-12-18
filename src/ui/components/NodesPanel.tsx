@@ -405,6 +405,8 @@ const ROLE_NAMES: Record<number, string> = {
   8: "HIDDEN",
   9: "L&F",
   10: "TAK_TRK",
+  11: "RTR_LATE",
+  12: "CLI_BASE",
 };
 
 // Single character role codes for compact display
@@ -412,14 +414,16 @@ const ROLE_CHARS: Record<number, string> = {
   0: "C",  // Client
   1: "M",  // Mute
   2: "R",  // Router
-  3: "r",  // Router_Client
-  4: "P",  // Repeater
+  3: "r",  // Router_Client (deprecated)
+  4: "P",  // Repeater (deprecated)
   5: "T",  // Tracker
   6: "S",  // Sensor
   7: "K",  // TAK
   8: "H",  // Hidden
   9: "L",  // Lost & Found
   10: "t", // TAK_Tracker
+  11: "D", // Router_Late (delayed)
+  12: "B", // Client_Base
 };
 
 function formatRole(role?: number | null): string {
@@ -429,13 +433,13 @@ function formatRole(role?: number | null): string {
 
 function formatRoleChar(role?: number | null): string {
   if (role == null) return "-";
-  return ROLE_CHARS[role] || `${role}`;
+  return ROLE_CHARS[role] || "?";
 }
 
 function getRoleColor(role?: number | null): string {
   if (role == null) return theme.fg.muted;
-  // Router/Repeater = infrastructure = purple (like nodeinfo)
-  if (role === 2 || role === 4) return theme.packet.nodeinfo;
+  // Router/Repeater/RouterLate = infrastructure = purple (like nodeinfo)
+  if (role === 2 || role === 4 || role === 11) return theme.packet.nodeinfo;
   // Tracker = cyan (like position)
   if (role === 5) return theme.packet.position;
   // Sensor = orange (like telemetry)
@@ -444,6 +448,6 @@ function getRoleColor(role?: number | null): string {
   if (role === 7 || role === 10) return theme.packet.telemetry;
   // Mute/Hidden = gray (like routing)
   if (role === 1 || role === 8) return theme.packet.routing;
-  // Client (default) = green (like message)
+  // Client/ClientBase (default) = green (like message)
   return theme.packet.message;
 }

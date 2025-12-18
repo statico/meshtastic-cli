@@ -282,6 +282,7 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth }: Messag
 const ROLE_NAMES: Record<number, string> = {
   0: "CLIENT", 1: "MUTE", 2: "ROUTER", 3: "RTR_CLI", 4: "REPEAT",
   5: "TRACKER", 6: "SENSOR", 7: "TAK", 8: "HIDDEN", 9: "L&F", 10: "TAK_TRK",
+  11: "RTR_LATE", 12: "CLI_BASE",
 };
 
 function formatRole(role?: number | null): string {
@@ -291,11 +292,11 @@ function formatRole(role?: number | null): string {
 
 function getRoleColor(role?: number | null): string {
   if (role == null) return theme.fg.muted;
-  if (role === 2 || role === 4) return theme.packet.nodeinfo; // Router/Repeater = purple
+  if (role === 2 || role === 4 || role === 11) return theme.packet.nodeinfo; // Router/Repeater/RouterLate = purple
   if (role === 5) return theme.packet.position; // Tracker = cyan
   if (role === 6 || role === 7 || role === 10) return theme.packet.telemetry; // Sensor/TAK = orange
   if (role === 1 || role === 8) return theme.packet.routing; // Mute/Hidden = gray
-  return theme.packet.message; // Client = green
+  return theme.packet.message; // Client/ClientBase = green
 }
 
 function formatLastHeard(timestamp?: number): string {
