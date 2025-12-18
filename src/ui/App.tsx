@@ -18,6 +18,7 @@ import { HelpDialog } from "./components/HelpDialog";
 import { QuitDialog } from "./components/QuitDialog";
 import { ResponseModal } from "./components/ResponseModal";
 import { LogPanel } from "./components/LogPanel";
+import { RebootModal } from "./components/RebootModal";
 import * as db from "../db";
 import { toBinary, create } from "@bufbuild/protobuf";
 import { formatNodeId } from "../utils/hex";
@@ -73,6 +74,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [connectError, setConnectError] = useState<string | null>(null);
 
+  // Reboot modal state
+  const [showRebootModal, setShowRebootModal] = useState(false);
+  const [rebootReason, setRebootReason] = useState("");
+  const [rebootElapsed, setRebootElapsed] = useState(0);
+
   // Spinner animation
   useEffect(() => {
     if (status === "connecting") {
@@ -118,6 +124,24 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
   useEffect(() => {
     setInspectorScrollOffset(0);
   }, [selectedPacketIndex, inspectorTab]);
+
+  // Reboot modal elapsed time tracker
+  useEffect(() => {
+    if (!showRebootModal) return;
+    const interval = setInterval(() => {
+      setRebootElapsed(e => e + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showRebootModal]);
+
+  // Auto-dismiss reboot modal when connection is restored
+  useEffect(() => {
+    if (showRebootModal && status === "connected") {
+      setShowRebootModal(false);
+      setRebootElapsed(0);
+      setRebootReason("");
+    }
+  }, [showRebootModal, status]);
 
   const [myNodeNum, setMyNodeNum] = useState(0);
   const [myShortName, setMyShortName] = useState("");
@@ -835,12 +859,14 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
     }
   }, [myNodeNum, transport, showNotification]);
 
-  const sendRebootRequest = useCallback(async (seconds: number = 2) => {
+  const sendRebootRequest = useCallback(async (seconds: number = 2, reason: string = "Manual reboot") => {
     if (!transport || !myNodeNum) return;
     try {
       const binary = adminHelper.createRebootRequest(seconds, { myNodeNum });
       await transport.send(binary);
-      showNotification(`Rebooting device in ${seconds}s...`);
+      setRebootReason(reason);
+      setRebootElapsed(0);
+      setShowRebootModal(true);
     } catch {
       showNotification("Failed to send reboot request");
     }
@@ -888,6 +914,14 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
     // Close help on any key if open
     if (showHelp) {
       setShowHelp(false);
+      return;
+    }
+
+    // Dismiss reboot modal on any key if timed out
+    if (showRebootModal && rebootElapsed >= 60) {
+      setShowRebootModal(false);
+      setRebootElapsed(0);
+      setRebootReason("");
       return;
     }
 
@@ -1758,6 +1792,24 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
               setShowResponseModal(false);
               setResponseModalData(null);
             }}
+          />
+        </Box>
+      )}
+
+      {/* Reboot modal overlay */}
+      {showRebootModal && (
+        <Box
+          position="absolute"
+          flexDirection="column"
+          justifyContent="center"
+          alignItems="center"
+          width="100%"
+          height="100%"
+        >
+          <RebootModal
+            reason={rebootReason}
+            elapsed={rebootElapsed}
+            timeout={60}
           />
         </Box>
       )}
