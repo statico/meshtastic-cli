@@ -1,5 +1,24 @@
 # Meshtastic CLI
 
+<table>
+  <tr>
+    <td>
+      <img width="945" height="801" alt="4" src="https://github.com/user-attachments/assets/460645ad-abca-4c64-a5a7-00efd0c96de2" />
+    </td>
+    <td>
+      <img width="945" height="801" alt="3" src="https://github.com/user-attachments/assets/b329736b-45f3-465e-8a11-a58cb0013744" />
+    </td> 
+  </tr>
+  <tr>
+    <td>
+      <img width="945" height="801" alt="2" src="https://github.com/user-attachments/assets/250c3e9b-e58f-48b7-8e38-5a142d362a4d" />
+    </td>
+    <td>
+      <img width="945" height="801" alt="1" src="https://github.com/user-attachments/assets/51d5dab7-4b50-4d1e-8d92-21502ac32be7" />
+    </td>
+  </tr>
+</table>
+
 > [!WARNING]
 > This project was completely vibe-coded with [Claude Code](https://claude.com/claude-code). Use at your own risk.
 
