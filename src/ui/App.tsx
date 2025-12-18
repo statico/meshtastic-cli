@@ -516,6 +516,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
   const processPacketRef = useRef(processPacketForNodes);
   processPacketRef.current = processPacketForNodes;
 
+  // MeshView cache (5 second TTL)
+  const meshViewCacheRef = useRef<{ data: any[]; timestamp: number } | null>(null);
+
   useEffect(() => {
     const unsubscribe = packetStore.onPacket((packet) => {
       processPacketRef.current(packet);
@@ -902,44 +905,57 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
       return;
     }
 
-    showNotification("Fetching from MeshView...");
+    const nodeHex = `!${nodeNum.toString(16).padStart(8, "0")}`;
+    const now = Date.now();
+    const CACHE_TTL = 5000; // 5 seconds
 
-    try {
-      const response = await fetch(`${localMeshViewUrl}/api/nodes?days_active=30`);
-      if (!response.ok) {
-        showNotification(`MeshView error: ${response.status}`);
+    // Check cache first
+    let nodes: any[];
+    if (meshViewCacheRef.current && (now - meshViewCacheRef.current.timestamp) < CACHE_TTL) {
+      nodes = meshViewCacheRef.current.data;
+      showNotification("Looking up from cache...");
+    } else {
+      showNotification("Fetching from MeshView...");
+      try {
+        const response = await fetch(`${localMeshViewUrl}/api/nodes?days_active=30`);
+        if (!response.ok) {
+          showNotification(`MeshView error: ${response.status}`);
+          return;
+        }
+
+        const data = await response.json();
+        nodes = data.nodes || data; // Handle both { nodes: [...] } and direct array
+
+        if (!Array.isArray(nodes)) {
+          showNotification("Invalid MeshView response format");
+          return;
+        }
+
+        // Cache the response
+        meshViewCacheRef.current = { data: nodes, timestamp: now };
+      } catch (err) {
+        showNotification(`Failed to fetch: ${err instanceof Error ? err.message : "unknown error"}`);
         return;
       }
+    }
 
-      const data = await response.json();
-      const nodes = data.nodes || data; // Handle both { nodes: [...] } and direct array
-      const nodeHex = `!${nodeNum.toString(16).padStart(8, "0")}`;
+    const found = nodes.find((n: { id?: string; node_id?: number }) =>
+      n.id === nodeHex || n.node_id === nodeNum
+    );
 
-      if (!Array.isArray(nodes)) {
-        showNotification("Invalid MeshView response format");
-        return;
-      }
-
-      const found = nodes.find((n: { id?: string; node_id?: number }) =>
-        n.id === nodeHex || n.node_id === nodeNum
-      );
-
-      if (found) {
-        nodeStore.updateFromMeshView(nodeNum, {
-          longName: found.long_name,
-          shortName: found.short_name,
-          hwModel: found.hw_model,
-          role: found.role,
-          lastLat: found.last_lat,
-          lastLong: found.last_long,
-          lastSeen: found.last_seen_us,
-        });
-        showNotification(`Updated: ${found.short_name || found.long_name || nodeHex}`);
-      } else {
-        showNotification(`Node ${nodeHex} not found in MeshView`);
-      }
-    } catch (err) {
-      showNotification(`Failed to fetch: ${err instanceof Error ? err.message : "unknown error"}`);
+    if (found) {
+      nodeStore.updateFromMeshView(nodeNum, {
+        longName: found.long_name,
+        shortName: found.short_name,
+        hwModel: found.hw_model,
+        role: found.role,
+        lastLat: found.last_lat,
+        lastLong: found.last_long,
+        lastSeen: found.last_seen_us,
+      });
+      showNotification(`Updated: ${found.short_name || found.long_name || nodeHex}`);
+    } else {
+      showNotification(`Node ${nodeHex} not found in MeshView`);
     }
   }, [localMeshViewUrl, nodeStore, showNotification]);
 
