@@ -57,7 +57,7 @@ Note: macOS binaries are not codesigned. You may need to right-click and select 
 ### Docker
 
 ```sh
-docker run --rm -it ghcr.io/statico/meshtastic-cli 192.168.1.100
+docker run --rm -it -e TERM ghcr.io/statico/meshtastic-cli 192.168.1.100
 ```
 
 ### Build from Source
