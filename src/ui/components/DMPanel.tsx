@@ -281,13 +281,22 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth }: Messag
 
 // Role name mappings
 const ROLE_NAMES: Record<number, string> = {
-  0: "Client", 1: "Mute", 2: "Router", 3: "RtrClnt", 4: "Repeater",
-  5: "Tracker", 6: "Sensor", 7: "TAK", 8: "Hidden", 9: "L&F", 10: "TAK+Trk",
+  0: "CLIENT", 1: "MUTE", 2: "ROUTER", 3: "RTR_CLI", 4: "REPEAT",
+  5: "TRACKER", 6: "SENSOR", 7: "TAK", 8: "HIDDEN", 9: "L&F", 10: "TAK_TRK",
 };
 
 function formatRole(role?: number | null): string {
   if (role == null) return "-";
   return ROLE_NAMES[role] || `R${role}`;
+}
+
+function getRoleColor(role?: number | null): string {
+  if (role == null) return theme.fg.muted;
+  if (role === 2 || role === 4) return theme.packet.nodeinfo; // Router/Repeater = purple
+  if (role === 5) return theme.packet.position; // Tracker = cyan
+  if (role === 6 || role === 7 || role === 10) return theme.packet.telemetry; // Sensor/TAK = orange
+  if (role === 1 || role === 8) return theme.packet.routing; // Mute/Hidden = gray
+  return theme.packet.message; // Client = green
 }
 
 function formatLastHeard(timestamp?: number): string {
@@ -349,7 +358,7 @@ function NodeInfoHeader({ nodeNum, nodeStore, deleteConfirm }: NodeInfoHeaderPro
       <Box paddingX={1}>
         {/* Line 2: Role, last heard, hops, hardware */}
         <Text color={theme.fg.muted}>Role:</Text>
-        <Text color={theme.fg.secondary}>{role}</Text>
+        <Text color={getRoleColor(node?.role)}>{role}</Text>
         <Text color={theme.fg.muted}>  Heard:</Text>
         <Text color={theme.fg.secondary}>{lastHeard}</Text>
         <Text color={theme.fg.muted}>  Hops:</Text>

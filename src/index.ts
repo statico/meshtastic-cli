@@ -1,6 +1,6 @@
 import React from "react";
 import { render } from "ink";
-import { appendFileSync, mkdirSync, existsSync } from "fs";
+import { appendFileSync, mkdirSync, existsSync, statSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { PacketStore, NodeStore } from "./protocol";
@@ -11,6 +11,24 @@ import { getSetting, DEFAULT_MESHVIEW_URL } from "./settings";
 // Global error handler - append errors to log file
 const ERROR_LOG_DIR = join(homedir(), ".config", "meshtastic-cli");
 const ERROR_LOG_PATH = join(ERROR_LOG_DIR, "error.log");
+const MAX_LOG_SIZE = 1024 * 1024; // 1 MB
+
+// Truncate log file if it exceeds max size
+function truncateLogIfNeeded() {
+  try {
+    if (!existsSync(ERROR_LOG_PATH)) return;
+    const stats = statSync(ERROR_LOG_PATH);
+    if (stats.size > MAX_LOG_SIZE) {
+      const content = readFileSync(ERROR_LOG_PATH, "utf-8");
+      const truncated = content.slice(-MAX_LOG_SIZE);
+      // Find first complete entry (starts with newline + timestamp)
+      const firstEntry = truncated.indexOf("\n[");
+      writeFileSync(ERROR_LOG_PATH, firstEntry > 0 ? truncated.slice(firstEntry) : truncated);
+    }
+  } catch {
+    // Ignore truncation errors
+  }
+}
 
 function logError(type: string, error: Error | unknown) {
   try {
@@ -27,6 +45,9 @@ function logError(type: string, error: Error | unknown) {
     // Ignore logging errors
   }
 }
+
+// Check log size at startup
+truncateLogIfNeeded();
 
 process.on("uncaughtException", (error) => {
   logError("UNCAUGHT EXCEPTION", error);

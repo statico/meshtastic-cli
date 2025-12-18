@@ -392,17 +392,17 @@ function getBatteryColor(level?: number, voltage?: number): string {
 }
 
 const ROLE_NAMES: Record<number, string> = {
-  0: "Client",
-  1: "Mute",
-  2: "Router",
-  3: "RtrClnt",
-  4: "Repeater",
-  5: "Tracker",
-  6: "Sensor",
+  0: "CLIENT",
+  1: "MUTE",
+  2: "ROUTER",
+  3: "RTR_CLI",
+  4: "REPEAT",
+  5: "TRACKER",
+  6: "SENSOR",
   7: "TAK",
-  8: "Hidden",
+  8: "HIDDEN",
   9: "L&F",
-  10: "TAK+Trk",
+  10: "TAK_TRK",
 };
 
 function formatRole(role?: number | null): string {
@@ -412,12 +412,16 @@ function formatRole(role?: number | null): string {
 
 function getRoleColor(role?: number | null): string {
   if (role == null) return theme.fg.muted;
-  // Router/Repeater = infrastructure = purple
+  // Router/Repeater = infrastructure = purple (like nodeinfo)
   if (role === 2 || role === 4) return theme.packet.nodeinfo;
-  // Tracker/Sensor = cyan
-  if (role === 5 || role === 6) return theme.packet.position;
-  // TAK = orange
+  // Tracker = cyan (like position)
+  if (role === 5) return theme.packet.position;
+  // Sensor = orange (like telemetry)
+  if (role === 6) return theme.packet.telemetry;
+  // TAK variants = orange
   if (role === 7 || role === 10) return theme.packet.telemetry;
-  // Client (default) = normal
-  return theme.fg.secondary;
+  // Mute/Hidden = gray (like routing)
+  if (role === 1 || role === 8) return theme.packet.routing;
+  // Client (default) = green (like message)
+  return theme.packet.message;
 }
