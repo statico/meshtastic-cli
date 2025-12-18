@@ -220,7 +220,7 @@ function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinner
     lines.push(
       <Box key="meshview">
         <Text color={theme.fg.muted}>MeshView: </Text>
-        <Text color={theme.fg.accent}>{meshViewUrl}/packet/{globalId}</Text>
+        <Text color={theme.data.hardware}>{meshViewUrl}/packet/{globalId}</Text>
       </Box>
     );
   }
