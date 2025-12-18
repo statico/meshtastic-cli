@@ -278,18 +278,24 @@ function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinner
         lines.push(<Box key="bf-sep" height={1} />);
         lines.push(
           <Box key="bf-found">
-            <Text color={theme.packet.direct}>✓ DECRYPTED</Text>
-            <Text color={theme.fg.muted}> (confidence: </Text>
+            <Text color={theme.packet.direct}>✓ DECRYPTED </Text>
+            <Text color={theme.fg.muted}>key=</Text>
+            <Text color={theme.fg.accent}>{r.keyHex}</Text>
+            <Text color={theme.fg.muted}> confidence=</Text>
             <Text color={r.confidence === "high" ? theme.packet.direct : r.confidence === "medium" ? theme.data.coords : theme.fg.muted}>
               {r.confidence}
             </Text>
-            <Text color={theme.fg.muted}>)</Text>
           </Box>
         );
+        // Confidence explanation
+        const confidenceHint = r.confidence === "high"
+          ? "protobuf header + known portnum"
+          : r.confidence === "medium"
+          ? "valid structure or mostly ASCII"
+          : "structure looks plausible";
         lines.push(
-          <Box key="bf-key">
-            <Text color={theme.fg.muted}>Key: </Text>
-            <Text color={theme.fg.accent}>{r.keyHex}</Text>
+          <Box key="bf-hint">
+            <Text color={theme.fg.muted}>  ({confidenceHint})</Text>
           </Box>
         );
         if (r.portnum !== undefined) {
@@ -300,14 +306,21 @@ function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinner
             </Box>
           );
         }
-        if (r.payload !== undefined) {
-          const payloadStr = typeof r.payload === "string"
-            ? `"${r.payload}"`
-            : `<${(r.payload as Uint8Array).length} bytes>`;
+        // Show message prominently if it's text
+        if (typeof r.payload === "string") {
+          lines.push(
+            <Box key="bf-message">
+              <Text color={theme.fg.muted}>Message: </Text>
+              <Text color={theme.packet.message}>"{r.payload}"</Text>
+            </Box>
+          );
+        } else if (r.payload !== undefined) {
+          const payloadHex = Array.from(r.payload as Uint8Array, b => b.toString(16).padStart(2, "0")).join("");
           lines.push(
             <Box key="bf-payload">
               <Text color={theme.fg.muted}>Payload: </Text>
-              <Text color={theme.packet.message}>{payloadStr}</Text>
+              <Text color={theme.fg.secondary}>{(r.payload as Uint8Array).length} bytes </Text>
+              <Text color={theme.packet.encrypted}>0x{payloadHex.slice(0, 32)}{payloadHex.length > 32 ? "..." : ""}</Text>
             </Box>
           );
         }
