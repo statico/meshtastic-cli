@@ -496,7 +496,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
       if (input === "1") { setMode("packets"); return; }
       if (input === "2") { setMode("nodes"); return; }
       if (input === "3") { setMode("chat"); return; }
-      if (input === "4" || input === "l") { setMode("log"); return; }
+      if (input === "4") { setMode("log"); return; }
     } else {
       // In chat mode, Escape or Ctrl+C exits to packets
       if (key.escape) { setMode("packets"); return; }

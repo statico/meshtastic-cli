@@ -12,7 +12,7 @@ const globalKeys = [
   { key: "1", desc: "Packets view" },
   { key: "2", desc: "Nodes view" },
   { key: "3", desc: "Chat view" },
-  { key: "4 / l", desc: "Log view" },
+  { key: "4", desc: "Log view" },
   { key: "q / Q", desc: "Quit" },
   { key: "?", desc: "Toggle help" },
 ];
