@@ -531,7 +531,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
       if (input === "3") { setMode("chat"); return; }
       if (input === "4") { setMode("log"); setChatInputFocused(false); return; }
     }
-    if (mode === "chat" && key.escape && !chatInputFocused && !showEmojiSelector) {
+    // Only treat bare escape (not escape sequences like Home/End) as tab switch
+    const isBareEscape = key.escape && (input === "" || input === "\x1b");
+    if (mode === "chat" && isBareEscape && !chatInputFocused && !showEmojiSelector) {
       setMode("packets");
       return;
     }
@@ -673,9 +675,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
       if (input === "k" || key.upArrow) {
         setSelectedLogIndex((i) => Math.max(i - 1, 0));
       }
-      // Home/End keys
-      const isLogHome = input === "\x1b[H" || input === "\x1b[1~" || input === "\x1bOH";
-      const isLogEnd = input === "\x1b[F" || input === "\x1b[4~" || input === "\x1bOF";
+      // Home/End keys (g/G for vim-style, escape sequences for Home/End)
+      const isLogHome = input === "g" || input === "\x1b[H" || input === "\x1b[1~" || input === "\x1bOH";
+      const isLogEnd = input === "G" || input === "\x1b[F" || input === "\x1b[4~" || input === "\x1bOF";
       if (isLogHome) {
         setSelectedLogIndex(0);
       }
