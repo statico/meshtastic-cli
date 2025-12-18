@@ -7,6 +7,7 @@ export interface NodeData {
   longName?: string;
   shortName?: string;
   hwModel?: number;
+  role?: number;
   latitudeI?: number;
   longitudeI?: number;
   altitude?: number;
@@ -94,6 +95,7 @@ export class NodeStore {
       longName: user.longName || existing.longName,
       shortName: user.shortName || existing.shortName,
       hwModel: user.hwModel || existing.hwModel,
+      role: user.role ?? existing.role,
       lastHeard: Date.now() / 1000,
     };
     this.nodes.set(nodeNum, updated);
@@ -144,11 +146,23 @@ export class NodeStore {
       hwModelNum = hwModels[data.hwModel] ?? existing.hwModel;
     }
 
+    // Map MeshView role string to role number
+    let roleNum = existing.role;
+    if (data.role) {
+      const roles: Record<string, number> = {
+        "CLIENT": 0, "CLIENT_MUTE": 1, "ROUTER": 2, "ROUTER_CLIENT": 3,
+        "REPEATER": 4, "TRACKER": 5, "SENSOR": 6, "TAK": 7, "CLIENT_HIDDEN": 8,
+        "LOST_AND_FOUND": 9, "TAK_TRACKER": 10,
+      };
+      roleNum = roles[data.role] ?? existing.role;
+    }
+
     const updated: NodeData = {
       ...existing,
       longName: data.longName || existing.longName,
       shortName: data.shortName || existing.shortName,
       hwModel: hwModelNum,
+      role: roleNum,
       latitudeI: data.lastLat ?? existing.latitudeI,
       longitudeI: data.lastLong ?? existing.longitudeI,
       lastHeard: data.lastSeen ? Math.floor(data.lastSeen / 1000000) : existing.lastHeard,

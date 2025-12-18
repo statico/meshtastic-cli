@@ -121,6 +121,7 @@ export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight 
           <Text color={theme.fg.muted}>{"NAME".padEnd(10)}</Text>
           <Text color={theme.fg.muted}>{"ID".padEnd(12)}</Text>
           <Text color={theme.fg.muted}>{"FAV"}{"  "}</Text>
+          <Text color={theme.fg.muted}>{"ROLE".padEnd(8)}</Text>
           <Text color={theme.fg.muted}>{"HOPS".padEnd(6)}</Text>
           <Text color={theme.fg.muted}>{"SNR".padEnd(8)}</Text>
           <Text color={theme.fg.muted}>{"BATT".padEnd(7)}</Text>
@@ -186,12 +187,14 @@ function NodeRow({ node, isSelected }: NodeRowProps) {
   const hwModel = node.hwModel !== undefined
     ? (Mesh.HardwareModel[node.hwModel] || `HW_${node.hwModel}`).replace("_", " ")
     : "";
+  const role = formatRole(node.role);
 
   return (
     <Box backgroundColor={bgColor} paddingX={1}>
       <Text color={nameColor}>{padEndVisual(displayName, 10)}</Text>
       <Text color={theme.fg.muted}>{nodeId.padEnd(12)}</Text>
       <Text color="#ffcc00">{favStar}</Text><Text>{"    "}</Text>
+      <Text color={getRoleColor(node.role)}>{role.padEnd(8)}</Text>
       <Text color={getHopsColor(node.hopsAway)}>{hops.padEnd(6)}</Text>
       <Text color={getSnrColor(node.snr)}>{snr.padStart(7)} </Text>
       <Text color={getBatteryColor(node.batteryLevel, node.voltage)}>{battery.padEnd(7)}</Text>
@@ -227,11 +230,17 @@ function NodeInspector({ node, height }: { node?: NodeData; height: number }) {
     </Box>
   );
 
-  // ID and hardware
+  // ID, role, and hardware
   lines.push(
     <Box key="hw">
       <Text color={theme.fg.muted}>ID: </Text>
       <Text color={theme.fg.secondary}>{formatNodeId(node.num)}</Text>
+      {node.role !== undefined && (
+        <>
+          <Text color={theme.fg.muted}>  Role: </Text>
+          <Text color={getRoleColor(node.role)}>{formatRole(node.role)}</Text>
+        </>
+      )}
       {node.hwModel !== undefined && (
         <>
           <Text color={theme.fg.muted}>  Hardware: </Text>
@@ -380,4 +389,35 @@ function getBatteryColor(level?: number, voltage?: number): string {
   }
   // Has voltage but no level - neutral color
   return theme.fg.primary;
+}
+
+const ROLE_NAMES: Record<number, string> = {
+  0: "Client",
+  1: "Mute",
+  2: "Router",
+  3: "RtrClnt",
+  4: "Repeater",
+  5: "Tracker",
+  6: "Sensor",
+  7: "TAK",
+  8: "Hidden",
+  9: "L&F",
+  10: "TAK+Trk",
+};
+
+function formatRole(role?: number): string {
+  if (role === undefined) return "-";
+  return ROLE_NAMES[role] || `R${role}`;
+}
+
+function getRoleColor(role?: number): string {
+  if (role === undefined) return theme.fg.muted;
+  // Router/Repeater = infrastructure = purple
+  if (role === 2 || role === 4) return theme.packet.nodeinfo;
+  // Tracker/Sensor = cyan
+  if (role === 5 || role === 6) return theme.packet.position;
+  // TAK = orange
+  if (role === 7 || role === 10) return theme.packet.telemetry;
+  // Client (default) = normal
+  return theme.fg.secondary;
 }

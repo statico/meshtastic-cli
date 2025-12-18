@@ -34,6 +34,7 @@ export function initDb(session: string = "default") {
       long_name TEXT,
       short_name TEXT,
       hw_model INTEGER,
+      role INTEGER,
       latitude_i INTEGER,
       longitude_i INTEGER,
       altitude INTEGER,
@@ -50,6 +51,13 @@ export function initDb(session: string = "default") {
       updated_at INTEGER
     )
   `);
+
+  // Migration: add role column if it doesn't exist
+  try {
+    db.run(`ALTER TABLE nodes ADD COLUMN role INTEGER`);
+  } catch {
+    // Column already exists
+  }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS messages (
@@ -154,6 +162,7 @@ export interface DbNode {
   longName?: string;
   shortName?: string;
   hwModel?: number;
+  role?: number;
   latitudeI?: number;
   longitudeI?: number;
   altitude?: number;
@@ -189,13 +198,14 @@ export interface DbMessage {
 
 export function upsertNode(node: DbNode) {
   db.run(`
-    INSERT INTO nodes (num, user_id, long_name, short_name, hw_model, latitude_i, longitude_i, altitude, snr, last_heard, battery_level, voltage, channel_utilization, air_util_tx, channel, via_mqtt, hops_away, is_favorite, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO nodes (num, user_id, long_name, short_name, hw_model, role, latitude_i, longitude_i, altitude, snr, last_heard, battery_level, voltage, channel_utilization, air_util_tx, channel, via_mqtt, hops_away, is_favorite, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(num) DO UPDATE SET
       user_id = COALESCE(excluded.user_id, user_id),
       long_name = COALESCE(excluded.long_name, long_name),
       short_name = COALESCE(excluded.short_name, short_name),
       hw_model = COALESCE(excluded.hw_model, hw_model),
+      role = COALESCE(excluded.role, role),
       latitude_i = COALESCE(excluded.latitude_i, latitude_i),
       longitude_i = COALESCE(excluded.longitude_i, longitude_i),
       altitude = COALESCE(excluded.altitude, altitude),
@@ -216,6 +226,7 @@ export function upsertNode(node: DbNode) {
     node.longName ?? null,
     node.shortName ?? null,
     node.hwModel ?? null,
+    node.role ?? null,
     node.latitudeI ?? null,
     node.longitudeI ?? null,
     node.altitude ?? null,
@@ -242,6 +253,7 @@ export function getNode(num: number): DbNode | null {
     longName: row.long_name,
     shortName: row.short_name,
     hwModel: row.hw_model,
+    role: row.role,
     latitudeI: row.latitude_i,
     longitudeI: row.longitude_i,
     altitude: row.altitude,
@@ -266,6 +278,7 @@ export function getAllNodes(): DbNode[] {
     longName: row.long_name,
     shortName: row.short_name,
     hwModel: row.hw_model,
+    role: row.role,
     latitudeI: row.latitude_i,
     longitudeI: row.longitude_i,
     altitude: row.altitude,

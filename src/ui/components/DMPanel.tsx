@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
+import { Mesh } from "@meshtastic/protobufs";
 import { theme } from "../theme";
 import type { DbMessage, DMConversation } from "../../db";
 import type { NodeStore } from "../../protocol/node-store";
@@ -76,7 +77,7 @@ export function DMPanel({
 
   // Right panel dimensions
   const rightPanelWidth = width - LEFT_PANEL_WIDTH - 3; // 3 for borders/padding
-  const chatHeight = height - 4; // Header, input area
+  const chatHeight = height - 5; // 2-line header + input area
 
   // Calculate scroll offset for messages
   const visibleMsgCount = chatHeight;
@@ -147,22 +148,12 @@ export function DMPanel({
 
       {/* Right panel - Chat */}
       <Box flexDirection="column" flexGrow={1}>
-        {/* Chat header */}
-        <Box paddingX={1}>
-          {deleteConfirm && selectedConvo ? (
-            <>
-              <Text color={theme.status.offline} bold>Delete conversation with {nodeStore.getNodeName(selectedConvo.nodeNum)}?</Text>
-              <Text color={theme.fg.muted}> (y/n)</Text>
-            </>
-          ) : selectedConvo ? (
-            <>
-              <Text color={theme.fg.accent} bold>{nodeStore.getNodeName(selectedConvo.nodeNum)}</Text>
-              <Text color={theme.fg.muted}> {formatNodeId(selectedConvo.nodeNum)}</Text>
-            </>
-          ) : (
-            <Text color={theme.fg.muted}>Select a conversation (j/k, Enter)</Text>
-          )}
-        </Box>
+        {/* Chat header - 2 lines of node info */}
+        <NodeInfoHeader
+          nodeNum={selectedConvo?.nodeNum}
+          nodeStore={nodeStore}
+          deleteConfirm={deleteConfirm}
+        />
 
         {/* Messages */}
         <Box height={chatHeight} flexDirection="column" paddingX={1}>
@@ -284,6 +275,88 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth }: Messag
         <Text color={theme.fg.primary}>{displayText}</Text>
         {getStatusIndicator()}
       </Text>
+    </Box>
+  );
+}
+
+// Role name mappings
+const ROLE_NAMES: Record<number, string> = {
+  0: "Client", 1: "Mute", 2: "Router", 3: "RtrClnt", 4: "Repeater",
+  5: "Tracker", 6: "Sensor", 7: "TAK", 8: "Hidden", 9: "L&F", 10: "TAK+Trk",
+};
+
+function formatRole(role?: number): string {
+  if (role === undefined) return "-";
+  return ROLE_NAMES[role] || `R${role}`;
+}
+
+function formatLastHeard(timestamp?: number): string {
+  if (!timestamp) return "never";
+  const now = Date.now() / 1000;
+  const diff = now - timestamp;
+  if (diff < 60) return "now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
+}
+
+interface NodeInfoHeaderProps {
+  nodeNum?: number;
+  nodeStore: NodeStore;
+  deleteConfirm?: boolean;
+}
+
+function NodeInfoHeader({ nodeNum, nodeStore, deleteConfirm }: NodeInfoHeaderProps) {
+  if (!nodeNum) {
+    return (
+      <Box flexDirection="column" paddingX={1}>
+        <Text color={theme.fg.muted}>Select a conversation (j/k, Enter)</Text>
+        <Text color={theme.fg.secondary}>Press 'd' on a node to start a DM</Text>
+      </Box>
+    );
+  }
+
+  const node = nodeStore.getNode(nodeNum);
+  const nodeName = nodeStore.getNodeName(nodeNum);
+
+  if (deleteConfirm) {
+    return (
+      <Box flexDirection="column" paddingX={1}>
+        <Text color={theme.status.offline} bold>Delete conversation with {nodeName}?</Text>
+        <Text color={theme.fg.muted}>(y/n)</Text>
+      </Box>
+    );
+  }
+
+  const shortName = node?.shortName || "???";
+  const longName = node?.longName || "";
+  const nodeId = formatNodeId(nodeNum);
+  const role = formatRole(node?.role);
+  const lastHeard = formatLastHeard(node?.lastHeard);
+  const hops = node?.hopsAway !== undefined ? `${node.hopsAway}` : "-";
+  const hwModel = node?.hwModel !== undefined
+    ? (Mesh.HardwareModel[node.hwModel] || `HW_${node.hwModel}`).replace(/_/g, " ")
+    : "-";
+
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      {/* Line 1: Short name, ID, long name */}
+      <Box>
+        <Text color={theme.fg.accent} bold>{shortName}</Text>
+        <Text color={theme.fg.muted}> {nodeId}</Text>
+        {longName && <Text color={theme.fg.primary}> {longName}</Text>}
+      </Box>
+      {/* Line 2: Role, last heard, hops, hardware */}
+      <Box>
+        <Text color={theme.fg.muted}>Role:</Text>
+        <Text color={theme.fg.secondary}>{role}</Text>
+        <Text color={theme.fg.muted}>  Heard:</Text>
+        <Text color={theme.fg.secondary}>{lastHeard}</Text>
+        <Text color={theme.fg.muted}>  Hops:</Text>
+        <Text color={theme.fg.secondary}>{hops}</Text>
+        <Text color={theme.fg.muted}>  HW:</Text>
+        <Text color={theme.data.hardware}>{hwModel}</Text>
+      </Box>
     </Box>
   );
 }
