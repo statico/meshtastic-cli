@@ -1,8 +1,28 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
 import { theme } from "../theme";
 import type { DbMessage } from "../../db";
 import type { NodeStore } from "../../protocol/node-store";
+
+function AnimatedDots() {
+  const [frame, setFrame] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFrame((f) => (f + 1) % 3);
+    }, 200);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <Text>
+      {" "}
+      <Text color={frame === 0 ? theme.fg.primary : theme.fg.muted}>.</Text>
+      <Text color={frame === 1 ? theme.fg.primary : theme.fg.muted}>.</Text>
+      <Text color={frame === 2 ? theme.fg.primary : theme.fg.muted}>.</Text>
+    </Text>
+  );
+}
 
 interface ChatPanelProps {
   messages: DbMessage[];
@@ -70,7 +90,7 @@ function MessageRow({ message, nodeStore, isOwn }: MessageRowProps) {
     if (!isOwn) return null;
     switch (message.status) {
       case "pending":
-        return <Text color={theme.fg.muted}> ...</Text>;
+        return <AnimatedDots />;
       case "acked":
         return <Text color={theme.status.online}> ✓</Text>;
       case "error":

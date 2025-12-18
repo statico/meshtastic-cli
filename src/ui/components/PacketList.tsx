@@ -11,9 +11,10 @@ interface PacketListProps {
   selectedIndex: number;
   nodeStore: NodeStore;
   height?: number;
+  isFollowing?: boolean;
 }
 
-export function PacketList({ packets, selectedIndex, nodeStore, height = 20 }: PacketListProps) {
+export function PacketList({ packets, selectedIndex, nodeStore, height = 20, isFollowing }: PacketListProps) {
   const visibleCount = Math.max(1, height - 2);
 
   let startIndex = 0;
@@ -29,6 +30,11 @@ export function PacketList({ packets, selectedIndex, nodeStore, height = 20 }: P
 
   return (
     <Box flexDirection="column" width="100%">
+      {isFollowing && (
+        <Box position="absolute" marginLeft={1}>
+          <Text color={theme.status.online} bold>LIVE</Text>
+        </Box>
+      )}
       {visiblePackets.map((packet, i) => {
         const actualIndex = startIndex + i;
         const isSelected = actualIndex === selectedIndex;

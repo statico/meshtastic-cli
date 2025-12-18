@@ -738,6 +738,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
                   selectedIndex={selectedPacketIndex}
                   nodeStore={nodeStore}
                   height={listHeight}
+                  isFollowing={selectedPacketIndex === packets.length - 1}
                 />
               </Box>
               <Box height={detailHeight} borderStyle="single" borderColor={theme.border.normal}>
