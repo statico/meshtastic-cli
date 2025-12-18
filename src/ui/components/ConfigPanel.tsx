@@ -161,6 +161,7 @@ export function ConfigPanel({
   meshViewUrl,
   editingField,
   editValue,
+  selectedChannelIndex,
   batchEditMode,
   batchEditCount,
 }: ConfigPanelProps) {
@@ -223,6 +224,7 @@ export function ConfigPanel({
             meshViewUrl={meshViewUrl}
             editingField={editingField}
             editValue={editValue}
+            selectedChannelIndex={selectedChannelIndex}
           />
         )}
       </Box>
@@ -762,29 +764,15 @@ function ChannelsConfigView({ channels, selectedIndex = 0, editingField, editVal
   const selectedChannel = validChannels[clampedIndex];
   const roleNames = ["DISABLED", "PRIMARY", "SECONDARY"];
 
-  // Format PSK for display
+  // Format PSK as base64
   const formatPsk = (psk?: Uint8Array): string => {
     if (!psk || psk.length === 0) return "None (unencrypted)";
-    if (psk.length === 1) {
-      if (psk[0] === 0) return "None (unencrypted)";
-      if (psk[0] === 1) return "Default key";
-      if (psk[0] >= 2 && psk[0] <= 10) return `Simple key ${psk[0] - 1}`;
-    }
-    // Show hex for custom keys
-    const hex = Array.from(psk).map(b => b.toString(16).padStart(2, "0")).join("");
-    if (hex.length > 32) return hex.slice(0, 32) + "...";
-    return hex;
-  };
-
-  // Format PSK as base64 for QR codes
-  const formatPskBase64 = (psk?: Uint8Array): string => {
-    if (!psk || psk.length === 0) return "";
-    // Use btoa-compatible encoding
+    if (psk.length === 1 && psk[0] === 0) return "None (unencrypted)";
     const binary = String.fromCharCode(...psk);
     try {
       return btoa(binary);
     } catch {
-      return "";
+      return "Invalid key";
     }
   };
 
@@ -832,12 +820,6 @@ function ChannelsConfigView({ channels, selectedIndex = 0, editingField, editVal
             <Text color={theme.fg.muted}>{"Encryption".padEnd(24)}</Text>
             <Text color={theme.packet.encrypted}>{formatPsk(selectedChannel.settings?.psk)}</Text>
           </Box>
-          {selectedChannel.settings?.psk && selectedChannel.settings.psk.length > 1 && (
-            <Box>
-              <Text color={theme.fg.muted}>{"PSK (base64)".padEnd(24)}</Text>
-              <Text color={theme.fg.secondary}>{formatPskBase64(selectedChannel.settings.psk)}</Text>
-            </Box>
-          )}
           <Box>
             <Text color={theme.fg.muted}>{"Uplink Enabled".padEnd(24)}</Text>
             <Text color={selectedChannel.settings?.uplinkEnabled ? theme.status.online : theme.fg.muted}>
