@@ -25,10 +25,9 @@ interface AppProps {
   packetStore: PacketStore;
   nodeStore: NodeStore;
   skipConfig?: boolean;
-  skipNodes?: boolean;
 }
 
-export function App({ address, packetStore, nodeStore, skipConfig = false, skipNodes = false }: AppProps) {
+export function App({ address, packetStore, nodeStore, skipConfig = false }: AppProps) {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const [transport, setTransport] = useState<Transport | null>(null);
@@ -169,8 +168,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       setMyNodeNum(myInfo.myNodeNum);
     }
 
-    // Skip node info updates if --skip-nodes flag is set
-    if (fr.payloadVariant.case === "nodeInfo" && !skipNodes) {
+    if (fr.payloadVariant.case === "nodeInfo") {
       const nodeInfo = fr.payloadVariant.value;
       nodeStore.updateFromNodeInfo(nodeInfo);
     }
@@ -213,7 +211,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         setMessages((prev) => [...prev, msg].slice(-100));
       }
     }
-  }, [nodeStore, skipNodes]);
+  }, [nodeStore]);
 
   const requestConfig = useCallback(async () => {
     if (!transport) return;
