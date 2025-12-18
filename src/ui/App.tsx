@@ -12,6 +12,7 @@ import { PacketInspector, InspectorTab } from "./components/PacketInspector";
 import { NodesPanel } from "./components/NodesPanel";
 import { ChatPanel } from "./components/ChatPanel";
 import { HelpDialog } from "./components/HelpDialog";
+import { QuitDialog } from "./components/QuitDialog";
 import * as db from "../db";
 import { toBinary, create } from "@bufbuild/protobuf";
 import { formatNodeId } from "../utils/hex";
@@ -40,6 +41,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("info");
   const [inspectorHeight, setInspectorHeight] = useState(12);
   const [showHelp, setShowHelp] = useState(false);
+  const [showQuitDialog, setShowQuitDialog] = useState(false);
   const [terminalHeight, setTerminalHeight] = useState(stdout?.rows || 24);
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -317,14 +319,19 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
 
   // Key input handling
   useInput((input, key) => {
-    // Quit - handle q, Q, and Ctrl+C
+    // If quit dialog is showing, it handles its own input
+    if (showQuitDialog) {
+      return;
+    }
+
+    // Quit - show confirmation dialog
     if ((input === "q" || input === "Q") && mode !== "chat") {
-      exit();
-      process.exit(0);
+      setShowQuitDialog(true);
+      return;
     }
     if (key.ctrl && input === "c") {
-      exit();
-      process.exit(0);
+      setShowQuitDialog(true);
+      return;
     }
 
     // Toggle help
@@ -552,6 +559,26 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
           height="100%"
         >
           <HelpDialog mode={mode} />
+        </Box>
+      )}
+
+      {/* Quit confirmation dialog */}
+      {showQuitDialog && (
+        <Box
+          position="absolute"
+          flexDirection="column"
+          justifyContent="center"
+          alignItems="center"
+          width="100%"
+          height="100%"
+        >
+          <QuitDialog
+            onConfirm={() => {
+              exit();
+              process.exit(0);
+            }}
+            onCancel={() => setShowQuitDialog(false)}
+          />
         </Box>
       )}
     </Box>
