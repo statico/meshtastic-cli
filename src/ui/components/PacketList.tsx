@@ -241,9 +241,11 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
   if (packet.decodeError) {
     return (
       <Box backgroundColor={bgColor}>
-        <Text color={theme.data.time}>[{time}] </Text>
-        <Text color={theme.packet.encrypted}>ERROR </Text>
-        <Text color={theme.fg.muted}>{packet.decodeError}</Text>
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.packet.encrypted}>ERROR </Text>
+          <Text color={theme.fg.muted}>{packet.decodeError}</Text>
+        </Text>
       </Box>
     );
   }
@@ -252,8 +254,10 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
   if (!fr) {
     return (
       <Box backgroundColor={bgColor}>
-        <Text color={theme.data.time}>[{time}] </Text>
-        <Text color={theme.packet.unknown}>EMPTY</Text>
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.packet.unknown}>EMPTY</Text>
+        </Text>
       </Box>
     );
   }
@@ -271,13 +275,15 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
 
     return (
       <Box backgroundColor={bgColor}>
-        <Text color={theme.data.time}>[{time}] </Text>
-        <Text color={theme.data.arrow}>{"<"} </Text>
-        <Text color={color}>{portName.padEnd(14)}</Text>
-        <Text color={theme.data.nodeFrom}>{fromName.padEnd(10)}</Text>
-        <Text color={theme.data.arrow}>{" -> "}</Text>
-        <Text color={theme.data.nodeTo}>{toName.padEnd(10)}</Text>
-        {renderPacketSummary(packet, nodeStore)}
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.arrow}>{"<"} </Text>
+          <Text color={color}>{portName.padEnd(14)}</Text>
+          <Text color={theme.data.nodeFrom}>{fromName.padEnd(10)}</Text>
+          <Text color={theme.data.arrow}>{" -> "}</Text>
+          <Text color={theme.data.nodeTo}>{toName.padEnd(10)}</Text>
+          {renderPacketSummary(packet, nodeStore)}
+        </Text>
       </Box>
     );
   }
@@ -292,13 +298,15 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     const id = formatNodeId(info.num);
     return (
       <Box backgroundColor={bgColor}>
-        <Text color={theme.data.time}>[{time}] </Text>
-        <Text color={theme.data.arrow}>{"*"} </Text>
-        <Text color={theme.packet.nodeinfo}>{"NODEINFO".padEnd(14)}</Text>
-        <Text color={theme.data.nodeFrom}>{shortName.padEnd(6)}</Text>
-        <Text color={theme.fg.muted}>{id} </Text>
-        {longName && <Text color={theme.fg.primary}>{longName} </Text>}
-        {hw && <Text color={theme.data.hardware}>| {hw}</Text>}
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.arrow}>{"*"} </Text>
+          <Text color={theme.packet.nodeinfo}>{"NODEINFO".padEnd(14)}</Text>
+          <Text color={theme.data.nodeFrom}>{shortName.padEnd(6)}</Text>
+          <Text color={theme.fg.muted}>{id} </Text>
+          {longName && <Text color={theme.fg.primary}>{longName} </Text>}
+          {hw && <Text color={theme.data.hardware}>| {hw}</Text>}
+        </Text>
       </Box>
     );
   }
@@ -308,10 +316,12 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     const id = formatNodeId(myInfo.myNodeNum);
     return (
       <Box backgroundColor={bgColor}>
-        <Text color={theme.data.time}>[{time}] </Text>
-        <Text color={theme.data.arrow}>{"*"} </Text>
-        <Text color={theme.packet.direct}>{"MY_INFO".padEnd(14)}</Text>
-        <Text color={theme.data.nodeFrom}>{id}</Text>
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.arrow}>{"*"} </Text>
+          <Text color={theme.packet.direct}>{"MY_INFO".padEnd(14)}</Text>
+          <Text color={theme.data.nodeFrom}>{id}</Text>
+        </Text>
       </Box>
     );
   }
@@ -321,10 +331,12 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     const configType = config.payloadVariant.case || "unknown";
     return (
       <Box backgroundColor={bgColor}>
-        <Text color={theme.data.time}>[{time}] </Text>
-        <Text color={theme.data.arrow}>{"*"} </Text>
-        <Text color={theme.packet.config}>{"CONFIG".padEnd(14)}</Text>
-        <Text color={theme.data.channel}>{configType}</Text>
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.arrow}>{"*"} </Text>
+          <Text color={theme.packet.config}>{"CONFIG".padEnd(14)}</Text>
+          <Text color={theme.data.channel}>{configType}</Text>
+        </Text>
       </Box>
     );
   }
@@ -334,10 +346,12 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     const configType = config.payloadVariant.case || "unknown";
     return (
       <Box backgroundColor={bgColor}>
-        <Text color={theme.data.time}>[{time}] </Text>
-        <Text color={theme.data.arrow}>{"*"} </Text>
-        <Text color={theme.packet.config}>{"MODULE_CONFIG".padEnd(14)}</Text>
-        <Text color={theme.data.channel}>{configType}</Text>
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.arrow}>{"*"} </Text>
+          <Text color={theme.packet.config}>{"MODULE_CONFIG".padEnd(14)}</Text>
+          <Text color={theme.data.channel}>{configType}</Text>
+        </Text>
       </Box>
     );
   }
@@ -347,11 +361,13 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
     const name = channel.settings?.name || `Channel ${channel.index}`;
     return (
       <Box backgroundColor={bgColor}>
-        <Text color={theme.data.time}>[{time}] </Text>
-        <Text color={theme.data.arrow}>{"*"} </Text>
-        <Text color={theme.packet.config}>{"CHANNEL".padEnd(14)}</Text>
-        <Text color={theme.data.channel}>#{channel.index} </Text>
-        <Text color={theme.fg.primary}>{name}</Text>
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.arrow}>{"*"} </Text>
+          <Text color={theme.packet.config}>{"CHANNEL".padEnd(14)}</Text>
+          <Text color={theme.data.channel}>#{channel.index} </Text>
+          <Text color={theme.fg.primary}>{name}</Text>
+        </Text>
       </Box>
     );
   }
@@ -359,9 +375,11 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
   if (variantCase === "configCompleteId") {
     return (
       <Box backgroundColor={bgColor}>
-        <Text color={theme.data.time}>[{time}] </Text>
-        <Text color={theme.data.arrow}>{"*"} </Text>
-        <Text color={theme.packet.direct}>{"CONFIG_COMPLETE".padEnd(14)}</Text>
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.arrow}>{"*"} </Text>
+          <Text color={theme.packet.direct}>{"CONFIG_COMPLETE".padEnd(14)}</Text>
+        </Text>
       </Box>
     );
   }
@@ -369,18 +387,22 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
   if (variantCase) {
     return (
       <Box backgroundColor={bgColor}>
-        <Text color={theme.data.time}>[{time}] </Text>
-        <Text color={theme.data.arrow}>{"*"} </Text>
-        <Text color={theme.packet.unknown}>{variantCase.toUpperCase().padEnd(14)}</Text>
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.arrow}>{"*"} </Text>
+          <Text color={theme.packet.unknown}>{variantCase.toUpperCase().padEnd(14)}</Text>
+        </Text>
       </Box>
     );
   }
 
   return (
     <Box backgroundColor={bgColor}>
-      <Text color={theme.data.time}>[{time}] </Text>
-      <Text color={theme.fg.secondary}>{"?"} </Text>
-      <Text color={theme.packet.unknown}>{"UNKNOWN".padEnd(14)}</Text>
+      <Text wrap="truncate">
+        <Text color={theme.data.time}>[{time}] </Text>
+        <Text color={theme.fg.secondary}>{"?"} </Text>
+        <Text color={theme.packet.unknown}>{"UNKNOWN".padEnd(14)}</Text>
+      </Text>
     </Box>
   );
 }
