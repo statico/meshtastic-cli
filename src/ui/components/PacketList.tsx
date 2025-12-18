@@ -12,17 +12,17 @@ function LiveIndicator() {
   useEffect(() => {
     const interval = setInterval(() => {
       setFrame((f) => (f + 1) % 4);
-    }, 300);
+    }, 250);
     return () => clearInterval(interval);
   }, []);
 
-  // Pulsing dot animation
-  const dots = ["●", "●", "○", "○"];
-  const colors = [theme.status.online, "#00cc7a", "#009959", "#00cc7a"];
+  // Radio waves animation
+  const frames = ["  •  ", " (•) ", "((•))"];
+  const pattern = [0, 1, 2, 1];
 
   return (
     <Text>
-      <Text color={colors[frame]}>{dots[frame]}</Text>
+      <Text color={theme.status.online}>{frames[pattern[frame]]}</Text>
       <Text color={theme.status.online} bold> LIVE</Text>
     </Text>
   );
