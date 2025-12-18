@@ -8,7 +8,7 @@ import type { Transport, DeviceStatus } from "../transport/types";
 import { HttpTransport } from "../transport";
 import { Mesh, Portnums, Telemetry } from "@meshtastic/protobufs";
 import { PacketList } from "./components/PacketList";
-import { PacketInspector } from "./components/PacketInspector";
+import { PacketInspector, InspectorTab } from "./components/PacketInspector";
 import { NodesPanel } from "./components/NodesPanel";
 import { ChatPanel } from "./components/ChatPanel";
 import * as db from "../db";
@@ -35,6 +35,7 @@ export function App({ address, packetStore, nodeStore }: AppProps) {
   const [selectedPacketIndex, setSelectedPacketIndex] = useState(0);
   const [nodes, setNodes] = useState<NodeData[]>([]);
   const [selectedNodeIndex, setSelectedNodeIndex] = useState(0);
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("info");
   const [terminalHeight, setTerminalHeight] = useState(stdout?.rows || 24);
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -325,6 +326,20 @@ export function App({ address, packetStore, nodeStore }: AppProps) {
       if (input === "k" || key.upArrow) {
         setSelectedPacketIndex((i) => Math.max(i - 1, 0));
       }
+      // Tab switching with h/l or left/right arrows
+      const tabs: InspectorTab[] = ["info", "json", "hex"];
+      if (input === "h" || key.leftArrow) {
+        setInspectorTab((t) => {
+          const idx = tabs.indexOf(t);
+          return tabs[(idx - 1 + tabs.length) % tabs.length];
+        });
+      }
+      if (input === "l" || key.rightArrow) {
+        setInspectorTab((t) => {
+          const idx = tabs.indexOf(t);
+          return tabs[(idx + 1) % tabs.length];
+        });
+      }
     } else if (mode === "nodes") {
       if (input === "j" || key.downArrow) {
         setSelectedNodeIndex((i) => Math.min(i + 1, nodes.length - 1));
@@ -439,7 +454,7 @@ export function App({ address, packetStore, nodeStore }: AppProps) {
               />
             </Box>
             <Box height={12} borderStyle="single" borderColor={theme.border.normal}>
-              <PacketInspector packet={selectedPacket} />
+              <PacketInspector packet={selectedPacket} activeTab={inspectorTab} height={10} nodeStore={nodeStore} />
             </Box>
           </>
         )}
