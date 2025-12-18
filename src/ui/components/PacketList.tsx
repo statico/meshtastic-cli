@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import { theme } from "../theme";
 import type { DecodedPacket } from "../../protocol/decoder";
 import type { NodeStore } from "../../protocol/node-store";
-import { Mesh, Portnums, Telemetry } from "@meshtastic/protobufs";
+import { Mesh, Portnums, Telemetry, StoreForward } from "@meshtastic/protobufs";
 import { formatNodeId } from "../../utils/hex";
 
 interface PacketListProps {
@@ -210,8 +210,52 @@ function renderPacketSummary(packet: DecodedPacket, nodeStore: NodeStore): React
 
   // Store and forward
   if (packet.portnum === Portnums.PortNum.STORE_FORWARD_APP) {
-    const sf = packet.payload as { variant?: { case?: string } };
-    return sf.variant?.case ? <Text color={theme.data.channel}> {sf.variant.case}</Text> : null;
+    const sf = packet.payload as StoreForward.StoreAndForward;
+    const rrName = StoreForward.StoreAndForward_RequestResponse[sf.rr] || "";
+    if (sf.variant.case === "stats") {
+      const stats = sf.variant.value;
+      return (
+        <>
+          <Text color={theme.data.channel}> {rrName}</Text>
+          <Text color={theme.fg.primary}> saved:{stats.messagesSaved}/{stats.messagesMax}</Text>
+          <Text color={theme.fg.muted}> up:{Math.floor(stats.upTime / 60)}m</Text>
+        </>
+      );
+    }
+    if (sf.variant.case === "history") {
+      const hist = sf.variant.value;
+      return (
+        <>
+          <Text color={theme.data.channel}> {rrName}</Text>
+          <Text color={theme.fg.primary}> msgs:{hist.historyMessages}</Text>
+          <Text color={theme.fg.muted}> win:{hist.window}m</Text>
+        </>
+      );
+    }
+    if (sf.variant.case === "heartbeat") {
+      const hb = sf.variant.value;
+      return (
+        <>
+          <Text color={theme.data.channel}> {rrName}</Text>
+          <Text color={theme.fg.primary}> period:{hb.period}s</Text>
+          {hb.secondary > 0 && <Text color={theme.fg.muted}> (secondary)</Text>}
+        </>
+      );
+    }
+    if (sf.variant.case === "text") {
+      try {
+        const text = new TextDecoder().decode(sf.variant.value).slice(0, 30);
+        return (
+          <>
+            <Text color={theme.data.channel}> {rrName}</Text>
+            <Text color={theme.data.quote}> "{text}"</Text>
+          </>
+        );
+      } catch {
+        return <Text color={theme.data.channel}> {rrName}</Text>;
+      }
+    }
+    return rrName ? <Text color={theme.data.channel}> {rrName}</Text> : null;
   }
 
   // Neighbor info

@@ -1,5 +1,5 @@
 import { fromBinary } from "@bufbuild/protobuf";
-import { Mesh, Portnums, Telemetry } from "@meshtastic/protobufs";
+import { Mesh, Portnums, Telemetry, StoreForward } from "@meshtastic/protobufs";
 
 export interface DecodedPacket {
   id: number;
@@ -53,6 +53,8 @@ function decodePayload(portnum: Portnums.PortNum, payload: Uint8Array): unknown 
         return fromBinary(Mesh.RoutingSchema, payload);
       case Portnums.PortNum.TRACEROUTE_APP:
         return fromBinary(Mesh.RouteDiscoverySchema, payload);
+      case Portnums.PortNum.STORE_FORWARD_APP:
+        return fromBinary(StoreForward.StoreAndForwardSchema, payload);
       default:
         return payload;
     }
