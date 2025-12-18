@@ -12,18 +12,19 @@ function LiveIndicator() {
   useEffect(() => {
     const interval = setInterval(() => {
       setFrame((f) => (f + 1) % 4);
-    }, 250);
+    }, 800);
     return () => clearInterval(interval);
   }, []);
 
-  // Radio waves animation
-  const frames = ["  •  ", " (•) ", "((•))"];
+  // Radio waves animation with ornate parens
+  const frames = ["  •  ", " ❨•❩ ", "❨❨•❩❩"];
   const pattern = [0, 1, 2, 1];
+  const dimGreen = "#2d5a3d";
 
   return (
     <Text>
-      <Text color={theme.status.online}>{frames[pattern[frame]]}</Text>
-      <Text color={theme.status.online} bold> LIVE</Text>
+      <Text color={theme.status.online} bold>LIVE </Text>
+      <Text color={dimGreen}>{frames[pattern[frame]]}</Text>
     </Text>
   );
 }
