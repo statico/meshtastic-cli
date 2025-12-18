@@ -71,6 +71,8 @@ interface ChatPanelProps {
   showEmojiSelector: boolean;
   emojiSelectorIndex: number;
   loraConfig?: Config.Config_LoRaConfig;
+  filter?: string;
+  filterInputActive?: boolean;
 }
 
 // Prefix width: [HH:MM:SS] (10) + space (1) + name (10) + space (1) = 22 chars
@@ -90,33 +92,48 @@ export function ChatPanel({
   showEmojiSelector,
   emojiSelectorIndex,
   loraConfig,
+  filter,
+  filterInputActive,
 }: ChatPanelProps) {
+  const hasFilter = filter && filter.length > 0;
+  const filterRowHeight = (hasFilter || filterInputActive) ? 1 : 0;
+
+  // Filter messages by text content or sender name
   const channelMessages = messages.filter((m) => m.channel === channel);
+  const filteredMessages = hasFilter
+    ? channelMessages.filter(m => {
+        const senderName = nodeStore.getNodeName(m.fromNode).toLowerCase();
+        const text = m.text.toLowerCase();
+        const filterLower = filter!.toLowerCase();
+        return text.includes(filterLower) || senderName.includes(filterLower);
+      })
+    : channelMessages;
+
   const channelInfo = channels.get(channel);
 
   // Fixed header height (4 lines for channel selector box, +1 if loraConfig) + input box (3 lines)
   const headerHeight = loraConfig ? 5 : 4;
   const inputHeight = 3;
   const emojiHeight = showEmojiSelector ? 3 : 0;
-  const messageAreaHeight = Math.max(1, height - headerHeight - inputHeight - emojiHeight);
+  const messageAreaHeight = Math.max(1, height - headerHeight - inputHeight - emojiHeight - filterRowHeight);
 
   // Calculate scroll offset to keep selected message visible
   let scrollOffset = 0;
-  if (channelMessages.length > messageAreaHeight) {
+  if (filteredMessages.length > messageAreaHeight) {
     if (selectedMessageIndex < 0) {
       // No selection - show most recent messages
-      scrollOffset = channelMessages.length - messageAreaHeight;
+      scrollOffset = filteredMessages.length - messageAreaHeight;
     } else {
       // Center the selected message in the view
       const halfView = Math.floor(messageAreaHeight / 2);
       scrollOffset = Math.max(0, Math.min(
         selectedMessageIndex - halfView,
-        channelMessages.length - messageAreaHeight
+        filteredMessages.length - messageAreaHeight
       ));
     }
   }
 
-  const visibleMessages = channelMessages.slice(scrollOffset, scrollOffset + messageAreaHeight);
+  const visibleMessages = filteredMessages.slice(scrollOffset, scrollOffset + messageAreaHeight);
 
   const getRoleName = (role: number) => {
     return Channel.Channel_Role[role] || `ROLE_${role}`;
@@ -179,10 +196,30 @@ export function ChatPanel({
         )}
       </Box>
 
+      {/* Filter row */}
+      {filterInputActive && (
+        <Box paddingX={1}>
+          <Text color={theme.fg.accent}>/</Text>
+          <Text color={theme.fg.primary}>{filter}</Text>
+          <Text color={theme.fg.accent}>█</Text>
+        </Box>
+      )}
+      {hasFilter && !filterInputActive && (
+        <Box paddingX={1}>
+          <Text color={theme.packet.encrypted} bold>[FILTERED: "{filter}"]</Text>
+          <Text color={theme.fg.muted}> ({filteredMessages.length} match{filteredMessages.length !== 1 ? "es" : ""}) </Text>
+          <Text color={theme.fg.secondary}>Esc to clear</Text>
+        </Box>
+      )}
+
       {/* Messages */}
       <Box flexDirection="column" flexGrow={1} flexShrink={1} paddingX={1} overflowY="hidden">
-        {channelMessages.length === 0 ? (
-          <Text color={theme.fg.muted}>No messages on channel {channel}</Text>
+        {filteredMessages.length === 0 ? (
+          hasFilter ? (
+            <Text color={theme.fg.muted}>No messages matching "{filter}"</Text>
+          ) : (
+            <Text color={theme.fg.muted}>No messages on channel {channel}</Text>
+          )
         ) : (
           visibleMessages.map((msg, i) => {
             const actualIndex = scrollOffset + i;

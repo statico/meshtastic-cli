@@ -1144,18 +1144,65 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
         if (input && !key.ctrl && !key.meta) {
           setChatInput((s) => s + input);
         }
+      } else if (chatFilterInput) {
+        // Filter input mode
+        if (key.escape) {
+          setChatFilterInput(false);
+          setChatFilter("");
+          setSelectedChatMessageIndex(-1);
+          return;
+        }
+        if (key.return) {
+          setChatFilterInput(false);
+          setSelectedChatMessageIndex(-1);
+          return;
+        }
+        if (key.backspace || key.delete) {
+          setChatFilter(s => s.slice(0, -1));
+          setSelectedChatMessageIndex(-1);
+          return;
+        }
+        if (input && !key.ctrl && !key.meta) {
+          setChatFilter(s => s + input);
+          setSelectedChatMessageIndex(-1);
+          return;
+        }
+        return;
       } else {
+        // Filter messages by text content or sender name
+        const filteredMessages = chatFilter
+          ? channelMessages.filter(m => {
+              const senderName = nodeStore.getNodeName(m.fromNode).toLowerCase();
+              const text = m.text.toLowerCase();
+              const filter = chatFilter.toLowerCase();
+              return text.includes(filter) || senderName.includes(filter);
+            })
+          : channelMessages;
+
+        // '/' to enter filter mode
+        if (input === "/") {
+          setChatFilterInput(true);
+          return;
+        }
+
+        // Escape to clear filter
+        if (key.escape && chatFilter) {
+          setChatFilter("");
+          setSelectedChatMessageIndex(-1);
+          return;
+        }
+
         // Message navigation
         if (input === "j" || key.downArrow) {
           setSelectedChatMessageIndex((i) => {
-            if (i < 0) return channelMessages.length - 1; // Start at bottom
-            return Math.min(i + 1, channelMessages.length - 1);
+            if (i < 0) return filteredMessages.length - 1; // Start at bottom
+            return Math.min(i + 1, filteredMessages.length - 1);
           });
           return;
         }
         if (input === "k" || key.upArrow) {
           setSelectedChatMessageIndex((i) => {
-            if (i < 0) return channelMessages.length - 1; // Start at bottom
+            if (i < 0) return filteredMessages.length - 1; // Start at bottom
             return Math.max(i - 1, 0);
           });
           return;
@@ -1163,7 +1210,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
         // Page up/down
         const chatPageSize = Math.max(1, terminalHeight - 12);
         if ((key.ctrl && input === "d") || key.pageDown) {
-          setSelectedChatMessageIndex((i) => Math.min(i + chatPageSize, channelMessages.length - 1));
+          setSelectedChatMessageIndex((i) => Math.min(i + chatPageSize, filteredMessages.length - 1));
           return;
         }
         if ((key.ctrl && input === "u") || key.pageUp) {
@@ -1178,12 +1225,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
           return;
         }
         if (isChatEnd) {
-          setSelectedChatMessageIndex(Math.max(0, channelMessages.length - 1));
+          setSelectedChatMessageIndex(Math.max(0, filteredMessages.length - 1));
           return;
         }
         // 'n' to go to sender node
         if (input === "n") {
-          const selectedMsg = channelMessages[selectedChatMessageIndex];
+          const selectedMsg = filteredMessages[selectedChatMessageIndex];
           if (selectedMsg) {
             const nodeIndex = nodes.findIndex((n) => n.num === selectedMsg.fromNode);
             if (nodeIndex >= 0) {
@@ -1207,11 +1254,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
             setChatChannel((c) => (c + 1) % 8);
           }
           setSelectedChatMessageIndex(-1);
+          setChatFilter(""); // Clear filter when changing channels
           return;
         }
         // 'd' to start DM with message sender
-        if (input === "d" && channelMessages[selectedChatMessageIndex]) {
-          const msg = channelMessages[selectedChatMessageIndex];
+        if (input === "d" && filteredMessages[selectedChatMessageIndex]) {
+          const msg = filteredMessages[selectedChatMessageIndex];
           if (msg.fromNode !== myNodeNum) {
             startDMWith(msg.fromNode);
           }
@@ -1512,6 +1560,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
               showEmojiSelector={showEmojiSelector}
               emojiSelectorIndex={emojiSelectorIndex}
               loraConfig={loraConfig}
+              filter={chatFilter}
+              filterInputActive={chatFilterInput}
             />
           </Box>
         )}
