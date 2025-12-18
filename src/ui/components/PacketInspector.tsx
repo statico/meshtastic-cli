@@ -9,6 +9,25 @@ import { formatNodeId } from "../../utils/hex";
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
+// Escape non-printable characters for display
+function escapeNonPrintable(data: Uint8Array): string {
+  const chars: string[] = [];
+  for (const b of data) {
+    if (b >= 32 && b < 127) {
+      chars.push(String.fromCharCode(b));
+    } else if (b === 10) {
+      chars.push("\\n");
+    } else if (b === 13) {
+      chars.push("\\r");
+    } else if (b === 9) {
+      chars.push("\\t");
+    } else {
+      chars.push(`\\x${b.toString(16).padStart(2, "0")}`);
+    }
+  }
+  return chars.join("");
+}
+
 export type InspectorTab = "info" | "json" | "hex";
 
 interface PacketInspectorProps {
@@ -275,6 +294,11 @@ function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinner
         );
       } else if (bruteForce?.status === "found" && bruteForce.result) {
         const r = bruteForce.result;
+        const confidenceHint = r.confidence === "high"
+          ? "protobuf+known port"
+          : r.confidence === "medium"
+          ? "valid structure"
+          : "plausible";
         lines.push(<Box key="bf-sep" height={1} />);
         lines.push(
           <Box key="bf-found">
@@ -285,17 +309,7 @@ function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinner
             <Text color={r.confidence === "high" ? theme.packet.direct : r.confidence === "medium" ? theme.data.coords : theme.fg.muted}>
               {r.confidence}
             </Text>
-          </Box>
-        );
-        // Confidence explanation
-        const confidenceHint = r.confidence === "high"
-          ? "protobuf header + known portnum"
-          : r.confidence === "medium"
-          ? "valid structure or mostly ASCII"
-          : "structure looks plausible";
-        lines.push(
-          <Box key="bf-hint">
-            <Text color={theme.fg.muted}>  ({confidenceHint})</Text>
+            <Text color={theme.fg.muted}> ({confidenceHint})</Text>
           </Box>
         );
         if (r.portnum !== undefined) {
@@ -306,24 +320,14 @@ function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinner
             </Box>
           );
         }
-        // Show message prominently if it's text
-        if (typeof r.payload === "string") {
-          lines.push(
-            <Box key="bf-message">
-              <Text color={theme.fg.muted}>Message: </Text>
-              <Text color={theme.packet.message}>"{r.payload}"</Text>
-            </Box>
-          );
-        } else if (r.payload !== undefined) {
-          const payloadHex = Array.from(r.payload as Uint8Array, b => b.toString(16).padStart(2, "0")).join("");
-          lines.push(
-            <Box key="bf-payload">
-              <Text color={theme.fg.muted}>Payload: </Text>
-              <Text color={theme.fg.secondary}>{(r.payload as Uint8Array).length} bytes </Text>
-              <Text color={theme.packet.encrypted}>0x{payloadHex.slice(0, 32)}{payloadHex.length > 32 ? "..." : ""}</Text>
-            </Box>
-          );
-        }
+        // Always show decrypted content with escaped non-printables
+        const escaped = escapeNonPrintable(r.decrypted);
+        lines.push(
+          <Box key="bf-decrypted">
+            <Text color={theme.fg.muted}>Decrypted: </Text>
+            <Text color={theme.packet.message}>{escaped}</Text>
+          </Box>
+        );
       } else if (bruteForce?.status === "not_found") {
         lines.push(
           <Box key="bf-notfound">
