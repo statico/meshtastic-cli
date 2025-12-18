@@ -15,22 +15,67 @@ export interface BruteForceProgress {
   keysPerSecond: number;
 }
 
+// Meshtastic default key template for simple PSK values (AQ== = 0x01, etc.)
+// The last byte is replaced with the simple key value (1-10)
+const DEFAULT_KEY_TEMPLATE = new Uint8Array([
+  0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59,
+  0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x00
+]);
+
 // Build the AES-CTR nonce from packet metadata
-// Meshtastic nonce: packetId (8 bytes LE) + fromNode (4 bytes LE) + 0x00000001 (4 bytes)
+// Meshtastic nonce structure (from CryptoEngine.cpp):
+//   bytes 0-7:  packetId (64-bit LE)
+//   bytes 8-11: fromNode (32-bit LE)
+//   bytes 12-15: counter (starts at 0)
 function buildNonce(packetId: number, fromNode: number): Uint8Array {
   const nonce = new Uint8Array(16);
   const view = new DataView(nonce.buffer);
-  view.setUint32(0, packetId, true); // packetId as little-endian
-  view.setUint32(8, fromNode, true); // fromNode as little-endian
-  view.setUint32(12, 1, true); // counter starts at 1
+  view.setUint32(0, packetId, true);   // packetId low 32 bits
+  view.setUint32(4, 0, true);          // packetId high 32 bits (always 0 in practice)
+  view.setUint32(8, fromNode, true);   // fromNode
+  view.setUint32(12, 0, true);         // counter starts at 0
   return nonce;
 }
 
-// Pad a short key to 16 bytes (AES-128) with zeros
-function padKey(shortKey: Uint8Array): Uint8Array {
+// Expand a short key to full 16-byte AES key
+// Simple keys (1-10) use the Meshtastic default key template
+function expandKey(shortKey: Uint8Array): Uint8Array {
+  if (shortKey.length === 1 && shortKey[0] >= 1 && shortKey[0] <= 10) {
+    // Simple key - use default template with last byte replaced
+    const key = new Uint8Array(DEFAULT_KEY_TEMPLATE);
+    key[15] = shortKey[0];
+    return key;
+  }
+  // Zero-pad for other short keys
   const key = new Uint8Array(16);
   key.set(shortKey.slice(0, 16));
   return key;
+}
+
+// Read a protobuf varint from data at offset
+function readVarint(data: Uint8Array, offset: number): { value: number; bytesRead: number } {
+  let value = 0;
+  let shift = 0;
+  let bytesRead = 0;
+  while (offset + bytesRead < data.length && bytesRead < 5) {
+    const byte = data[offset + bytesRead];
+    value |= (byte & 0x7f) << shift;
+    bytesRead++;
+    if ((byte & 0x80) === 0) break;
+    shift += 7;
+  }
+  return { value, bytesRead };
+}
+
+// Count printable ASCII characters in data
+function countPrintable(data: Uint8Array): number {
+  let count = 0;
+  for (const b of data) {
+    if ((b >= 32 && b < 127) || b === 10 || b === 13 || b === 9) {
+      count++;
+    }
+  }
+  return count;
 }
 
 // Decrypt using AES-CTR
@@ -52,44 +97,58 @@ async function decryptAesCtr(
     ["decrypt"]
   );
   const result = await crypto.subtle.decrypt(
-    { name: "AES-CTR", counter: nonceBuffer, length: 64 },
+    { name: "AES-CTR", counter: nonceBuffer, length: 32 },
     cryptoKey,
     encryptedBuffer
   );
   return new Uint8Array(result);
 }
 
-// Validate decrypted data looks like a valid Meshtastic payload
-function validateDecrypted(data: Uint8Array): { valid: boolean; confidence: "high" | "medium" | "low"; portnum?: number } {
-  if (data.length < 2) return { valid: false, confidence: "low" };
+// Validate decrypted data - STRICT: only accept TEXT_MESSAGE with high ASCII ratio
+// This avoids false positives from random data that happens to start with 0x08 + valid portnum
+function validateDecrypted(data: Uint8Array, encryptedLen: number): { valid: boolean; confidence: "high" | "medium" | "low"; portnum?: number } {
+  if (data.length < 4) return { valid: false, confidence: "low" };
 
-  // Check for protobuf structure: first byte is often 0x08 (field 1, varint)
-  // which represents the portnum field in Meshtastic Data message
-  if (data[0] === 0x08) {
-    const portnum = data[1];
-    // Valid portnums are typically 1-256
-    if (portnum >= 1 && portnum <= 256) {
-      // High confidence if it's a known portnum
-      if (portnum === 1 || portnum === 3 || portnum === 4 || portnum === 5 ||
-          portnum === 32 || portnum === 33 || portnum === 67 || portnum === 68 ||
-          portnum === 70 || portnum === 71 || portnum === 72 || portnum === 73) {
-        return { valid: true, confidence: "high", portnum };
-      }
-      return { valid: true, confidence: "medium", portnum };
+  // Must start with 0x08 (field 1, varint wire type = portnum)
+  if (data[0] !== 0x08) return { valid: false, confidence: "low" };
+
+  // Read portnum as varint
+  const portnum = readVarint(data, 1);
+  if (portnum.value < 1 || portnum.value > 512) return { valid: false, confidence: "low" };
+
+  // Look for field 2 (payload) - tag 0x12 (field 2, length-delimited)
+  const payloadTagOffset = 1 + portnum.bytesRead;
+  if (payloadTagOffset >= data.length) return { valid: false, confidence: "low" };
+
+  // Field 2 tag should be 0x12
+  if (data[payloadTagOffset] !== 0x12) return { valid: false, confidence: "low" };
+
+  // Read payload length
+  const payloadLen = readVarint(data, payloadTagOffset + 1);
+  if (payloadLen.value <= 0 || payloadLen.value > data.length) {
+    return { valid: false, confidence: "low" };
+  }
+
+  const headerSize = payloadTagOffset + 1 + payloadLen.bytesRead;
+  const expectedTotal = headerSize + payloadLen.value;
+
+  // Sanity check: total size should roughly match encrypted size (allow ±4 for padding)
+  if (expectedTotal > encryptedLen + 4 || expectedTotal < encryptedLen - 4) {
+    return { valid: false, confidence: "low" };
+  }
+
+  // ONLY accept TEXT_MESSAGE (portnum=1) with ≥95% printable ASCII
+  // Other portnums produce too many false positives
+  if (portnum.value === 1 && payloadLen.value > 0) {
+    const payloadOffset = headerSize;
+    const payload = data.slice(payloadOffset, payloadOffset + payloadLen.value);
+    const printableRatio = countPrintable(payload) / payload.length;
+    if (printableRatio >= 0.95) {
+      return { valid: true, confidence: "high", portnum: 1 };
     }
   }
 
-  // Check if it looks like ASCII text (for TEXT_MESSAGE_APP)
-  let printableCount = 0;
-  for (const b of data) {
-    if ((b >= 32 && b < 127) || b === 10 || b === 13) {
-      printableCount++;
-    }
-  }
-  if (printableCount > data.length * 0.8) {
-    return { valid: true, confidence: "medium" };
-  }
-
+  // Reject everything else - too many false positives
   return { valid: false, confidence: "low" };
 }
 
@@ -97,33 +156,51 @@ function validateDecrypted(data: Uint8Array): { valid: boolean; confidence: "hig
 function extractPayload(data: Uint8Array): { portnum?: number; payload?: Uint8Array } {
   if (data.length < 2 || data[0] !== 0x08) return {};
 
-  const portnum = data[1];
+  // Read portnum as varint
+  const portnumVar = readVarint(data, 1);
+  const portnum = portnumVar.value;
 
-  // Look for field 2 (payload) which is length-delimited (wire type 2)
-  // Field 2, wire type 2 = (2 << 3) | 2 = 0x12
-  for (let i = 2; i < data.length - 1; i++) {
-    if (data[i] === 0x12) {
-      const len = data[i + 1];
-      if (len > 0 && i + 2 + len <= data.length) {
-        return { portnum, payload: data.slice(i + 2, i + 2 + len) };
-      }
-    }
+  // Look for field 2 (payload) tag 0x12
+  const payloadTagOffset = 1 + portnumVar.bytesRead;
+  if (payloadTagOffset >= data.length || data[payloadTagOffset] !== 0x12) {
+    return { portnum };
+  }
+
+  // Read payload length as varint
+  const payloadLen = readVarint(data, payloadTagOffset + 1);
+  const payloadOffset = payloadTagOffset + 1 + payloadLen.bytesRead;
+  const payloadEnd = payloadOffset + payloadLen.value;
+
+  if (payloadLen.value > 0 && payloadEnd <= data.length) {
+    return { portnum, payload: data.slice(payloadOffset, payloadEnd) };
   }
 
   return { portnum };
 }
 
 // Generator that yields key candidates for brute forcing
+// Yields 1-byte keys first (to try default template), then progressively longer keys
 function* keyGenerator(depth: number): Generator<Uint8Array> {
-  const maxKey = Math.pow(256, depth);
-  for (let k = 0; k < maxKey; k++) {
-    const key = new Uint8Array(depth);
-    let val = k;
-    for (let i = 0; i < depth; i++) {
-      key[i] = val & 0xff;
-      val >>>= 8;
+  // First try 1-byte simple keys (will use default template via expandKey)
+  for (let k = 1; k <= 10; k++) {
+    yield new Uint8Array([k]);
+  }
+
+  // Then try all keys up to the specified depth
+  for (let d = 1; d <= depth; d++) {
+    const maxKey = Math.pow(256, d);
+    for (let k = 0; k < maxKey; k++) {
+      // Skip 1-byte simple keys 1-10 (already tried above)
+      if (d === 1 && k >= 1 && k <= 10) continue;
+
+      const key = new Uint8Array(d);
+      let val = k;
+      for (let i = 0; i < d; i++) {
+        key[i] = val & 0xff;
+        val >>>= 8;
+      }
+      yield key;
     }
-    yield key;
   }
 }
 
@@ -145,7 +222,12 @@ export async function bruteForceDecrypt(
   if (depth <= 0 || depth > 4) return null;
 
   const nonce = buildNonce(packetId, fromNode);
-  const total = Math.pow(256, depth);
+  // Total keys: 10 simple keys + sum of 256^d for d=1 to depth (minus 10 already counted)
+  let total = 10;
+  for (let d = 1; d <= depth; d++) {
+    total += Math.pow(256, d);
+  }
+  total -= 10; // Simple keys 1-10 are counted once, not in each depth
   let current = 0;
   const startTime = Date.now();
 
@@ -160,11 +242,11 @@ export async function bruteForceDecrypt(
       if (result.done) return null;
 
       const shortKey = result.value;
-      const key = padKey(shortKey);
+      const key = expandKey(shortKey);
 
       try {
         const decrypted = await decryptAesCtr(encrypted, key, nonce);
-        const validation = validateDecrypted(decrypted);
+        const validation = validateDecrypted(decrypted, encrypted.length);
 
         if (validation.valid) {
           const keyHex = Array.from(shortKey, b => b.toString(16).padStart(2, "0")).join("");
