@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
-import { Channel } from "@meshtastic/protobufs";
+import { Channel, Config } from "@meshtastic/protobufs";
 import { theme } from "../theme";
 import type { DbMessage } from "../../db";
 import type { NodeStore } from "../../protocol/node-store";
@@ -70,6 +70,7 @@ interface ChatPanelProps {
   selectedMessageIndex: number;
   showEmojiSelector: boolean;
   emojiSelectorIndex: number;
+  loraConfig?: Config.Config_LoRaConfig;
 }
 
 // Prefix width: [HH:MM:SS] (10) + space (1) + name (10) + space (1) = 22 chars
@@ -88,12 +89,13 @@ export function ChatPanel({
   selectedMessageIndex,
   showEmojiSelector,
   emojiSelectorIndex,
+  loraConfig,
 }: ChatPanelProps) {
   const channelMessages = messages.filter((m) => m.channel === channel);
   const channelInfo = channels.get(channel);
 
-  // Fixed header height (4 lines for channel selector box) + input box (3 lines)
-  const headerHeight = 4;
+  // Fixed header height (4 lines for channel selector box, +1 if loraConfig) + input box (3 lines)
+  const headerHeight = loraConfig ? 5 : 4;
   const inputHeight = 3;
   const emojiHeight = showEmojiSelector ? 3 : 0;
   const messageAreaHeight = Math.max(1, height - headerHeight - inputHeight - emojiHeight);
@@ -161,6 +163,20 @@ export function ChatPanel({
             <Text color={theme.fg.muted}>No channel info (connect to device)</Text>
           )}
         </Box>
+        {loraConfig && (
+          <Box>
+            <Text color={theme.fg.muted}>Preset: </Text>
+            <Text color={theme.packet.telemetry}>{Config.Config_LoRaConfig_ModemPreset[loraConfig.modemPreset]}</Text>
+            <Text color={theme.fg.muted}>  Slot: </Text>
+            <Text color={theme.fg.primary}>{loraConfig.channelNum || "Auto"}</Text>
+            {loraConfig.overrideFrequency > 0 && (
+              <>
+                <Text color={theme.fg.muted}>  Freq: </Text>
+                <Text color={theme.fg.accent}>{loraConfig.overrideFrequency.toFixed(3)} MHz</Text>
+              </>
+            )}
+          </Box>
+        )}
       </Box>
 
       {/* Messages */}

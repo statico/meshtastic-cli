@@ -1511,6 +1511,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
               selectedMessageIndex={selectedChatMessageIndex}
               showEmojiSelector={showEmojiSelector}
               emojiSelectorIndex={emojiSelectorIndex}
+              loraConfig={loraConfig}
             />
           </Box>
         )}
