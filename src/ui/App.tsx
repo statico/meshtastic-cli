@@ -103,12 +103,20 @@ export function App({ address, packetStore, nodeStore }: AppProps) {
     });
   }, []);
 
-  // Subscribe to new packets
+  // Subscribe to new packets with smart autoscroll
+  const selectedPacketIndexRef = useRef(selectedPacketIndex);
+  selectedPacketIndexRef.current = selectedPacketIndex;
+
   useEffect(() => {
     const unsubscribe = packetStore.onPacket((packet) => {
       processPacketForNodes(packet);
       setPackets((prev) => {
         const next = [...prev, packet].slice(-50);
+        // Auto-scroll only if viewing the last packet
+        const wasAtEnd = selectedPacketIndexRef.current >= prev.length - 1;
+        if (wasAtEnd) {
+          setSelectedPacketIndex(next.length - 1);
+        }
         return next;
       });
     });
@@ -329,6 +337,13 @@ export function App({ address, packetStore, nodeStore }: AppProps) {
       }
       if (input === "k" || key.upArrow) {
         setSelectedPacketIndex((i) => Math.max(i - 1, 0));
+      }
+      // Jump to first/last packet (vim-style g/G)
+      if (input === "g") {
+        setSelectedPacketIndex(0);
+      }
+      if (input === "G") {
+        setSelectedPacketIndex(packets.length - 1);
       }
       // Tab switching with h/l or left/right arrows
       const tabs: InspectorTab[] = ["info", "json", "hex"];
