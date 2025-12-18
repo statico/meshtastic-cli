@@ -1,10 +1,13 @@
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Box, Text } from "ink";
 import { theme } from "../theme";
 import type { DecodedPacket } from "../../protocol/decoder";
 import type { NodeStore } from "../../protocol/node-store";
+import { bruteForceDecrypt, portnumToString, type DecryptResult, type BruteForceProgress } from "../../protocol/crypto";
 import { Mesh, Portnums, Channel, Telemetry } from "@meshtastic/protobufs";
 import { formatNodeId } from "../../utils/hex";
+
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 export type InspectorTab = "info" | "json" | "hex";
 
@@ -14,9 +17,100 @@ interface PacketInspectorProps {
   height?: number;
   nodeStore: NodeStore;
   scrollOffset?: number;
+  bruteForceDepth?: number;
 }
 
-export function PacketInspector({ packet, activeTab, height = 12, nodeStore, scrollOffset = 0 }: PacketInspectorProps) {
+type BruteForceStatus = "idle" | "running" | "found" | "not_found";
+
+interface BruteForceState {
+  status: BruteForceStatus;
+  progress: BruteForceProgress | null;
+  result: DecryptResult | null;
+}
+
+export function PacketInspector({ packet, activeTab, height = 12, nodeStore, scrollOffset = 0, bruteForceDepth = 2 }: PacketInspectorProps) {
+  const [bruteForce, setBruteForce] = useState<BruteForceState>({
+    status: "idle",
+    progress: null,
+    result: null,
+  });
+  const [spinnerFrame, setSpinnerFrame] = useState(0);
+  const cancelRef = useRef<{ cancelled: boolean }>({ cancelled: false });
+  const lastPacketIdRef = useRef<number | null>(null);
+
+  // Spinner animation
+  useEffect(() => {
+    if (bruteForce.status !== "running") return;
+    const interval = setInterval(() => {
+      setSpinnerFrame((f) => (f + 1) % SPINNER_FRAMES.length);
+    }, 80);
+    return () => clearInterval(interval);
+  }, [bruteForce.status]);
+
+  // Start brute force when encrypted packet is selected
+  useEffect(() => {
+    const mp = packet?.meshPacket;
+    const isEncrypted = mp?.payloadVariant.case === "encrypted";
+    const packetId = mp?.id;
+
+    // Cancel any running brute force
+    cancelRef.current.cancelled = true;
+
+    // Reset state if packet changed or not encrypted
+    if (!isEncrypted || !mp || bruteForceDepth <= 0) {
+      setBruteForce({ status: "idle", progress: null, result: null });
+      lastPacketIdRef.current = null;
+      return;
+    }
+
+    // Don't restart if same packet
+    if (packetId === lastPacketIdRef.current) return;
+    lastPacketIdRef.current = packetId ?? null;
+
+    // Start brute force
+    const encrypted = mp.payloadVariant.value as Uint8Array;
+    const signal = { cancelled: false };
+    cancelRef.current = signal;
+
+    setBruteForce({ status: "running", progress: null, result: null });
+
+    bruteForceDecrypt({
+      encrypted,
+      packetId: mp.id,
+      fromNode: mp.from,
+      depth: bruteForceDepth,
+      signal,
+      chunkSize: 500,
+      onProgress: (progress) => {
+        if (!signal.cancelled) {
+          setBruteForce((s) => ({ ...s, progress }));
+        }
+      },
+    }).then((result) => {
+      if (signal.cancelled) return;
+      if (result) {
+        setBruteForce({ status: "found", progress: null, result });
+      } else {
+        setBruteForce({ status: "not_found", progress: null, result: null });
+      }
+    }).catch(() => {
+      if (!signal.cancelled) {
+        setBruteForce({ status: "not_found", progress: null, result: null });
+      }
+    });
+
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [packet?.id, packet?.meshPacket?.id, bruteForceDepth, activeTab]);
+
+  // Cancel brute force when tab changes away from info
+  useEffect(() => {
+    if (activeTab !== "info") {
+      cancelRef.current.cancelled = true;
+    }
+  }, [activeTab]);
+
   if (!packet) {
     return (
       <Box flexDirection="column" paddingX={1}>
@@ -29,7 +123,16 @@ export function PacketInspector({ packet, activeTab, height = 12, nodeStore, scr
   return (
     <Box flexDirection="column" paddingX={1} height={height}>
       <TabBar activeTab={activeTab} scrollOffset={scrollOffset} />
-      {activeTab === "info" && <InfoView packet={packet} nodeStore={nodeStore} height={height - 2} scrollOffset={scrollOffset} />}
+      {activeTab === "info" && (
+        <InfoView
+          packet={packet}
+          nodeStore={nodeStore}
+          height={height - 2}
+          scrollOffset={scrollOffset}
+          bruteForce={bruteForce}
+          spinnerFrame={spinnerFrame}
+        />
+      )}
       {activeTab === "json" && <JsonView packet={packet} height={height - 2} scrollOffset={scrollOffset} />}
       {activeTab === "hex" && <HexView packet={packet} height={height - 2} scrollOffset={scrollOffset} />}
     </Box>
@@ -63,7 +166,14 @@ function TabBar({ activeTab, scrollOffset = 0 }: { activeTab: InspectorTab; scro
 }
 
 // === INFO VIEW ===
-function InfoView({ packet, nodeStore, height, scrollOffset }: { packet: DecodedPacket; nodeStore: NodeStore; height: number; scrollOffset: number }) {
+function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinnerFrame }: {
+  packet: DecodedPacket;
+  nodeStore: NodeStore;
+  height: number;
+  scrollOffset: number;
+  bruteForce?: BruteForceState;
+  spinnerFrame?: number;
+}) {
   const mp = packet.meshPacket;
   const fr = packet.fromRadio;
   const lines: React.ReactNode[] = [];
@@ -149,6 +259,66 @@ function InfoView({ packet, nodeStore, height, scrollOffset }: { packet: Decoded
           <Text color={theme.packet.encrypted}>0x{hex}</Text>
         </Box>
       );
+
+      // Brute force status
+      if (bruteForce?.status === "running") {
+        const progress = bruteForce.progress;
+        const pct = progress ? ((progress.current / progress.total) * 100).toFixed(1) : "0";
+        const kps = progress?.keysPerSecond ?? 0;
+        lines.push(
+          <Box key="bf-progress">
+            <Text color={theme.fg.accent}>{SPINNER_FRAMES[spinnerFrame ?? 0]} </Text>
+            <Text color={theme.fg.muted}>Brute forcing: </Text>
+            <Text color={theme.fg.primary}>{pct}%</Text>
+            <Text color={theme.fg.muted}> ({kps.toLocaleString()} keys/s)</Text>
+          </Box>
+        );
+      } else if (bruteForce?.status === "found" && bruteForce.result) {
+        const r = bruteForce.result;
+        lines.push(<Box key="bf-sep" height={1} />);
+        lines.push(
+          <Box key="bf-found">
+            <Text color={theme.packet.direct}>✓ DECRYPTED</Text>
+            <Text color={theme.fg.muted}> (confidence: </Text>
+            <Text color={r.confidence === "high" ? theme.packet.direct : r.confidence === "medium" ? theme.data.coords : theme.fg.muted}>
+              {r.confidence}
+            </Text>
+            <Text color={theme.fg.muted}>)</Text>
+          </Box>
+        );
+        lines.push(
+          <Box key="bf-key">
+            <Text color={theme.fg.muted}>Key: </Text>
+            <Text color={theme.fg.accent}>{r.keyHex}</Text>
+          </Box>
+        );
+        if (r.portnum !== undefined) {
+          lines.push(
+            <Box key="bf-port">
+              <Text color={theme.fg.muted}>Port: </Text>
+              <Text color={theme.fg.primary}>{portnumToString(r.portnum)}</Text>
+            </Box>
+          );
+        }
+        if (r.payload !== undefined) {
+          const payloadStr = typeof r.payload === "string"
+            ? `"${r.payload}"`
+            : `<${(r.payload as Uint8Array).length} bytes>`;
+          lines.push(
+            <Box key="bf-payload">
+              <Text color={theme.fg.muted}>Payload: </Text>
+              <Text color={theme.packet.message}>{payloadStr}</Text>
+            </Box>
+          );
+        }
+      } else if (bruteForce?.status === "not_found") {
+        lines.push(
+          <Box key="bf-notfound">
+            <Text color={theme.fg.muted}>Brute force: </Text>
+            <Text color={theme.packet.encrypted}>no simple key found</Text>
+          </Box>
+        );
+      }
     }
 
     // Payload-specific details

@@ -36,9 +36,10 @@ interface AppProps {
   packetStore: PacketStore;
   nodeStore: NodeStore;
   skipConfig?: boolean;
+  bruteForceDepth?: number;
 }
 
-export function App({ address, packetStore, nodeStore, skipConfig = false }: AppProps) {
+export function App({ address, packetStore, nodeStore, skipConfig = false, bruteForceDepth = 2 }: AppProps) {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const [transport, setTransport] = useState<Transport | null>(null);
@@ -892,7 +893,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false }: App
                 />
               </Box>
               <Box height={detailHeight} borderStyle="single" borderColor={theme.border.normal}>
-                <PacketInspector packet={selectedPacket} activeTab={inspectorTab} height={detailHeight - 2} nodeStore={nodeStore} scrollOffset={inspectorScrollOffset} />
+                <PacketInspector packet={selectedPacket} activeTab={inspectorTab} height={detailHeight - 2} nodeStore={nodeStore} scrollOffset={inspectorScrollOffset} bruteForceDepth={bruteForceDepth} />
               </Box>
             </>
           );
