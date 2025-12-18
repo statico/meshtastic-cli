@@ -604,6 +604,54 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
     }
   }, [myNodeNum, chatChannel, transport, showNotification]);
 
+  const resendMessage = useCallback(async (msg: db.DbMessage) => {
+    if (!transport || !myNodeNum) return;
+
+    const packetId = Math.floor(Math.random() * 0xffffffff);
+    const data = create(Mesh.DataSchema, {
+      portnum: Portnums.PortNum.TEXT_MESSAGE_APP,
+      payload: new TextEncoder().encode(msg.text),
+    });
+
+    const meshPacket = create(Mesh.MeshPacketSchema, {
+      id: packetId,
+      from: myNodeNum,
+      to: msg.toNode,
+      channel: msg.channel,
+      wantAck: true,
+      payloadVariant: { case: "decoded", value: data },
+    });
+
+    const toRadio = create(Mesh.ToRadioSchema, {
+      payloadVariant: { case: "packet", value: meshPacket },
+    });
+
+    try {
+      const binary = toBinary(Mesh.ToRadioSchema, toRadio);
+      await transport.send(binary);
+
+      // Update the original message status to pending with new packet ID
+      if (msg.id) {
+        db.updateMessageStatus(msg.id, "pending");
+      }
+      // Add new message entry for the resend
+      const newMsg: db.DbMessage = {
+        packetId,
+        fromNode: myNodeNum,
+        toNode: msg.toNode,
+        channel: msg.channel,
+        text: msg.text,
+        timestamp: Math.floor(Date.now() / 1000),
+        status: "pending",
+      };
+      db.insertMessage(newMsg);
+      setMessages((prev) => [...prev, newMsg].slice(-100));
+      showNotification("Message resent");
+    } catch {
+      showNotification("Failed to resend message");
+    }
+  }, [myNodeNum, transport, showNotification]);
+
   const sendDM = useCallback(async (text: string, toNode: number) => {
     if (!transport || !myNodeNum || !text.trim()) return;
 
@@ -1030,6 +1078,24 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
       if (input === "4") { setMode("dm"); return; }
       if (input === "5") { setMode("config"); setChatInputFocused(false); setDmInputFocused(false); return; }
       if (input === "6") { setMode("log"); setChatInputFocused(false); setDmInputFocused(false); return; }
+      // Bracket keys for tab switching
+      const modes: AppMode[] = ["packets", "nodes", "chat", "dm", "config", "log"];
+      if (input === "[") {
+        const idx = modes.indexOf(mode);
+        const newMode = modes[(idx - 1 + modes.length) % modes.length];
+        setMode(newMode);
+        setChatInputFocused(false);
+        setDmInputFocused(false);
+        return;
+      }
+      if (input === "]") {
+        const idx = modes.indexOf(mode);
+        const newMode = modes[(idx + 1) % modes.length];
+        setMode(newMode);
+        setChatInputFocused(false);
+        setDmInputFocused(false);
+        return;
+      }
     }
     // Only treat bare escape (not escape sequences like Home/End) as tab switch
     const isBareEscape = key.escape && (input === "" || input === "\x1b");
@@ -1398,6 +1464,14 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
           }
           return;
         }
+        // 'R' to resend failed message
+        if (input === "R") {
+          const selectedMsg = filteredMessages[selectedChatMessageIndex];
+          if (selectedMsg && selectedMsg.fromNode === myNodeNum && selectedMsg.status === "error") {
+            resendMessage(selectedMsg);
+          }
+          return;
+        }
         // Enter to focus input
         if (key.return) {
           setChatInputFocused(true);
@@ -1484,6 +1558,14 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
           if (nodeIndex >= 0) {
             setMode("nodes");
             setSelectedNodeIndex(nodeIndex);
+          }
+          return;
+        }
+        // 'R' to resend failed message
+        if (input === "R" && dmMessages[selectedDMMessageIndex]) {
+          const msg = dmMessages[selectedDMMessageIndex];
+          if (msg.fromNode === myNodeNum && msg.status === "error") {
+            resendMessage(msg);
           }
           return;
         }

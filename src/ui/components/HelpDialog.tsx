@@ -9,12 +9,8 @@ interface HelpDialogProps {
 }
 
 const globalKeys = [
-  { key: "1", desc: "Packets view" },
-  { key: "2", desc: "Nodes view" },
-  { key: "3", desc: "Chat view" },
-  { key: "4", desc: "DM view" },
-  { key: "5", desc: "Config view" },
-  { key: "6", desc: "Log view" },
+  { key: "1-6", desc: "Switch to view (Packets/Nodes/...)" },
+  { key: "[ / ]", desc: "Previous / Next view" },
   { key: "q / Q", desc: "Quit" },
   { key: "?", desc: "Toggle help" },
 ];
@@ -64,6 +60,7 @@ const chatKeys = [
   { key: "Tab/S-Tab", desc: "Next/Prev channel" },
   { key: "n", desc: "Go to sender node" },
   { key: "d", desc: "DM the sender" },
+  { key: "R", desc: "Resend failed message" },
   { key: "Enter", desc: "Focus input" },
   { key: "Escape", desc: "Unfocus / Exit chat" },
   { key: "Ctrl+E", desc: "Emoji selector (in input)" },
@@ -74,6 +71,7 @@ const dmKeys = [
   { key: "k / ↑", desc: "Previous conversation/message" },
   { key: "g / G", desc: "First / Last" },
   { key: "n", desc: "Go to node" },
+  { key: "R", desc: "Resend failed message" },
   { key: "Enter", desc: "Select / Focus input" },
   { key: "Escape", desc: "Back / Unfocus" },
 ];

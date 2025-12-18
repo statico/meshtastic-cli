@@ -121,6 +121,7 @@ export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight 
           <Text color={theme.fg.muted}>
             {"NAME".padEnd(10)}
             {"ID".padEnd(12)}
+            {"FAV"}{"  "}
             {"HOPS".padEnd(6)}
             {"SNR".padEnd(8)}
             {"BATT".padEnd(7)}
@@ -182,11 +183,14 @@ function NodeRow({ node, isSelected }: NodeRowProps) {
     displayName = truncated;
   }
 
+  const favStar = node.isFavorite ? "★" : " ";
+
   return (
     <Box backgroundColor={bgColor} paddingX={1}>
       <Text wrap="truncate">
         <Text color={nameColor}>{padEndVisual(displayName, 10)}</Text>
         <Text color={theme.fg.muted}>{nodeId.padEnd(12)}</Text>
+        <Text color="#ffcc00">{favStar}</Text>{"    "}
         <Text color={getHopsColor(node.hopsAway)}>{hops.padEnd(6)}</Text>
         <Text color={getSnrColor(node.snr)}>{snr.padEnd(8)}</Text>
         <Text color={getBatteryColor(node.batteryLevel)}>{battery.padEnd(7)}</Text>

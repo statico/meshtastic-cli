@@ -57,17 +57,16 @@ export function DMPanel({
   height,
   width,
 }: DMPanelProps) {
-  // Layout: header (1) + convo list (variable) + separator (1) + messages (variable) + input (3)
-  const inputHeight = 3;
-  const headerHeight = 1;
-  const separatorHeight = 1;
-  const listHeight = Math.max(3, Math.floor((height - inputHeight - headerHeight - separatorHeight) * 0.3));
-  const messageAreaHeight = Math.max(3, height - listHeight - inputHeight - headerHeight - separatorHeight);
-
   const selectedConvo = conversations[selectedConvoIndex];
 
+  // Fixed conversation list height (3-5 rows depending on count)
+  const convoListHeight = Math.min(5, Math.max(3, conversations.length));
+
+  // Message area height: total - header(1) - convo list - separator(1) - msg header(1) - input(3)
+  const messageAreaHeight = Math.max(3, height - 1 - convoListHeight - 1 - 1 - 3);
+
   // Calculate scroll offset for conversation list
-  const visibleConvoCount = Math.max(1, listHeight);
+  const visibleConvoCount = convoListHeight;
   let convoScrollOffset = 0;
   if (conversations.length > visibleConvoCount) {
     const halfView = Math.floor(visibleConvoCount / 2);
@@ -78,8 +77,8 @@ export function DMPanel({
   }
   const visibleConvos = conversations.slice(convoScrollOffset, convoScrollOffset + visibleConvoCount);
 
-  // Calculate scroll offset for messages - account for header line in message area
-  const visibleMsgCount = Math.max(1, messageAreaHeight - 1);
+  // Calculate scroll offset for messages
+  const visibleMsgCount = messageAreaHeight;
   let msgScrollOffset = 0;
   if (messages.length > visibleMsgCount) {
     if (selectedMessageIndex < 0) {
@@ -94,19 +93,19 @@ export function DMPanel({
   }
   const visibleMessages = messages.slice(msgScrollOffset, msgScrollOffset + visibleMsgCount);
 
-  // Available width for message text: total width - padding (2) - prefix - status indicator (6)
-  const textWidth = Math.max(20, width - 2 - PREFIX_WIDTH - 6);
+  // Available width for message text
+  const textWidth = Math.max(20, width - 4 - PREFIX_WIDTH - 6);
 
   return (
     <Box flexDirection="column" width="100%" height={height}>
       {/* Header */}
-      <Box paddingX={1}>
+      <Box paddingX={1} flexShrink={0}>
         <Text color={theme.fg.accent} bold>DIRECT MESSAGES</Text>
         <Text color={theme.fg.muted}> ({conversations.length} conversation{conversations.length !== 1 ? "s" : ""})</Text>
       </Box>
 
       {/* Conversation list */}
-      <Box height={listHeight} flexDirection="column" paddingX={1}>
+      <Box height={convoListHeight} flexDirection="column" paddingX={1} flexShrink={0}>
         {conversations.length === 0 ? (
           <Text color={theme.fg.muted}>No DM conversations yet. Press 'd' on a node to start one.</Text>
         ) : (
@@ -127,10 +126,10 @@ export function DMPanel({
       </Box>
 
       {/* Separator */}
-      <Box height={1} borderStyle="single" borderColor={theme.border.normal} borderTop={true} borderBottom={false} borderLeft={false} borderRight={false} />
+      <Box flexShrink={0} borderStyle="single" borderColor={theme.border.normal} borderTop={true} borderBottom={false} borderLeft={false} borderRight={false} />
 
       {/* Message header */}
-      <Box paddingX={1}>
+      <Box paddingX={1} flexShrink={0}>
         {selectedConvo ? (
           <>
             <Text color={theme.fg.muted}>DM with </Text>
@@ -143,7 +142,7 @@ export function DMPanel({
       </Box>
 
       {/* Messages */}
-      <Box flexGrow={1} flexDirection="column" paddingX={1} overflowY="hidden">
+      <Box height={messageAreaHeight} flexDirection="column" paddingX={1}>
         {messages.length === 0 ? (
           <Text color={theme.fg.muted}>{selectedConvo ? "No messages yet. Start the conversation!" : "Press 'd' on a node to start a DM"}</Text>
         ) : (

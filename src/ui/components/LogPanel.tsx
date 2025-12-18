@@ -15,27 +15,27 @@ interface LogPanelProps {
 export function LogPanel({ responses, selectedIndex, height, nodeStore }: LogPanelProps) {
   if (responses.length === 0) {
     return (
-      <Box flexDirection="column" paddingX={1} paddingY={1}>
+      <Box flexDirection="column" paddingX={1} paddingY={1} height={height}>
         <Text color={theme.fg.muted}>No position or traceroute responses logged yet.</Text>
         <Text> </Text>
         <Text color={theme.fg.secondary}>In NODES view, use:</Text>
         <Text color={theme.data.nodeFrom}>  p</Text><Text color={theme.fg.muted}> - Request position</Text>
         <Text color={theme.data.nodeFrom}>  t</Text><Text color={theme.fg.muted}> - Traceroute</Text>
-        <Text color={theme.data.nodeFrom}>  d</Text><Text color={theme.fg.muted}> - Direct ping (hop=0)</Text>
+        <Text color={theme.data.nodeFrom}>  D</Text><Text color={theme.fg.muted}> - Direct ping (hop=0)</Text>
         <Text color={theme.data.nodeFrom}>  e</Text><Text color={theme.fg.muted}> - Request telemetry</Text>
       </Box>
     );
   }
 
   // Split pane: upper half list, lower half inspector
-  const listHeight = Math.floor((height - 2) * 0.5);
-  const inspectorHeight = height - listHeight - 1;
+  const listHeight = Math.max(5, Math.floor((height - 1) * 0.5));
+  const inspectorHeight = Math.max(5, height - listHeight - 1);
 
   const selectedResponse = responses[selectedIndex];
 
   return (
-    <Box flexDirection="column" width="100%">
-      <Box height={listHeight} flexDirection="column">
+    <Box flexDirection="column" width="100%" height={height}>
+      <Box height={listHeight} flexDirection="column" flexShrink={0}>
         <LogList
           responses={responses}
           selectedIndex={selectedIndex}
@@ -43,8 +43,8 @@ export function LogPanel({ responses, selectedIndex, height, nodeStore }: LogPan
           nodeStore={nodeStore}
         />
       </Box>
-      <Box height={1} borderStyle="single" borderColor={theme.border.normal} borderTop={true} borderBottom={false} borderLeft={false} borderRight={false} />
-      <Box height={inspectorHeight} flexDirection="column">
+      <Box flexShrink={0} borderStyle="single" borderColor={theme.border.normal} borderTop={true} borderBottom={false} borderLeft={false} borderRight={false} />
+      <Box height={inspectorHeight} flexDirection="column" flexShrink={0}>
         <LogInspector
           response={selectedResponse}
           nodeStore={nodeStore}
