@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import { theme } from "../theme";
 import type { DecodedPacket } from "../../protocol/decoder";
 import type { NodeStore } from "../../protocol/node-store";
-import { Mesh, Portnums, Telemetry, StoreForward } from "@meshtastic/protobufs";
+import { Mesh, Portnums, Telemetry, StoreForward, Channel, Config } from "@meshtastic/protobufs";
 import { formatNodeId } from "../../utils/hex";
 
 function LiveIndicator() {
@@ -288,13 +288,21 @@ function renderPacketSummary(packet: DecodedPacket, nodeStore: NodeStore): React
     return rrName ? <Text color={theme.data.channel}> {rrName}</Text> : null;
   }
 
-  // Neighbor info
+  // Neighbor info - show count and first few neighbor names
   if (packet.portnum === Portnums.PortNum.NEIGHBORINFO_APP) {
-    const ni = packet.payload as { neighbors?: unknown[] };
-    if (ni.neighbors) {
-      return <Text color={theme.data.hops}> {ni.neighbors.length} neighbors</Text>;
+    const ni = packet.payload as { neighbors?: { nodeId?: number; snr?: number }[] };
+    if (ni.neighbors && ni.neighbors.length > 0) {
+      const first3 = ni.neighbors.slice(0, 3).map(n => n.nodeId ? nodeStore.getNodeName(n.nodeId) : "?");
+      const more = ni.neighbors.length > 3 ? `+${ni.neighbors.length - 3}` : "";
+      return (
+        <>
+          <Text color={theme.data.hops}> {ni.neighbors.length}:</Text>
+          <Text color={theme.fg.primary}> {first3.join(", ")}</Text>
+          {more && <Text color={theme.fg.muted}> {more}</Text>}
+        </>
+      );
     }
-    return null;
+    return <Text color={theme.fg.muted}> 0 neighbors</Text>;
   }
 
   return null;
@@ -341,7 +349,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
   if (variantCase === "packet" && packet.meshPacket) {
     const mp = packet.meshPacket;
     const fromName = nodeStore.getNodeName(mp.from);
-    const toName = mp.to === 0xffffffff ? "^all" : nodeStore.getNodeName(mp.to);
+    const toName = mp.to === 0xffffffff ? "^all"
+      : mp.to === 1 ? "^mqtt" // NODENUM_BROADCAST_NO_LORA - non-LoRa broadcast (MQTT/BLE)
+      : nodeStore.getNodeName(mp.to);
     const portName = packet.portnum !== undefined
       ? Portnums.PortNum[packet.portnum]?.replace(/_APP$/, "") || `PORT_${packet.portnum}`
       : "ENCRYPTED";
@@ -416,6 +426,8 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
           <Text color={theme.data.arrow}>{"*"} </Text>
           <Text color={theme.packet.direct}>{"MY_INFO".padEnd(14)}</Text>
           <Text color={theme.data.nodeFrom}>{id}</Text>
+          {myInfo.rebootCount > 0 && <Text color={theme.fg.muted}> reboots:{myInfo.rebootCount}</Text>}
+          {myInfo.pioEnv && <Text color={theme.data.hardware}> | {myInfo.pioEnv}</Text>}
         </Text>
       </Box>
     );
@@ -424,6 +436,23 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
   if (variantCase === "config") {
     const config = fr.payloadVariant.value as Mesh.Config;
     const configType = config.payloadVariant.case || "unknown";
+    const configValue = config.payloadVariant.value as Record<string, unknown> | undefined;
+    let configSummary = "";
+    if (configValue) {
+      if (configType === "device" && "role" in configValue && configValue.role != null) {
+        const role = Config.Config_DeviceConfig_Role[configValue.role as number] || configValue.role;
+        configSummary = ` role:${role}`;
+      } else if (configType === "lora" && "region" in configValue && configValue.region != null) {
+        const region = Config.Config_LoRaConfig_RegionCode[configValue.region as number] || configValue.region;
+        configSummary = ` region:${region}`;
+      } else if (configType === "display" && "screenOnSecs" in configValue) {
+        configSummary = ` screen:${configValue.screenOnSecs}s`;
+      } else if (configType === "power" && "lsSecs" in configValue) {
+        configSummary = ` ls:${configValue.lsSecs}s`;
+      } else if (configType === "position" && "gpsEnabled" in configValue) {
+        configSummary = ` gps:${configValue.gpsEnabled ? "on" : "off"}`;
+      }
+    }
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
@@ -431,6 +460,7 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
           <Text color={theme.data.arrow}>{"*"} </Text>
           <Text color={theme.packet.config}>{"CONFIG".padEnd(14)}</Text>
           <Text color={theme.data.channel}>{configType}</Text>
+          <Text color={theme.fg.muted}>{configSummary}</Text>
         </Text>
       </Box>
     );
@@ -439,6 +469,11 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
   if (variantCase === "moduleConfig") {
     const config = fr.payloadVariant.value as Mesh.ModuleConfig;
     const configType = config.payloadVariant.case || "unknown";
+    const moduleValue = config.payloadVariant.value as Record<string, unknown> | undefined;
+    let moduleSummary = "";
+    if (moduleValue && "enabled" in moduleValue) {
+      moduleSummary = moduleValue.enabled ? " [enabled]" : " [disabled]";
+    }
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
@@ -446,6 +481,7 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
           <Text color={theme.data.arrow}>{"*"} </Text>
           <Text color={theme.packet.config}>{"MODULE_CONFIG".padEnd(14)}</Text>
           <Text color={theme.data.channel}>{configType}</Text>
+          <Text color={moduleSummary.includes("enabled") ? theme.status.online : theme.fg.muted}>{moduleSummary}</Text>
         </Text>
       </Box>
     );
@@ -453,7 +489,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
 
   if (variantCase === "channel") {
     const channel = fr.payloadVariant.value as Mesh.Channel;
-    const name = channel.settings?.name || `Channel ${channel.index}`;
+    const name = channel.settings?.name || "(default)";
+    const role = Channel.Channel_Role[channel.role] || "DISABLED";
+    const pskLen = channel.settings?.psk?.length || 0;
     return (
       <Box backgroundColor={bgColor}>
         <Text wrap="truncate">
@@ -461,7 +499,9 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
           <Text color={theme.data.arrow}>{"*"} </Text>
           <Text color={theme.packet.config}>{"CHANNEL".padEnd(14)}</Text>
           <Text color={theme.data.channel}>#{channel.index} </Text>
-          <Text color={theme.fg.primary}>{name}</Text>
+          <Text color={theme.fg.primary}>{name} </Text>
+          <Text color={role === "PRIMARY" ? theme.status.online : role === "DISABLED" ? theme.fg.muted : theme.fg.secondary}>{role}</Text>
+          {pskLen > 0 && <Text color={theme.fg.muted}> psk:{pskLen}B</Text>}
         </Text>
       </Box>
     );
@@ -491,6 +531,69 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
           <Text color={theme.data.arrow}>{"!"} </Text>
           <Text color={levelColor}>{"NOTIFICATION".padEnd(14)}</Text>
           <Text color={theme.fg.primary}>{notif.message || ""}</Text>
+        </Text>
+      </Box>
+    );
+  }
+
+  if (variantCase === "metadata") {
+    const meta = fr.payloadVariant.value as Mesh.DeviceMetadata;
+    const hw = meta.hwModel !== undefined ? Mesh.HardwareModel[meta.hwModel] || `HW_${meta.hwModel}` : "";
+    return (
+      <Box backgroundColor={bgColor}>
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.arrow}>{"*"} </Text>
+          <Text color={theme.packet.telemetry}>{"METADATA".padEnd(14)}</Text>
+          <Text color={theme.fg.primary}>{meta.firmwareVersion || "?"}</Text>
+          {hw && <Text color={theme.data.hardware}> | {hw}</Text>}
+          {meta.hasPKC && <Text color={theme.status.online}> PKC</Text>}
+        </Text>
+      </Box>
+    );
+  }
+
+  if (variantCase === "deviceuiConfig") {
+    const ui = fr.payloadVariant.value as { screenBrightness?: number; screenTimeout?: number; theme?: number };
+    return (
+      <Box backgroundColor={bgColor}>
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.arrow}>{"*"} </Text>
+          <Text color={theme.packet.config}>{"DEVICE_UI".padEnd(14)}</Text>
+          {ui.screenBrightness !== undefined && <Text color={theme.fg.primary}>bright:{ui.screenBrightness} </Text>}
+          {ui.screenTimeout !== undefined && <Text color={theme.fg.muted}>timeout:{ui.screenTimeout}s</Text>}
+        </Text>
+      </Box>
+    );
+  }
+
+  if (variantCase === "fileInfo") {
+    const file = fr.payloadVariant.value as { fileName?: string; sizeBytes?: number };
+    const name = file.fileName?.split("/").pop() || file.fileName || "?";
+    return (
+      <Box backgroundColor={bgColor}>
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.arrow}>{"*"} </Text>
+          <Text color={theme.packet.config}>{"FILE_INFO".padEnd(14)}</Text>
+          <Text color={theme.fg.primary}>{name}</Text>
+          {file.sizeBytes !== undefined && <Text color={theme.fg.muted}> {file.sizeBytes}B</Text>}
+        </Text>
+      </Box>
+    );
+  }
+
+  if (variantCase === "queueStatus") {
+    const qs = fr.payloadVariant.value as { free?: number; maxlen?: number; res?: number };
+    return (
+      <Box backgroundColor={bgColor}>
+        <Text wrap="truncate">
+          <Text color={theme.data.time}>[{time}] </Text>
+          <Text color={theme.data.arrow}>{"*"} </Text>
+          <Text color={theme.packet.routing}>{"QUEUE_STATUS".padEnd(14)}</Text>
+          <Text color={theme.fg.primary}>{qs.free ?? "?"}/{qs.maxlen ?? "?"} free</Text>
+          {qs.res !== undefined && qs.res !== 0 && <Text color={theme.packet.encrypted}> res:{qs.res}</Text>}
         </Text>
       </Box>
     );

@@ -4,7 +4,7 @@ import { theme } from "../theme";
 import type { DecodedPacket } from "../../protocol/decoder";
 import type { NodeStore } from "../../protocol/node-store";
 import { bruteForceDecrypt, portnumToString, type DecryptResult, type BruteForceProgress } from "../../protocol/crypto";
-import { Mesh, Portnums, Channel, Telemetry } from "@meshtastic/protobufs";
+import { Mesh, Portnums, Channel, Telemetry, Config } from "@meshtastic/protobufs";
 import { formatNodeId } from "../../utils/hex";
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -210,7 +210,11 @@ function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinner
   // MeshPacket info
   if (mp) {
     const fromName = nodeStore.getNodeName(mp.from);
-    const toName = mp.to === 0xffffffff ? "BROADCAST" : nodeStore.getNodeName(mp.to);
+    const isBroadcast = mp.to === 0xffffffff;
+    const isMqttBroadcast = mp.to === 1; // NODENUM_BROADCAST_NO_LORA
+    const toName = isBroadcast ? "BROADCAST"
+      : isMqttBroadcast ? "MQTT_BROADCAST"
+      : nodeStore.getNodeName(mp.to);
 
     lines.push(
       <Box key="from-to">
@@ -219,7 +223,7 @@ function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinner
         <Text color={theme.fg.muted}> ({formatNodeId(mp.from)})</Text>
         <Text color={theme.fg.muted}>  To: </Text>
         <Text color={theme.fg.primary}>{toName}</Text>
-        {mp.to !== 0xffffffff && <Text color={theme.fg.muted}> ({formatNodeId(mp.to)})</Text>}
+        {!isBroadcast && !isMqttBroadcast && <Text color={theme.fg.muted}> ({formatNodeId(mp.to)})</Text>}
         <Text color={theme.fg.muted}>  Ch: </Text>
         <Text color={theme.fg.primary}>{mp.channel}</Text>
       </Box>
@@ -589,7 +593,16 @@ function renderPayloadDetails(packet: DecodedPacket, nodeStore: NodeStore): Reac
 
   // Neighbor info
   if (packet.portnum === Portnums.PortNum.NEIGHBORINFO_APP) {
-    const ni = packet.payload as { neighbors?: { nodeId?: number; snr?: number }[] };
+    const ni = packet.payload as { nodeId?: number; neighbors?: { nodeId?: number; snr?: number }[] };
+    if (ni.nodeId) {
+      lines.push(
+        <Box key="ni-from">
+          <Text color={theme.fg.muted}>From Node: </Text>
+          <Text color={theme.fg.accent}>{nodeStore.getNodeName(ni.nodeId)}</Text>
+          <Text color={theme.fg.muted}> ({formatNodeId(ni.nodeId)})</Text>
+        </Box>
+      );
+    }
     if (ni.neighbors && ni.neighbors.length > 0) {
       lines.push(
         <Box key="ni-count">
@@ -597,23 +610,31 @@ function renderPayloadDetails(packet: DecodedPacket, nodeStore: NodeStore): Reac
           <Text color={theme.fg.primary}>{ni.neighbors.length}</Text>
         </Box>
       );
-      ni.neighbors.slice(0, 5).forEach((n, i) => {
+      ni.neighbors.slice(0, 8).forEach((n, i) => {
         const name = n.nodeId ? nodeStore.getNodeName(n.nodeId) : "?";
+        const id = n.nodeId ? formatNodeId(n.nodeId) : "";
         lines.push(
           <Box key={`ni-${i}`}>
             <Text color={theme.fg.muted}>  • </Text>
             <Text color={theme.fg.accent}>{name}</Text>
-            {n.snr != null && <Text color={theme.fg.secondary}> SNR: {n.snr.toFixed(1)}dB</Text>}
+            {id && <Text color={theme.fg.muted}> ({id})</Text>}
+            {n.snr != null && <Text color={theme.fg.secondary}> SNR: {(n.snr / 4).toFixed(1)}dB</Text>}
           </Box>
         );
       });
-      if (ni.neighbors.length > 5) {
+      if (ni.neighbors.length > 8) {
         lines.push(
           <Box key="ni-more">
-            <Text color={theme.fg.muted}>  ... and {ni.neighbors.length - 5} more</Text>
+            <Text color={theme.fg.muted}>  ... and {ni.neighbors.length - 8} more</Text>
           </Box>
         );
       }
+    } else {
+      lines.push(
+        <Box key="ni-empty">
+          <Text color={theme.fg.muted}>No neighbors reported</Text>
+        </Box>
+      );
     }
     return lines.length > 0 ? lines : null;
   }
@@ -638,8 +659,30 @@ function renderFromRadioDetails(fr: Mesh.FromRadio): React.ReactNode[] | null {
         <Box key="node">
           <Text color={theme.fg.muted}>Node: </Text>
           <Text color={theme.fg.primary}>{formatNodeId(info.myNodeNum)}</Text>
+          {info.rebootCount > 0 && (
+            <>
+              <Text color={theme.fg.muted}>  Reboots: </Text>
+              <Text color={theme.fg.secondary}>{info.rebootCount}</Text>
+            </>
+          )}
         </Box>
       );
+      if (info.pioEnv) {
+        lines.push(
+          <Box key="pio">
+            <Text color={theme.fg.muted}>Platform: </Text>
+            <Text color={theme.fg.accent}>{info.pioEnv}</Text>
+          </Box>
+        );
+      }
+      if (info.minAppVersion) {
+        lines.push(
+          <Box key="app">
+            <Text color={theme.fg.muted}>Min App: </Text>
+            <Text color={theme.fg.secondary}>{info.minAppVersion}</Text>
+          </Box>
+        );
+      }
       break;
     }
 
@@ -685,6 +728,7 @@ function renderFromRadioDetails(fr: Mesh.FromRadio): React.ReactNode[] | null {
     case "config": {
       const config = variant.value as Mesh.Config;
       const configCase = config.payloadVariant.case || "unknown";
+      const configValue = config.payloadVariant.value as Record<string, unknown> | undefined;
       lines.push(
         <Box key="type">
           <Text color={theme.fg.muted}>Type: </Text>
@@ -693,12 +737,87 @@ function renderFromRadioDetails(fr: Mesh.FromRadio): React.ReactNode[] | null {
           <Text color={theme.fg.accent}>{configCase}</Text>
         </Box>
       );
+      // Show key settings for each config type
+      if (configValue) {
+        if (configCase === "device") {
+          const role = configValue.role !== undefined
+            ? Config.Config_DeviceConfig_Role[configValue.role as number] || configValue.role
+            : "?";
+          lines.push(
+            <Box key="device">
+              <Text color={theme.fg.muted}>Role: </Text>
+              <Text color={theme.fg.primary}>{role}</Text>
+              {"serialEnabled" in configValue && (
+                <>
+                  <Text color={theme.fg.muted}>  Serial: </Text>
+                  <Text color={configValue.serialEnabled ? theme.status.online : theme.fg.muted}>
+                    {configValue.serialEnabled ? "on" : "off"}
+                  </Text>
+                </>
+              )}
+            </Box>
+          );
+        } else if (configCase === "lora") {
+          const region = configValue.region !== undefined
+            ? Config.Config_LoRaConfig_RegionCode[configValue.region as number] || configValue.region
+            : "?";
+          lines.push(
+            <Box key="lora">
+              <Text color={theme.fg.muted}>Region: </Text>
+              <Text color={theme.fg.primary}>{region}</Text>
+              {"hopLimit" in configValue && (
+                <>
+                  <Text color={theme.fg.muted}>  Hops: </Text>
+                  <Text color={theme.fg.secondary}>{configValue.hopLimit as number}</Text>
+                </>
+              )}
+              {"txPower" in configValue && (
+                <>
+                  <Text color={theme.fg.muted}>  TX: </Text>
+                  <Text color={theme.fg.secondary}>{configValue.txPower as number}dBm</Text>
+                </>
+              )}
+            </Box>
+          );
+        } else if (configCase === "display") {
+          lines.push(
+            <Box key="display">
+              {"screenOnSecs" in configValue && (
+                <>
+                  <Text color={theme.fg.muted}>Screen: </Text>
+                  <Text color={theme.fg.primary}>{configValue.screenOnSecs as number}s</Text>
+                </>
+              )}
+              {"gpsFormat" in configValue && (
+                <>
+                  <Text color={theme.fg.muted}>  GPS: </Text>
+                  <Text color={theme.fg.secondary}>{configValue.gpsFormat as number}</Text>
+                </>
+              )}
+            </Box>
+          );
+        } else if (configCase === "position") {
+          lines.push(
+            <Box key="position">
+              <Text color={theme.fg.muted}>GPS: </Text>
+              <Text color={configValue.gpsEnabled ? theme.status.online : theme.fg.muted}>
+                {configValue.gpsEnabled ? "enabled" : "disabled"}
+              </Text>
+              {"fixedPosition" in configValue && configValue.fixedPosition && (
+                <Text color={theme.fg.secondary}> [fixed]</Text>
+              )}
+            </Box>
+          );
+        }
+      }
       break;
     }
 
     case "moduleConfig": {
       const config = variant.value as Mesh.ModuleConfig;
       const configCase = config.payloadVariant.case || "unknown";
+      const moduleValue = config.payloadVariant.value as Record<string, unknown> | undefined;
+      const isEnabled = moduleValue && "enabled" in moduleValue ? moduleValue.enabled : undefined;
       lines.push(
         <Box key="type">
           <Text color={theme.fg.muted}>Type: </Text>
@@ -707,6 +826,53 @@ function renderFromRadioDetails(fr: Mesh.FromRadio): React.ReactNode[] | null {
           <Text color={theme.fg.accent}>{configCase}</Text>
         </Box>
       );
+      if (isEnabled !== undefined) {
+        lines.push(
+          <Box key="enabled">
+            <Text color={theme.fg.muted}>Status: </Text>
+            <Text color={isEnabled ? theme.status.online : theme.fg.muted}>
+              {isEnabled ? "ENABLED" : "DISABLED"}
+            </Text>
+          </Box>
+        );
+      }
+      // Show module-specific settings
+      if (moduleValue) {
+        if (configCase === "mqtt" && isEnabled) {
+          lines.push(
+            <Box key="mqtt">
+              {"address" in moduleValue && moduleValue.address && (
+                <>
+                  <Text color={theme.fg.muted}>Server: </Text>
+                  <Text color={theme.fg.primary}>{moduleValue.address as string}</Text>
+                </>
+              )}
+            </Box>
+          );
+        } else if (configCase === "serial" && isEnabled) {
+          lines.push(
+            <Box key="serial">
+              {"baud" in moduleValue && (
+                <>
+                  <Text color={theme.fg.muted}>Baud: </Text>
+                  <Text color={theme.fg.primary}>{moduleValue.baud as number}</Text>
+                </>
+              )}
+            </Box>
+          );
+        } else if (configCase === "telemetry") {
+          lines.push(
+            <Box key="telem">
+              {"deviceUpdateInterval" in moduleValue && (
+                <>
+                  <Text color={theme.fg.muted}>Device interval: </Text>
+                  <Text color={theme.fg.primary}>{moduleValue.deviceUpdateInterval as number}s</Text>
+                </>
+              )}
+            </Box>
+          );
+        }
+      }
       break;
     }
 
@@ -752,6 +918,7 @@ function renderFromRadioDetails(fr: Mesh.FromRadio): React.ReactNode[] | null {
 
     case "metadata": {
       const meta = variant.value as Mesh.DeviceMetadata;
+      const hw = meta.hwModel !== undefined ? Mesh.HardwareModel[meta.hwModel] || `Model_${meta.hwModel}` : null;
       lines.push(
         <Box key="type">
           <Text color={theme.fg.muted}>Type: </Text>
@@ -760,16 +927,38 @@ function renderFromRadioDetails(fr: Mesh.FromRadio): React.ReactNode[] | null {
       );
       lines.push(
         <Box key="fw">
-          <Text color={theme.fg.muted}>FW: </Text>
-          <Text color={theme.fg.primary}>{meta.firmwareVersion}</Text>
-          {meta.deviceStateVersion && (
+          <Text color={theme.fg.muted}>Firmware: </Text>
+          <Text color={theme.fg.primary}>{meta.firmwareVersion || "?"}</Text>
+          {meta.deviceStateVersion !== undefined && (
             <>
               <Text color={theme.fg.muted}>  State: </Text>
-              <Text color={theme.fg.secondary}>{meta.deviceStateVersion}</Text>
+              <Text color={theme.fg.secondary}>v{meta.deviceStateVersion}</Text>
             </>
           )}
         </Box>
       );
+      if (hw) {
+        lines.push(
+          <Box key="hw">
+            <Text color={theme.fg.muted}>Hardware: </Text>
+            <Text color={theme.fg.accent}>{hw}</Text>
+          </Box>
+        );
+      }
+      const caps: string[] = [];
+      if (meta.hasWifi) caps.push("WiFi");
+      if (meta.hasBluetooth) caps.push("BT");
+      if (meta.hasEthernet) caps.push("Eth");
+      if (meta.hasPKC) caps.push("PKC");
+      if (meta.canShutdown) caps.push("Shutdown");
+      if (caps.length > 0) {
+        lines.push(
+          <Box key="caps">
+            <Text color={theme.fg.muted}>Capabilities: </Text>
+            <Text color={theme.fg.secondary}>{caps.join(", ")}</Text>
+          </Box>
+        );
+      }
       break;
     }
 
@@ -803,6 +992,105 @@ function renderFromRadioDetails(fr: Mesh.FromRadio): React.ReactNode[] | null {
           <Box key="msg">
             <Text color={theme.fg.muted}>Message: </Text>
             <Text color={theme.fg.primary}>{notif.message}</Text>
+          </Box>
+        );
+      }
+      break;
+    }
+
+    case "deviceuiConfig": {
+      const ui = variant.value as {
+        screenBrightness?: number;
+        screenTimeout?: number;
+        screenLock?: boolean;
+        theme?: number;
+        language?: number;
+        alertEnabled?: boolean;
+        bannerEnabled?: boolean;
+      };
+      lines.push(
+        <Box key="type">
+          <Text color={theme.fg.muted}>Type: </Text>
+          <Text color={theme.packet.config}>DEVICE_UI_CONFIG</Text>
+        </Box>
+      );
+      lines.push(
+        <Box key="screen">
+          <Text color={theme.fg.muted}>Screen: </Text>
+          <Text color={theme.fg.primary}>brightness={ui.screenBrightness ?? "?"}</Text>
+          <Text color={theme.fg.muted}>  timeout=</Text>
+          <Text color={theme.fg.primary}>{ui.screenTimeout ?? "?"}s</Text>
+          {ui.screenLock && <Text color={theme.fg.secondary}> [locked]</Text>}
+        </Box>
+      );
+      lines.push(
+        <Box key="features">
+          <Text color={theme.fg.muted}>Features: </Text>
+          <Text color={ui.alertEnabled ? theme.status.online : theme.fg.muted}>
+            alerts:{ui.alertEnabled ? "on" : "off"}
+          </Text>
+          <Text color={theme.fg.muted}>  </Text>
+          <Text color={ui.bannerEnabled ? theme.status.online : theme.fg.muted}>
+            banner:{ui.bannerEnabled ? "on" : "off"}
+          </Text>
+        </Box>
+      );
+      break;
+    }
+
+    case "fileInfo": {
+      const file = variant.value as { fileName?: string; sizeBytes?: number };
+      lines.push(
+        <Box key="type">
+          <Text color={theme.fg.muted}>Type: </Text>
+          <Text color={theme.packet.config}>FILE_INFO</Text>
+        </Box>
+      );
+      lines.push(
+        <Box key="file">
+          <Text color={theme.fg.muted}>File: </Text>
+          <Text color={theme.fg.primary}>{file.fileName || "?"}</Text>
+        </Box>
+      );
+      lines.push(
+        <Box key="size">
+          <Text color={theme.fg.muted}>Size: </Text>
+          <Text color={theme.fg.secondary}>{file.sizeBytes ?? 0} bytes</Text>
+        </Box>
+      );
+      break;
+    }
+
+    case "queueStatus": {
+      const qs = variant.value as { free?: number; maxlen?: number; res?: number; meshPacketId?: number };
+      lines.push(
+        <Box key="type">
+          <Text color={theme.fg.muted}>Type: </Text>
+          <Text color={theme.packet.routing}>QUEUE_STATUS</Text>
+        </Box>
+      );
+      lines.push(
+        <Box key="queue">
+          <Text color={theme.fg.muted}>Queue: </Text>
+          <Text color={theme.fg.primary}>{qs.free ?? "?"}</Text>
+          <Text color={theme.fg.muted}>/</Text>
+          <Text color={theme.fg.primary}>{qs.maxlen ?? "?"}</Text>
+          <Text color={theme.fg.muted}> slots free</Text>
+        </Box>
+      );
+      if (qs.res !== undefined && qs.res !== 0) {
+        lines.push(
+          <Box key="res">
+            <Text color={theme.fg.muted}>Result: </Text>
+            <Text color={theme.packet.encrypted}>{qs.res}</Text>
+          </Box>
+        );
+      }
+      if (qs.meshPacketId) {
+        lines.push(
+          <Box key="pkt">
+            <Text color={theme.fg.muted}>Packet ID: </Text>
+            <Text color={theme.fg.secondary}>0x{qs.meshPacketId.toString(16)}</Text>
           </Box>
         );
       }
