@@ -132,7 +132,7 @@ export function DMPanel({
               <Text color={theme.fg.accent}>{nodeStore.getNodeName(selectedConvo.nodeNum)}</Text>
               <Text color={theme.fg.muted}> ({formatNodeId(selectedConvo.nodeNum)})</Text>
             </Box>
-            <Box flexDirection="column" flexGrow={1} paddingX={1}>
+            <Box flexDirection="column" flexGrow={1} flexShrink={1} paddingX={1} overflowY="hidden">
               {messages.length === 0 ? (
                 <Text color={theme.fg.muted}>No messages yet. Start the conversation!</Text>
               ) : (
