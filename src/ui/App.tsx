@@ -1159,8 +1159,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, brute
       return;
     }
 
-    // Toggle help
-    if (input === "?") {
+    // Toggle help (but not when input is focused)
+    const isInputFocused = (mode === "chat" && chatInputFocused) || (mode === "dm" && dmInputFocused);
+    if (input === "?" && !isInputFocused) {
       setShowHelp((h) => !h);
       return;
     }
