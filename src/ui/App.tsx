@@ -18,6 +18,8 @@ import { HelpDialog } from "./components/HelpDialog";
 import { QuitDialog } from "./components/QuitDialog";
 import { ResponseModal } from "./components/ResponseModal";
 import { LogPanel } from "./components/LogPanel";
+import { MeshViewPacketList, MeshViewInspector, MeshViewInspectorTab } from "./components/MeshViewPanel";
+import { MeshViewStore, MeshViewPacket, MeshViewApiResponse } from "../protocol/meshview";
 import { RebootModal } from "./components/RebootModal";
 import { DeviceNotificationModal } from "./components/DeviceNotificationModal";
 import * as db from "../db";
@@ -29,7 +31,7 @@ import packageJson from "../../package.json";
 
 const BROADCAST_ADDR = 0xFFFFFFFF;
 
-type AppMode = "packets" | "nodes" | "chat" | "dm" | "config" | "log";
+type AppMode = "packets" | "nodes" | "chat" | "dm" | "config" | "log" | "meshview";
 
 export interface ChannelInfo {
   index: number;
@@ -224,6 +226,18 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const [selectedChannelIndex, setSelectedChannelIndex] = useState(0);
   const [selectedConfigFieldIndex, setSelectedConfigFieldIndex] = useState(0);
   const [localMeshViewUrl, setLocalMeshViewUrl] = useState<string | undefined>(meshViewUrl);
+
+  // MeshView firehose state
+  const [meshViewPackets, setMeshViewPackets] = useState<MeshViewPacket[]>([]);
+  const [selectedMeshViewIndex, setSelectedMeshViewIndex] = useState(0);
+  const [meshViewInspectorTab, setMeshViewInspectorTab] = useState<MeshViewInspectorTab>("info");
+  const [meshViewInspectorHeight, setMeshViewInspectorHeight] = useState(18);
+  const [meshViewInspectorExpanded, setMeshViewInspectorExpanded] = useState(false);
+  const [meshViewInspectorScrollOffset, setMeshViewInspectorScrollOffset] = useState(0);
+  const [meshViewPolling, setMeshViewPolling] = useState(false);
+  const [meshViewError, setMeshViewError] = useState<string | null>(null);
+  const meshViewStoreRef = useRef<MeshViewStore>(new MeshViewStore());
+
   const [batchEditMode, setBatchEditMode] = useState(false);
   const [batchEditCount, setBatchEditCount] = useState(0);
 
@@ -581,6 +595,53 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     });
     return unsubscribe;
   }, []);
+
+  // MeshView firehose polling - poll every second when on meshview tab
+  useEffect(() => {
+    if (mode !== "meshview" || !localMeshViewUrl) return;
+
+    let running = true;
+    const poll = async () => {
+      if (!running) return;
+      setMeshViewPolling(true);
+      try {
+        const since = meshViewStoreRef.current.getLatestImportTime();
+        const url = since
+          ? `${localMeshViewUrl}/api/packets?since=${since}&limit=100`
+          : `${localMeshViewUrl}/api/packets?limit=100`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data: MeshViewApiResponse = await response.json();
+        if (data.packets?.length > 0) {
+          // Get count BEFORE adding new packets to check if user was at end
+          const prevCount = meshViewStoreRef.current.count;
+          meshViewStoreRef.current.addPackets(data.packets, data.latest_import_time);
+          const allPackets = meshViewStoreRef.current.getAll();
+          setMeshViewPackets(allPackets);
+          // Only auto-scroll if user was at the end (following)
+          setSelectedMeshViewIndex((prev) => {
+            const wasAtEnd = prevCount === 0 || prev >= prevCount - 1;
+            return wasAtEnd ? allPackets.length - 1 : prev;
+          });
+        }
+        setMeshViewError(null);
+      } catch (e) {
+        setMeshViewError(e instanceof Error ? e.message : "Poll failed");
+      } finally {
+        setMeshViewPolling(false);
+      }
+    };
+
+    // Initial poll immediately
+    poll();
+    // Then poll every second
+    const interval = setInterval(poll, 1000);
+
+    return () => {
+      running = false;
+      clearInterval(interval);
+    };
+  }, [mode, localMeshViewUrl]);
 
   // Start transport
   useEffect(() => {
@@ -1449,8 +1510,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       if (input === "4") { setMode("dm"); return; }
       if (input === "5") { setMode("config"); setChatInputFocused(false); setDmInputFocused(false); if (!batchEditMode) startBatchEdit(); return; }
       if (input === "6") { setMode("log"); setChatInputFocused(false); setDmInputFocused(false); return; }
+      if (input === "7" && localMeshViewUrl) { setMode("meshview"); setChatInputFocused(false); setDmInputFocused(false); return; }
       // Bracket keys for tab switching
-      const modes: AppMode[] = ["packets", "nodes", "chat", "dm", "config", "log"];
+      const modes: AppMode[] = localMeshViewUrl
+        ? ["packets", "nodes", "chat", "dm", "config", "log", "meshview"]
+        : ["packets", "nodes", "chat", "dm", "config", "log"];
       if (input === "[") {
         const idx = modes.indexOf(mode);
         const newMode = modes[(idx - 1 + modes.length) % modes.length];
@@ -2428,6 +2492,86 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           }
         }
       }
+    } else if (mode === "meshview") {
+      const pageSize = Math.max(1, terminalHeight - meshViewInspectorHeight - 10);
+
+      // Navigation
+      if (input === "j" || key.downArrow) {
+        setSelectedMeshViewIndex((i) => Math.min(i + 1, meshViewPackets.length - 1));
+        setMeshViewInspectorScrollOffset(0);
+      }
+      if (input === "k" || key.upArrow) {
+        setSelectedMeshViewIndex((i) => Math.max(i - 1, 0));
+        setMeshViewInspectorScrollOffset(0);
+      }
+      if ((key.ctrl && input === "d") || key.pageDown) {
+        setSelectedMeshViewIndex((i) => Math.min(i + pageSize, meshViewPackets.length - 1));
+        setMeshViewInspectorScrollOffset(0);
+      }
+      if ((key.ctrl && input === "u") || key.pageUp) {
+        setSelectedMeshViewIndex((i) => Math.max(i - pageSize, 0));
+        setMeshViewInspectorScrollOffset(0);
+      }
+      // Home/End
+      const isMvHome = input === "g" || input === "\x1b[H" || input === "\x1b[1~" || input === "\x1bOH";
+      const isMvEnd = input === "G" || input === "\x1b[F" || input === "\x1b[4~" || input === "\x1bOF";
+      if (isMvHome) {
+        setSelectedMeshViewIndex(0);
+        setMeshViewInspectorScrollOffset(0);
+      }
+      if (isMvEnd) {
+        setSelectedMeshViewIndex(meshViewPackets.length - 1);
+        setMeshViewInspectorScrollOffset(0);
+      }
+
+      // Inspector tabs
+      if (input === "h" || key.leftArrow) {
+        setMeshViewInspectorTab((t) => t === "json" ? "info" : "json");
+        setMeshViewInspectorScrollOffset(0);
+      }
+      if (input === "l" || key.rightArrow) {
+        setMeshViewInspectorTab((t) => t === "info" ? "json" : "info");
+        setMeshViewInspectorScrollOffset(0);
+      }
+
+      // Inspector scroll
+      if (input === " " || input === "b") {
+        const scrollAmount = meshViewInspectorHeight - 3;
+        if (input === " ") {
+          setMeshViewInspectorScrollOffset((o) => o + scrollAmount);
+        } else {
+          setMeshViewInspectorScrollOffset((o) => Math.max(0, o - scrollAmount));
+        }
+      }
+
+      // Resize inspector
+      if (input === "+" || input === "=") {
+        setMeshViewInspectorHeight((h) => Math.min(h + 2, terminalHeight - 10));
+      }
+      if (input === "-" || input === "_") {
+        setMeshViewInspectorHeight((h) => Math.max(h - 2, 6));
+      }
+
+      // Toggle expanded
+      if (key.tab) {
+        setMeshViewInspectorExpanded((e) => !e);
+      }
+
+      // 'o' to open packet in MeshView web UI
+      if (input === "o") {
+        const packet = meshViewPackets[selectedMeshViewIndex];
+        if (packet && localMeshViewUrl) {
+          exec(`open "${localMeshViewUrl}/packet/${packet.id}"`);
+        }
+      }
+
+      // 'c' to clear and refresh
+      if (input === "c") {
+        meshViewStoreRef.current.clear();
+        setMeshViewPackets([]);
+        setSelectedMeshViewIndex(0);
+        setMeshViewInspectorScrollOffset(0);
+      }
     }
   });
 
@@ -2441,6 +2585,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     const d = mode === "dm";
     const cfg = mode === "config";
     const l = mode === "log";
+    const mv = mode === "meshview";
     return (
       <Text>
         <Text color={p ? theme.fg.accent : theme.fg.muted} bold={p}>[PACKETS]</Text>
@@ -2454,6 +2599,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         <Text color={cfg ? theme.fg.accent : theme.fg.muted} bold={cfg}>[CONFIG]</Text>
         {" "}
         <Text color={l ? theme.fg.accent : theme.fg.muted} bold={l}>[LOG]</Text>
+        {localMeshViewUrl && (
+          <>
+            {" "}
+            <Text color={mv ? theme.fg.accent : theme.fg.muted} bold={mv}>[MESHVIEW]</Text>
+          </>
+        )}
       </Text>
     );
   };
@@ -2663,6 +2814,37 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
             />
           </Box>
         )}
+
+        {mode === "meshview" && (() => {
+          const listHeight = meshViewInspectorExpanded
+            ? Math.floor((terminalHeight - 7) * 0.2)
+            : terminalHeight - meshViewInspectorHeight - 7;
+          const detailHeight = meshViewInspectorExpanded
+            ? Math.floor((terminalHeight - 7) * 0.8)
+            : meshViewInspectorHeight;
+
+          return (
+            <>
+              <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
+                <MeshViewPacketList
+                  packets={meshViewPackets}
+                  selectedIndex={selectedMeshViewIndex}
+                  height={listHeight}
+                  error={meshViewError}
+                />
+              </Box>
+              <Box height={detailHeight} borderStyle="single" borderColor={theme.border.normal}>
+                <MeshViewInspector
+                  packet={meshViewPackets[selectedMeshViewIndex]}
+                  activeTab={meshViewInspectorTab}
+                  height={detailHeight - 2}
+                  scrollOffset={meshViewInspectorScrollOffset}
+                  meshViewUrl={localMeshViewUrl}
+                />
+              </Box>
+            </>
+          );
+        })()}
       </Box>
 
       {/* Status bar */}

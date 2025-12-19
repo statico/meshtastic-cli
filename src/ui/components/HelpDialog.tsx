@@ -2,15 +2,15 @@ import React from "react";
 import { Box, Text } from "ink";
 import { theme } from "../theme";
 
-type AppMode = "packets" | "nodes" | "chat" | "dm" | "config" | "log";
+type AppMode = "packets" | "nodes" | "chat" | "dm" | "config" | "log" | "meshview";
 
 interface HelpDialogProps {
   mode: AppMode;
   meshViewUrl?: string;
 }
 
-const globalKeys = [
-  { key: "1-6", desc: "Switch to view (Packets/Nodes/...)" },
+const getGlobalKeys = (hasMeshView: boolean) => [
+  { key: hasMeshView ? "1-7" : "1-6", desc: "Switch to view (Packets/Nodes/...)" },
   { key: "[ / ]", desc: "Previous / Next view" },
   { key: "q / Q", desc: "Quit" },
   { key: "?", desc: "Toggle help" },
@@ -108,12 +108,29 @@ const logKeys = [
   { key: "k / ↑", desc: "Previous response" },
 ];
 
+const meshviewKeys = [
+  { key: "j / ↓", desc: "Next packet" },
+  { key: "k / ↑", desc: "Previous packet" },
+  { key: "Ctrl+d/PgDn", desc: "Page down" },
+  { key: "Ctrl+u/PgUp", desc: "Page up" },
+  { key: "g / G", desc: "First / Last packet" },
+  { key: "h / l", desc: "Previous / Next inspector tab" },
+  { key: "Tab", desc: "Toggle pane sizes" },
+  { key: "Space / b", desc: "Scroll inspector" },
+  { key: "+ / -", desc: "Resize inspector" },
+  { key: "o", desc: "Open in MeshView web UI" },
+  { key: "c", desc: "Clear packets and refresh" },
+];
+
 export function HelpDialog({ mode, meshViewUrl }: HelpDialogProps) {
+  const globalKeys = getGlobalKeys(!!meshViewUrl);
+
   const modeKeys = mode === "packets" ? packetKeys
     : mode === "nodes" ? nodeKeys
     : mode === "chat" ? chatKeys
     : mode === "dm" ? dmKeys
     : mode === "config" ? configKeys
+    : mode === "meshview" ? meshviewKeys
     : logKeys;
 
   // Check if a shortcut is MeshView-related
@@ -124,6 +141,7 @@ export function HelpDialog({ mode, meshViewUrl }: HelpDialogProps) {
     : mode === "chat" ? "CHAT"
     : mode === "dm" ? "DM"
     : mode === "config" ? "CONFIG"
+    : mode === "meshview" ? "MESHVIEW"
     : "LOG";
 
   return (
