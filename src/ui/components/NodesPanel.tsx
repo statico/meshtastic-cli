@@ -128,11 +128,11 @@ export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight 
           <Text color={sortKey === "hops" ? theme.fg.accent : theme.fg.muted}>{sortKey === "hops" ? (sortAscending ? "↑" : "↓") : " "}</Text>
           <Text color={sortKey === "hops" ? theme.fg.accent : theme.fg.muted}>{"HOP".padEnd(3)}</Text>
           <Text color={sortKey === "snr" ? theme.fg.accent : theme.fg.muted}>{sortKey === "snr" ? (sortAscending ? "↑" : "↓") : " "}</Text>
-          <Text color={sortKey === "snr" ? theme.fg.accent : theme.fg.muted}>{"SNR".padEnd(7)}</Text>
+          <Text color={sortKey === "snr" ? theme.fg.accent : theme.fg.muted}>{"SNR".padStart(7)} </Text>
           <Text color={sortKey === "battery" ? theme.fg.accent : theme.fg.muted}>{sortKey === "battery" ? (sortAscending ? "↑" : "↓") : " "}</Text>
           <Text color={sortKey === "battery" ? theme.fg.accent : theme.fg.muted}>{"BAT".padEnd(4)}</Text>
           <Text color={sortKey === "time" ? theme.fg.accent : theme.fg.muted}>{sortKey === "time" ? (sortAscending ? "↑" : "↓") : " "}</Text>
-          <Text color={sortKey === "time" ? theme.fg.accent : theme.fg.muted}>{"HEARD".padEnd(5)}</Text>
+          <Text color={sortKey === "time" ? theme.fg.accent : theme.fg.muted}>{"AGE".padEnd(5)}</Text>
           <Text color={theme.fg.muted}>{"R "}</Text>
           <Box flexGrow={1}><Text color={theme.fg.muted}>LONG NAME</Text></Box>
           <Box width={16}><Text color={theme.fg.muted}>MODEL</Text></Box>

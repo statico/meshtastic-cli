@@ -1664,7 +1664,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       if (input === "S") { handleSortKey("snr"); return; }
       if (input === "B") { handleSortKey("battery"); return; }
       if (input === "A") { handleSortKey("time"); return; }
-      if (input === "V") { handleSortKey("favorites"); return; }
+      if (input === "F") { handleSortKey("favorites"); return; }
 
       const nodePageSize = Math.max(1, terminalHeight - 16);
       if (input === "j" || key.downArrow) {

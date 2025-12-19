@@ -138,7 +138,7 @@ Options:
 | S | Sort by SNR |
 | B | Sort by battery |
 | A | Sort by age (last heard) |
-| V | Sort by favorites |
+| F | Sort by favorites |
 
 ### Chat View
 
