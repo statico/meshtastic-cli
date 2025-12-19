@@ -182,10 +182,23 @@ Options:
 |-----|--------|
 | h/j/k/l | Navigate menu |
 | Enter | Select section |
+| j/k | Navigate config fields |
+| g/G | First/last field |
 | c | Commit changes |
 | C | Discard changes |
 | Escape | Back to menu |
 | r | Reboot device |
+
+### Channel Config
+
+| Key | Action |
+|-----|--------|
+| j/k | Navigate channels |
+| e | Edit channel name |
+| r | Cycle channel role |
+| p | Edit encryption key (PSK) |
+| u | Toggle uplink |
+| D | Toggle downlink |
 
 ## License
 

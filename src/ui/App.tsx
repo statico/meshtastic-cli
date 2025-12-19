@@ -12,7 +12,7 @@ import { PacketInspector, InspectorTab } from "./components/PacketInspector";
 import { NodesPanel } from "./components/NodesPanel";
 import { ChatPanel } from "./components/ChatPanel";
 import { DMPanel } from "./components/DMPanel";
-import { ConfigPanel, ConfigSection, getMenuItemByIndex, getMenuItemCount } from "./components/ConfigPanel";
+import { ConfigPanel, ConfigSection, getMenuItemByIndex, getMenuItemCount, CONFIG_FIELD_COUNTS } from "./components/ConfigPanel";
 import * as adminHelper from "../protocol/admin";
 import { HelpDialog } from "./components/HelpDialog";
 import { QuitDialog } from "./components/QuitDialog";
@@ -221,6 +221,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const [configEditing, setConfigEditing] = useState<string | null>(null);
   const [configEditValue, setConfigEditValue] = useState("");
   const [selectedChannelIndex, setSelectedChannelIndex] = useState(0);
+  const [selectedConfigFieldIndex, setSelectedConfigFieldIndex] = useState(0);
   const [localMeshViewUrl, setLocalMeshViewUrl] = useState<string | undefined>(meshViewUrl);
   const [batchEditMode, setBatchEditMode] = useState(false);
   const [batchEditCount, setBatchEditCount] = useState(0);
@@ -1263,6 +1264,60 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     }
   }, [myNodeNum, transport, configChannels, showNotification, batchEditMode]);
 
+  // Save radio config (device, position, power, network, display, lora, bluetooth, security)
+  type RadioConfigCase = "device" | "position" | "power" | "network" | "display" | "lora" | "bluetooth" | "security";
+  const saveRadioConfig = useCallback(async <T extends object>(
+    configCase: RadioConfigCase,
+    configValue: T,
+    setter: React.Dispatch<React.SetStateAction<T | undefined>>,
+    label: string
+  ) => {
+    if (!transport || !myNodeNum) return;
+    try {
+      const config = create(Config.ConfigSchema, {
+        payloadVariant: { case: configCase, value: configValue } as Config.Config["payloadVariant"],
+      });
+      const binary = adminHelper.createSetConfigRequest(config, { myNodeNum });
+      await transport.send(binary);
+      setter(configValue);
+      if (batchEditMode) {
+        setBatchEditCount(c => c + 1);
+        showNotification(`Queued ${label} change`);
+      } else {
+        showNotification(`Saved ${label}. Device may reboot.`);
+      }
+    } catch {
+      showNotification(`Failed to save ${label}`);
+    }
+  }, [myNodeNum, transport, showNotification, batchEditMode]);
+
+  // Save module config
+  type ModuleConfigCase = "mqtt" | "serial" | "externalNotification" | "storeForward" | "rangeTest" | "telemetry" | "cannedMessage" | "audio" | "remoteHardware" | "neighborInfo" | "ambientLighting" | "detectionSensor" | "paxcounter";
+  const saveModuleConfig = useCallback(async <T extends object>(
+    configCase: ModuleConfigCase,
+    configValue: T,
+    setter: React.Dispatch<React.SetStateAction<T | undefined>>,
+    label: string
+  ) => {
+    if (!transport || !myNodeNum) return;
+    try {
+      const config = create(ModuleConfig.ModuleConfigSchema, {
+        payloadVariant: { case: configCase, value: configValue } as ModuleConfig.ModuleConfig["payloadVariant"],
+      });
+      const binary = adminHelper.createSetModuleConfigRequest(config, { myNodeNum });
+      await transport.send(binary);
+      setter(configValue);
+      if (batchEditMode) {
+        setBatchEditCount(c => c + 1);
+        showNotification(`Queued ${label} change`);
+      } else {
+        showNotification(`Saved ${label}. Device may reboot.`);
+      }
+    } catch {
+      showNotification(`Failed to save ${label}`);
+    }
+  }, [myNodeNum, transport, showNotification, batchEditMode]);
+
   const startBatchEdit = useCallback(async () => {
     if (!transport || !myNodeNum) return;
     try {
@@ -2099,7 +2154,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           const item = getMenuItemByIndex(configMenuIndex);
           if (item) {
             setConfigSection(item.key);
-            // Reset channel index when entering channels section
+            // Reset indices when entering sections
+            setSelectedConfigFieldIndex(0);
             if (item.key === "channels") {
               setSelectedChannelIndex(0);
             }
@@ -2234,6 +2290,36 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           setConfigEditValue(localMeshViewUrl || "");
           return;
         }
+        // Generic config field navigation and editing for radio/module configs
+        const isEditableConfigSection = [
+          "device", "position", "power", "network", "display", "lora", "bluetooth", "security",
+          "mqtt", "serial", "extnotif", "storeforward", "rangetest", "telemetry", "cannedmsg",
+          "audio", "remotehw", "neighborinfo", "ambientlight", "detectionsensor", "paxcounter"
+        ].includes(configSection);
+
+        if (isEditableConfigSection) {
+          const fieldCount = CONFIG_FIELD_COUNTS[configSection] || 0;
+
+          // j/k to navigate fields
+          if (input === "j" || key.downArrow) {
+            setSelectedConfigFieldIndex(i => Math.min(i + 1, fieldCount - 1));
+            return;
+          }
+          if (input === "k" || key.upArrow) {
+            setSelectedConfigFieldIndex(i => Math.max(i - 1, 0));
+            return;
+          }
+          // g/G for first/last field
+          if (input === "g") {
+            setSelectedConfigFieldIndex(0);
+            return;
+          }
+          if (input === "G") {
+            setSelectedConfigFieldIndex(fieldCount - 1);
+            return;
+          }
+        }
+
         // Channel navigation and editing
         const validChannels = configChannels.filter(ch => ch != null).sort((a, b) => a.index - b.index);
         if (configSection === "channels" && validChannels.length > 0) {
@@ -2522,6 +2608,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               meshViewUrl={localMeshViewUrl}
               editingField={configEditing}
               editValue={configEditValue}
+              selectedFieldIndex={selectedConfigFieldIndex}
               selectedChannelIndex={selectedChannelIndex}
               batchEditMode={batchEditMode}
               batchEditCount={batchEditCount}
