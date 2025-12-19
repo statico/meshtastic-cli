@@ -229,6 +229,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const [chatFilter, setChatFilter] = useState("");
   const [chatFilterInput, setChatFilterInput] = useState(false);
 
+  // Sort state for nodes
+  type NodeSortKey = "hops" | "snr" | "battery" | "time" | "favorites";
+  const [nodesSortKey, setNodesSortKey] = useState<NodeSortKey>("hops");
+  const [nodesSortAscending, setNodesSortAscending] = useState(true);
+
   // Load initial data
   useEffect(() => {
     const initialPackets = packetStore.getAll();
@@ -1463,13 +1468,38 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         }
       }
     } else if (mode === "nodes") {
-      // Compute filtered nodes for length checks
-      const filteredNodes = nodesFilter
+      // Sort function for nodes
+      const sortNodes = (nodeList: NodeData[]) => {
+        return [...nodeList].sort((a, b) => {
+          let cmp = 0;
+          switch (nodesSortKey) {
+            case "hops":
+              cmp = (a.hopsAway ?? 999) - (b.hopsAway ?? 999);
+              break;
+            case "snr":
+              cmp = (b.snr ?? -999) - (a.snr ?? -999);
+              break;
+            case "battery":
+              cmp = (b.batteryLevel ?? -1) - (a.batteryLevel ?? -1);
+              break;
+            case "time":
+              cmp = b.lastHeard - a.lastHeard;
+              break;
+            case "favorites":
+              cmp = (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0);
+              break;
+          }
+          return nodesSortAscending ? cmp : -cmp;
+        });
+      };
+
+      // Compute filtered and sorted nodes
+      const filteredNodes = sortNodes(nodesFilter
         ? nodes.filter(n =>
             (n.shortName?.toLowerCase().includes(nodesFilter.toLowerCase())) ||
             (n.longName?.toLowerCase().includes(nodesFilter.toLowerCase()))
           )
-        : nodes;
+        : nodes);
 
       // Filter input mode
       if (nodesFilterInput) {
@@ -1520,6 +1550,22 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         setSelectedNodeIndex(0);
         return;
       }
+
+      // Sort key handlers (capital letters to avoid conflicts)
+      const handleSortKey = (newKey: NodeSortKey) => {
+        if (nodesSortKey === newKey) {
+          setNodesSortAscending(a => !a);
+        } else {
+          setNodesSortKey(newKey);
+          setNodesSortAscending(true);
+        }
+        setSelectedNodeIndex(0);
+      };
+      if (input === "H") { handleSortKey("hops"); return; }
+      if (input === "S") { handleSortKey("snr"); return; }
+      if (input === "B") { handleSortKey("battery"); return; }
+      if (input === "A") { handleSortKey("time"); return; }
+      if (input === "V") { handleSortKey("favorites"); return; }
 
       const nodePageSize = Math.max(1, terminalHeight - 16);
       if (input === "j" || key.downArrow) {
@@ -2350,12 +2396,26 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         })()}
 
         {mode === "nodes" && (() => {
-          const filteredNodes = nodesFilter
+          // Sort function for nodes
+          const sortNodes = (nodeList: NodeData[]) => {
+            return [...nodeList].sort((a, b) => {
+              let cmp = 0;
+              switch (nodesSortKey) {
+                case "hops": cmp = (a.hopsAway ?? 999) - (b.hopsAway ?? 999); break;
+                case "snr": cmp = (b.snr ?? -999) - (a.snr ?? -999); break;
+                case "battery": cmp = (b.batteryLevel ?? -1) - (a.batteryLevel ?? -1); break;
+                case "time": cmp = b.lastHeard - a.lastHeard; break;
+                case "favorites": cmp = (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0); break;
+              }
+              return nodesSortAscending ? cmp : -cmp;
+            });
+          };
+          const filteredNodes = sortNodes(nodesFilter
             ? nodes.filter(n =>
                 (n.shortName?.toLowerCase().includes(nodesFilter.toLowerCase())) ||
                 (n.longName?.toLowerCase().includes(nodesFilter.toLowerCase()))
               )
-            : nodes;
+            : nodes);
           return (
             <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
               <NodesPanel
@@ -2364,6 +2424,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
                 height={terminalHeight - 6}
                 filter={nodesFilter}
                 filterInputActive={nodesFilterInput}
+                sortKey={nodesSortKey}
+                sortAscending={nodesSortAscending}
               />
             </Box>
           );

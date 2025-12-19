@@ -37,6 +37,8 @@ function padEndVisual(str: string, targetWidth: number): string {
   return str + " ".repeat(targetWidth - currentWidth);
 }
 
+type NodeSortKey = "hops" | "snr" | "battery" | "time" | "favorites";
+
 interface NodesPanelProps {
   nodes: NodeData[];
   selectedIndex: number;
@@ -44,9 +46,11 @@ interface NodesPanelProps {
   inspectorHeight?: number;
   filter?: string;
   filterInputActive?: boolean;
+  sortKey?: NodeSortKey;
+  sortAscending?: boolean;
 }
 
-export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight = 10, filter, filterInputActive }: NodesPanelProps) {
+export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight = 10, filter, filterInputActive, sortKey = "hops", sortAscending = true }: NodesPanelProps) {
   const hasFilter = filter && filter.length > 0;
   const filterRowHeight = (hasFilter || filterInputActive) ? 1 : 0;
 
@@ -116,15 +120,19 @@ export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight 
 
       {/* Node list */}
       <Box height={listHeight} flexDirection="column">
-        {/* Header */}
+        {/* Header with sort indicator */}
         <Box paddingX={1}>
           <Text color={theme.fg.muted}>{"NAME".padEnd(8)}</Text>
           <Text color={theme.fg.muted}>{"ID".padEnd(11)}</Text>
-          <Text color={theme.fg.muted}>{"★ "}</Text>
-          <Text color={theme.fg.muted}>{"HOP".padEnd(4)}</Text>
-          <Text color={theme.fg.muted}>{"SNR".padEnd(8)}</Text>
-          <Text color={theme.fg.muted}>{"BAT".padEnd(5)}</Text>
-          <Text color={theme.fg.muted}>{"HEARD".padEnd(6)}</Text>
+          <Text color={sortKey === "favorites" ? theme.fg.accent : theme.fg.muted}>{"★ "}</Text>
+          <Text color={sortKey === "hops" ? theme.fg.accent : theme.fg.muted}>{sortKey === "hops" ? (sortAscending ? "↑" : "↓") : " "}</Text>
+          <Text color={sortKey === "hops" ? theme.fg.accent : theme.fg.muted}>{"HOP".padEnd(3)}</Text>
+          <Text color={sortKey === "snr" ? theme.fg.accent : theme.fg.muted}>{sortKey === "snr" ? (sortAscending ? "↑" : "↓") : " "}</Text>
+          <Text color={sortKey === "snr" ? theme.fg.accent : theme.fg.muted}>{"SNR".padEnd(7)}</Text>
+          <Text color={sortKey === "battery" ? theme.fg.accent : theme.fg.muted}>{sortKey === "battery" ? (sortAscending ? "↑" : "↓") : " "}</Text>
+          <Text color={sortKey === "battery" ? theme.fg.accent : theme.fg.muted}>{"BAT".padEnd(4)}</Text>
+          <Text color={sortKey === "time" ? theme.fg.accent : theme.fg.muted}>{sortKey === "time" ? (sortAscending ? "↑" : "↓") : " "}</Text>
+          <Text color={sortKey === "time" ? theme.fg.accent : theme.fg.muted}>{"HEARD".padEnd(5)}</Text>
           <Text color={theme.fg.muted}>{"R "}</Text>
           <Box flexGrow={1}><Text color={theme.fg.muted}>LONG NAME</Text></Box>
           <Box width={16}><Text color={theme.fg.muted}>MODEL</Text></Box>

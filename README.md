@@ -140,6 +140,11 @@ Options:
 | i | Request node info |
 | I | Toggle ignored |
 | x | Remove node from DB |
+| H | Sort by hops |
+| S | Sort by SNR |
+| B | Sort by battery |
+| A | Sort by age (last heard) |
+| V | Sort by favorites |
 
 ### Chat View
 
