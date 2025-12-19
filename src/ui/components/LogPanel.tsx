@@ -14,6 +14,10 @@ interface LogPanelProps {
 }
 
 export function LogPanel({ responses, selectedIndex, height, nodeStore }: LogPanelProps) {
+  // Fixed height calculations
+  const listHeight = Math.max(5, Math.floor(height / 2));
+  const inspectorHeight = height - listHeight - 1;
+
   if (responses.length === 0) {
     return (
       <Box flexDirection="column" paddingX={1} paddingY={1} height={height}>
@@ -28,30 +32,22 @@ export function LogPanel({ responses, selectedIndex, height, nodeStore }: LogPan
     );
   }
 
-  // Split pane: upper half list, lower half inspector
-  const listHeight = Math.max(5, Math.floor((height - 1) * 0.5));
-  const inspectorHeight = Math.max(5, height - listHeight - 1);
-
   const selectedResponse = responses[selectedIndex];
 
   return (
-    <Box flexDirection="column" width="100%" height={height}>
-      <Box height={listHeight} flexDirection="column" flexShrink={0}>
-        <LogList
-          responses={responses}
-          selectedIndex={selectedIndex}
-          height={listHeight}
-          nodeStore={nodeStore}
-        />
-      </Box>
-      <Box flexShrink={0} borderStyle="single" borderColor={theme.border.normal} borderTop={true} borderBottom={false} borderLeft={false} borderRight={false} />
-      <Box height={inspectorHeight} flexDirection="column" flexShrink={0}>
-        <LogInspector
-          response={selectedResponse}
-          nodeStore={nodeStore}
-          height={inspectorHeight}
-        />
-      </Box>
+    <Box flexDirection="column" paddingX={1} width="100%" height={height}>
+      <LogList
+        responses={responses}
+        selectedIndex={selectedIndex}
+        height={listHeight}
+        nodeStore={nodeStore}
+      />
+      <Text color={theme.border.normal}>{"─".repeat(70)}</Text>
+      <LogInspector
+        response={selectedResponse}
+        nodeStore={nodeStore}
+        height={inspectorHeight}
+      />
     </Box>
   );
 }
@@ -62,7 +58,7 @@ function LogList({ responses, selectedIndex, height, nodeStore }: {
   height: number;
   nodeStore: NodeStore;
 }) {
-  const visibleCount = Math.max(1, height - 2);
+  const visibleCount = Math.max(1, height - 1);
 
   let startIndex = 0;
   if (responses.length > visibleCount) {
@@ -76,23 +72,21 @@ function LogList({ responses, selectedIndex, height, nodeStore }: {
   const visibleResponses = responses.slice(startIndex, startIndex + visibleCount);
 
   return (
-    <Box flexDirection="column" paddingX={1}>
-      <Box>
-        <Text color={theme.fg.muted}>
-          {"TYPE".padEnd(12)}
-          {"FROM".padEnd(12)}
-          {"TIME"}
-        </Text>
-      </Box>
+    <>
+      <Text color={theme.fg.muted}>
+        {"TYPE".padEnd(12)}
+        {"FROM".padEnd(12)}
+        {"TIME"}
+      </Text>
       {visibleResponses.map((response, i) => (
         <LogRow
-          key={response.id || `${response.timestamp}-${i}`}
+          key={`log-${response.id || response.timestamp}-${i}`}
           response={response}
           isSelected={startIndex + i === selectedIndex}
           nodeStore={nodeStore}
         />
       ))}
-    </Box>
+    </>
   );
 }
 
@@ -109,22 +103,21 @@ function LogRow({ response, isSelected, nodeStore }: {
   isSelected: boolean;
   nodeStore: NodeStore;
 }) {
-  const bgColor = isSelected ? theme.bg.selected : undefined;
   const isPosition = isPositionResponse(response);
   const isNodeInfo = isNodeInfoResponse(response);
   const type = isPosition ? "POSITION" : isNodeInfo ? "NODEINFO" : "TRACEROUTE";
   const typeColor = isPosition ? theme.packet.position : isNodeInfo ? theme.packet.nodeinfo : theme.packet.traceroute;
   const fromName = nodeStore.getNodeName(response.fromNode);
   const time = new Date(response.timestamp * 1000).toLocaleTimeString("en-US", { hour12: false });
+  const prefix = isSelected ? "▶ " : "  ";
 
   return (
-    <Box backgroundColor={bgColor}>
-      <Text wrap="truncate">
-        <Text color={typeColor}>{type.padEnd(12)}</Text>
-        <Text color={theme.fg.accent}>{fromName.slice(0, 10).padEnd(12)}</Text>
-        <Text color={theme.fg.secondary}>{time}</Text>
-      </Text>
-    </Box>
+    <Text>
+      <Text color={theme.fg.accent}>{prefix}</Text>
+      <Text color={typeColor}>{type.padEnd(12)}</Text>
+      <Text color={theme.fg.accent}>{fromName.slice(0, 10).padEnd(12)}</Text>
+      <Text color={theme.fg.secondary}>{time}</Text>
+    </Text>
   );
 }
 
@@ -134,11 +127,7 @@ function LogInspector({ response, nodeStore, height }: {
   height: number;
 }) {
   if (!response) {
-    return (
-      <Box paddingX={1}>
-        <Text color={theme.fg.muted}>No response selected</Text>
-      </Box>
-    );
+    return <Text color={theme.fg.muted}>No response selected</Text>;
   }
 
   const fromName = nodeStore.getNodeName(response.fromNode);
@@ -149,31 +138,18 @@ function LogInspector({ response, nodeStore, height }: {
     const lon = pos.longitudeI != null ? pos.longitudeI / 1e7 : null;
 
     return (
-      <Box flexDirection="column" paddingX={1}>
-        <Box>
-          <Text color={theme.fg.muted}>From: </Text>
-          <Text color={theme.fg.accent}>{fromName}</Text>
-          <Text color={theme.fg.muted}> ({formatNodeId(pos.fromNode)})</Text>
-        </Box>
+      <>
+        <Text><Text color={theme.fg.muted}>From: </Text><Text color={theme.fg.accent}>{fromName}</Text><Text color={theme.fg.muted}> ({formatNodeId(pos.fromNode)})</Text></Text>
         {lat != null && lon != null && (
-          <Box>
-            <Text color={theme.fg.muted}>Position: </Text>
-            <Text color={theme.packet.position}>{lat.toFixed(6)}, {lon.toFixed(6)}</Text>
-          </Box>
+          <Text><Text color={theme.fg.muted}>Position: </Text><Text color={theme.packet.position}>{lat.toFixed(6)}, {lon.toFixed(6)}</Text></Text>
         )}
         {pos.altitude != null && (
-          <Box>
-            <Text color={theme.fg.muted}>Altitude: </Text>
-            <Text color={theme.fg.primary}>{pos.altitude}m</Text>
-          </Box>
+          <Text><Text color={theme.fg.muted}>Altitude: </Text><Text color={theme.fg.primary}>{pos.altitude}m</Text></Text>
         )}
         {pos.satsInView != null && (
-          <Box>
-            <Text color={theme.fg.muted}>Satellites: </Text>
-            <Text color={theme.fg.primary}>{pos.satsInView}</Text>
-          </Box>
+          <Text><Text color={theme.fg.muted}>Satellites: </Text><Text color={theme.fg.primary}>{pos.satsInView}</Text></Text>
         )}
-      </Box>
+      </>
     );
   }
 
@@ -183,29 +159,16 @@ function LogInspector({ response, nodeStore, height }: {
     const hwModelName = ni.hwModel != null ? Mesh.HardwareModel[ni.hwModel] || `Unknown (${ni.hwModel})` : "Unknown";
 
     return (
-      <Box flexDirection="column" paddingX={1}>
-        <Box>
-          <Text color={theme.fg.muted}>From: </Text>
-          <Text color={theme.fg.accent}>{fromName}</Text>
-          <Text color={theme.fg.muted}> ({formatNodeId(ni.fromNode)})</Text>
-        </Box>
+      <>
+        <Text><Text color={theme.fg.muted}>From: </Text><Text color={theme.fg.accent}>{fromName}</Text><Text color={theme.fg.muted}> ({formatNodeId(ni.fromNode)})</Text></Text>
         {ni.longName && (
-          <Box>
-            <Text color={theme.fg.muted}>Long Name: </Text>
-            <Text color={theme.packet.nodeinfo}>{ni.longName}</Text>
-          </Box>
+          <Text><Text color={theme.fg.muted}>Long Name: </Text><Text color={theme.packet.nodeinfo}>{ni.longName}</Text></Text>
         )}
         {ni.shortName && (
-          <Box>
-            <Text color={theme.fg.muted}>Short Name: </Text>
-            <Text color={theme.packet.nodeinfo}>{ni.shortName}</Text>
-          </Box>
+          <Text><Text color={theme.fg.muted}>Short Name: </Text><Text color={theme.packet.nodeinfo}>{ni.shortName}</Text></Text>
         )}
-        <Box>
-          <Text color={theme.fg.muted}>Hardware: </Text>
-          <Text color={theme.fg.primary}>{hwModelName}</Text>
-        </Box>
-      </Box>
+        <Text><Text color={theme.fg.muted}>Hardware: </Text><Text color={theme.fg.primary}>{hwModelName}</Text></Text>
+      </>
     );
   }
 
@@ -215,42 +178,23 @@ function LogInspector({ response, nodeStore, height }: {
   const snrTowards: number[] = tr.snrTowards || [];
 
   return (
-    <Box flexDirection="column" paddingX={1}>
-      <Box>
-        <Text color={theme.fg.muted}>To: </Text>
-        <Text color={theme.fg.accent}>{fromName}</Text>
-        <Text color={theme.fg.muted}> ({formatNodeId(tr.fromNode)})</Text>
-      </Box>
-      <Box>
-        <Text color={theme.fg.muted}>Hop Limit: </Text>
-        <Text color={theme.fg.primary}>{tr.hopLimit}</Text>
-        {tr.hopLimit === 0 && <Text color={theme.packet.direct}> (direct ping)</Text>}
-      </Box>
+    <>
+      <Text><Text color={theme.fg.muted}>To: </Text><Text color={theme.fg.accent}>{fromName}</Text><Text color={theme.fg.muted}> ({formatNodeId(tr.fromNode)})</Text></Text>
+      <Text><Text color={theme.fg.muted}>Hop Limit: </Text><Text color={theme.fg.primary}>{tr.hopLimit}</Text>{tr.hopLimit === 0 && <Text color={theme.packet.direct}> (direct ping)</Text>}</Text>
       {route.length === 0 ? (
-        <Box>
-          <Text color={theme.packet.direct}>Direct connection (0 hops)</Text>
-        </Box>
+        <Text color={theme.packet.direct}>Direct connection (0 hops)</Text>
       ) : (
         <>
-          <Box>
-            <Text color={theme.fg.muted}>Route: </Text>
-            <Text color={theme.packet.traceroute}>{route.length} hop{route.length !== 1 ? "s" : ""}</Text>
-          </Box>
+          <Text><Text color={theme.fg.muted}>Route: </Text><Text color={theme.packet.traceroute}>{route.length} hop{route.length !== 1 ? "s" : ""}</Text></Text>
           {route.slice(0, height - 4).map((nodeNum, i) => {
             const name = nodeStore.getNodeName(nodeNum);
             const snr = snrTowards[i];
             return (
-              <Box key={nodeNum}>
-                <Text color={theme.fg.muted}>  {i + 1}. </Text>
-                <Text color={theme.fg.accent}>{name}</Text>
-                {snr != null && (
-                  <Text color={theme.fg.secondary}> SNR: {(snr / 4).toFixed(1)}dB</Text>
-                )}
-              </Box>
+              <Text key={`hop-${i}`}><Text color={theme.fg.muted}>  {i + 1}. </Text><Text color={theme.fg.accent}>{name}</Text>{snr != null && (<Text color={theme.fg.secondary}> SNR: {(snr / 4).toFixed(1)}dB</Text>)}</Text>
             );
           })}
         </>
       )}
-    </Box>
+    </>
   );
 }
