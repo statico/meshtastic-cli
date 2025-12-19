@@ -2969,6 +2969,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           <QuitDialog
             onConfirm={() => {
               exit();
+              process.stdout.write('\x1bc'); // Clear screen on quit
               process.exit(0);
             }}
             onCancel={() => setShowQuitDialog(false)}
