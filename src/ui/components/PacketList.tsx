@@ -185,8 +185,8 @@ function renderPacketSummary(packet: DecodedPacket, nodeStore: NodeStore, useFah
       return (
         <>
           {dm.batteryLevel != null && dm.batteryLevel > 0 && (
-            <Text color={dm.batteryLevel > 20 ? theme.data.battery : theme.data.batteryLow}>
-              {" "}{dm.batteryLevel}%
+            <Text color={dm.batteryLevel > 100 || dm.batteryLevel > 20 ? theme.data.battery : theme.data.batteryLow}>
+              {" "}{dm.batteryLevel > 100 ? "Pwr" : `${dm.batteryLevel}%`}
             </Text>
           )}
           {dm.voltage != null && dm.voltage > 0 && (

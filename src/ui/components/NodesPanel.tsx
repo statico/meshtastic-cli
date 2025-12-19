@@ -240,12 +240,17 @@ function NodeInspector({ node, height }: { node?: NodeData; height: number }) {
 
   // Battery/power
   if (node.batteryLevel !== undefined || node.voltage !== undefined) {
+    const batteryDisplay = node.batteryLevel !== undefined && node.batteryLevel > 100
+      ? "Powered"
+      : node.batteryLevel !== undefined && node.batteryLevel > 0
+        ? `${node.batteryLevel}%`
+        : null;
     lines.push(
       <Box key="power">
-        {node.batteryLevel !== undefined && node.batteryLevel > 0 && (
+        {batteryDisplay && (
           <>
             <Text color={theme.fg.muted}>Battery: </Text>
-            <Text color={getBatteryColor(node.batteryLevel)}>{node.batteryLevel}%</Text>
+            <Text color={getBatteryColor(node.batteryLevel)}>{batteryDisplay}</Text>
           </>
         )}
         {node.voltage !== undefined && node.voltage > 0 && (
@@ -300,6 +305,9 @@ function NodeInspector({ node, height }: { node?: NodeData; height: number }) {
 }
 
 function getBatteryDisplay(level?: number, voltage?: number): string {
+  if (level !== undefined && level > 100) {
+    return "Pwr"; // Powered/plugged in
+  }
   if (level !== undefined && level > 0) {
     return `${level}%`;
   }
@@ -341,6 +349,9 @@ function getBatteryColor(level?: number, voltage?: number): string {
   // Show muted for "-" (no battery info)
   if ((level === undefined || level === 0) && (voltage === undefined || voltage === 0)) {
     return theme.fg.muted;
+  }
+  if (level !== undefined && level > 100) {
+    return theme.packet.direct; // Powered - show as healthy green
   }
   if (level !== undefined && level > 0) {
     if (level >= 50) return theme.packet.direct;

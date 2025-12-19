@@ -488,11 +488,16 @@ function renderPayloadDetails(packet: DecodedPacket, nodeStore: NodeStore, useFa
           <Text color={theme.packet.telemetry}>Device Metrics</Text>
         </Box>
       );
+      const batteryDisplay = dm.batteryLevel != null && dm.batteryLevel > 100
+        ? "Powered"
+        : dm.batteryLevel != null
+          ? `${dm.batteryLevel}%`
+          : "?";
       lines.push(
         <Box key="telem-batt">
           <Text color={theme.fg.muted}>Battery: </Text>
-          <Text color={dm.batteryLevel && dm.batteryLevel > 50 ? theme.packet.direct : theme.packet.telemetry}>
-            {dm.batteryLevel ?? "?"}%
+          <Text color={dm.batteryLevel && (dm.batteryLevel > 100 || dm.batteryLevel > 50) ? theme.packet.direct : theme.packet.telemetry}>
+            {batteryDisplay}
           </Text>
           {dm.voltage != null && (
             <>
