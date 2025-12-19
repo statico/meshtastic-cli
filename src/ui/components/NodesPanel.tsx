@@ -5,6 +5,14 @@ import type { NodeData } from "../../protocol/node-store";
 import { formatNodeId, getHardwareModelName } from "../../utils";
 import { stringWidth, truncateVisual, padEndVisual } from "../../utils/string-width";
 
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 type NodeSortKey = "hops" | "snr" | "battery" | "time" | "favorites";
 
 interface NodesPanelProps {
@@ -117,7 +125,7 @@ export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight 
 
       {/* Node inspector */}
       <Box height={inspectorHeight} flexDirection="column">
-        <NodeInspector node={selectedNode} height={inspectorHeight} />
+        <NodeInspector node={selectedNode} allNodes={nodes} height={inspectorHeight} />
       </Box>
     </Box>
   );
@@ -165,7 +173,7 @@ function NodeRow({ node, isSelected }: NodeRowProps) {
   );
 }
 
-function NodeInspector({ node, height }: { node?: NodeData; height: number }) {
+function NodeInspector({ node, allNodes, height }: { node?: NodeData; allNodes: NodeData[]; height: number }) {
   if (!node) {
     return (
       <Box paddingX={1}>
@@ -209,6 +217,31 @@ function NodeInspector({ node, height }: { node?: NodeData; height: number }) {
       )}
     </Box>
   );
+
+  // Public key
+  if (node.publicKey && node.publicKey.length > 0) {
+    const publicKeyBase64 = uint8ArrayToBase64(node.publicKey);
+    lines.push(
+      <Box key="pubkey">
+        <Text color={theme.fg.muted}>Public Key: </Text>
+        <Text color={theme.fg.secondary}>{publicKeyBase64}</Text>
+      </Box>
+    );
+
+    // Check for duplicate public keys
+    const duplicates = allNodes.filter(
+      (n) => n.num !== node.num && n.publicKey && n.publicKey.length > 0 &&
+        uint8ArrayToBase64(n.publicKey) === publicKeyBase64
+    );
+    if (duplicates.length > 0) {
+      const dupList = duplicates.map((d) => `${d.shortName || "?"} (${formatNodeId(d.num)})`).join(", ");
+      lines.push(
+        <Box key="pubkey-warn">
+          <Text color={theme.status.offline}>⚠ Public key also used by: {dupList}</Text>
+        </Box>
+      );
+    }
+  }
 
   // Radio metrics
   if (node.snr !== undefined || node.hopsAway !== undefined) {

@@ -69,6 +69,7 @@ export class NodeStore {
       longName: info.user?.longName || existing.longName,
       shortName: info.user?.shortName || existing.shortName,
       hwModel: info.user?.hwModel || existing.hwModel,
+      publicKey: info.user?.publicKey?.length ? info.user.publicKey : existing.publicKey,
       latitudeI: info.position?.latitudeI ?? existing.latitudeI,
       longitudeI: info.position?.longitudeI ?? existing.longitudeI,
       altitude: info.position?.altitude ?? existing.altitude,
@@ -97,6 +98,7 @@ export class NodeStore {
       shortName: user.shortName || existing.shortName,
       hwModel: user.hwModel || existing.hwModel,
       role: user.role ?? existing.role,
+      publicKey: user.publicKey?.length ? user.publicKey : existing.publicKey,
       lastHeard: Date.now() / 1000,
     };
     this.nodes.set(nodeNum, updated);
