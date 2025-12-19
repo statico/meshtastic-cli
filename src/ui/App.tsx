@@ -77,6 +77,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const [terminalWidth, setTerminalWidth] = useState(stdout?.columns || 80);
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Reboot modal state
   const [showRebootModal, setShowRebootModal] = useState(false);
@@ -1313,6 +1314,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     }
     if (key.ctrl && input === "c") {
       setShowQuitDialog(true);
+      return;
+    }
+    // Ctrl+L to refresh/redraw screen
+    if (key.ctrl && input === "l") {
+      process.stdout.write("\x1b[2J\x1b[H"); // Clear screen and move cursor to top
+      setRefreshKey((k) => k + 1); // Force re-render
       return;
     }
     if (input === "?" && !isInputFocused) {
