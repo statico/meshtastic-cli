@@ -154,6 +154,13 @@ export function ChatPanel({
     return b64;
   };
 
+  // Calculate channel letter from PSK hash (0x41 + XOR of all bytes % 26)
+  const getChannelLetter = (psk: Uint8Array | null) => {
+    if (!psk || psk.length === 0) return "-";
+    const xorResult = psk.reduce((acc, byte) => acc ^ byte, 0);
+    return String.fromCharCode(0x41 + (xorResult % 26));
+  };
+
   return (
     <Box flexDirection="column" width="100%" height={height}>
       {/* Channel selector */}
@@ -177,6 +184,8 @@ export function ChatPanel({
             <>
               <Text color={theme.fg.muted}>Name: </Text>
               <Text color={theme.fg.accent}>{channelInfo.name || "(default)"}</Text>
+              <Text color={theme.fg.muted}>  Letter: </Text>
+              <Text color={theme.data.channel}>{getChannelLetter(channelInfo.psk)}</Text>
               <Text color={theme.fg.muted}>  Role: </Text>
               <Text color={theme.fg.secondary}>{getRoleName(channelInfo.role)}</Text>
               <Text color={theme.fg.muted}>  Key: </Text>
