@@ -1913,11 +1913,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           setShowEmojiSelector(false);
           return;
         }
-        if (key.leftArrow) {
+        if (key.leftArrow || input === "h") {
           setEmojiSelectorIndex((i) => Math.max(i - 1, 0));
           return;
         }
-        if (key.rightArrow) {
+        if (key.rightArrow || input === "l") {
           setEmojiSelectorIndex((i) => Math.min(i + 1, emojiCount - 1));
           return;
         }
