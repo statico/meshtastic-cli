@@ -278,6 +278,17 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     }
   }, [myNodeNum, dmConversations, selectedDMConvoIndex]);
 
+  // Try to detect myNodeNum from loaded nodes if not set
+  useEffect(() => {
+    if (myNodeNum !== 0 || nodes.length === 0) return;
+    // Look for local node (hopsAway === 0)
+    const localNode = nodes.find(n => n.hopsAway === 0);
+    if (localNode) {
+      setMyNodeNum(localNode.num);
+      if (localNode.shortName) setMyShortName(localNode.shortName);
+    }
+  }, [myNodeNum, nodes]);
+
   const processPacketForNodes = useCallback((packet: DecodedPacket) => {
     const fr = packet.fromRadio;
     if (!fr) return;
@@ -618,7 +629,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   }, [transport]);
 
   const fetchOwnerFallback = useCallback(async () => {
-    if (!transport?.fetchOwner) return;
+    if (!transport?.fetchOwner) {
+      return;
+    }
     const owner = await transport.fetchOwner();
     if (owner && owner.myNodeNum) {
       setMyNodeNum(owner.myNodeNum);
