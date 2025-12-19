@@ -391,7 +391,7 @@ function PacketRow({ packet, nodeStore, isSelected, useFahrenheit }: PacketRowPr
     // Hop info (only show for received packets with valid hop data)
     // Fixed width column (7 chars) for alignment
     const hops = mp.hopStart != null && mp.hopLimit != null && mp.hopStart > 0
-      ? `(${mp.hopStart - mp.hopLimit}/${mp.hopStart})`.padEnd(7)
+      ? `${mp.hopStart - mp.hopLimit}/${mp.hopStart}`.padEnd(7)
       : "       ";
 
     // For encrypted packets, show channel and length
