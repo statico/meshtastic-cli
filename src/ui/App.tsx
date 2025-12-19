@@ -110,8 +110,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         }
       } catch (e) {
         if (!cancelled) {
-          setConnectError(e instanceof Error ? e.message : String(e));
-          setStatus("disconnected");
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error(`Connection failed: ${msg}`);
+          process.exit(1);
         }
       }
     })();
