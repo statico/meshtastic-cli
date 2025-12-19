@@ -180,7 +180,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const [showEmojiSelector, setShowEmojiSelector] = useState(false);
   const [emojiSelectorIndex, setEmojiSelectorIndex] = useState(0);
   const [channels, setChannels] = useState<Map<number, ChannelInfo>>(new Map());
-  const [notification, setNotification] = useState("");
+  const [notification, setNotification] = useState<{ message: string; color?: string } | null>(null);
 
   // DM state
   const [dmConversations, setDmConversations] = useState<db.DMConversation[]>([]);
@@ -445,6 +445,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               m.packetId === packet.requestId ? { ...m, status: newStatus } : m
             )
           );
+          // Show ACK notification (but not for self-to-self)
+          if (isAck && mp.from !== myNodeNum) {
+            const nodeName = nodeStore.getNodeName(mp.from);
+            showNotification(`✓ ACK from ${nodeName}`, theme.packet.direct);
+          }
         }
       }
 
@@ -639,9 +644,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     }
   }, [transport]);
 
-  const showNotification = useCallback((msg: string) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(""), 2000);
+  const showNotification = useCallback((msg: string, color?: string) => {
+    setNotification({ message: msg, color });
+    setTimeout(() => setNotification(null), 2000);
   }, []);
 
   const sendMessage = useCallback(async (text: string) => {
@@ -2667,8 +2672,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         <Text color={theme.fg.muted}> | </Text>
         <Text color={theme.fg.secondary}>{nodeCount} nodes</Text>
         <Text color={theme.fg.muted}> | </Text>
-        <Text color={notification ? theme.fg.accent : theme.fg.muted}>
-          {notification || helpHint}
+        <Text color={notification ? (notification.color || theme.fg.accent) : theme.fg.muted}>
+          {notification?.message || helpHint}
         </Text>
       </Box>
 
