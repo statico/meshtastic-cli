@@ -1915,7 +1915,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           setSelectedDMMessageIndex((i) => Math.max(i - 1, 0));
           return;
         }
-        if (key.escape) {
+        // Escape or 'h' / left arrow to go back to conversation list
+        if (key.escape || input === "h" || key.leftArrow) {
           setSelectedDMMessageIndex(-1);
           return;
         }
@@ -1969,6 +1970,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       }
       if (input === "k" || key.upArrow) {
         setSelectedDMConvoIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      // 'l' or right arrow to enter message selection mode
+      if ((input === "l" || key.rightArrow) && dmMessages.length > 0) {
+        setSelectedDMMessageIndex(dmMessages.length - 1); // Start at most recent message
         return;
       }
       // Home/End for conversation list

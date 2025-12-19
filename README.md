@@ -165,12 +165,15 @@ Options:
 
 | Key | Action |
 |-----|--------|
-| j/k | Navigate conversations/messages |
+| j/k | Navigate conversations or messages |
+| l/→ | Enter message selection mode |
+| h/← | Back to conversation list |
 | n | Go to node |
 | u | Update node from MeshView |
 | R | Resend failed message |
-| Enter | Select / Focus input |
+| Enter | Focus input |
 | Escape | Back / Unfocus |
+| # | Delete conversation |
 
 ### Config View
 
