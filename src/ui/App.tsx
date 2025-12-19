@@ -25,6 +25,7 @@ import { toBinary, create } from "@bufbuild/protobuf";
 import { formatNodeId } from "../utils/hex";
 import { exec } from "child_process";
 import { setSetting } from "../settings";
+import packageJson from "../../package.json";
 
 const BROADCAST_ADDR = 0xFFFFFFFF;
 
@@ -2460,7 +2461,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const statusColor = status === "connected" ? theme.status.online : theme.status.offline;
   const nodeCount = nodes.length;
 
-  const helpHint = "[?] Help";
+  const helpHint = `v${packageJson.version} [?] Help`;
 
   // Show connecting screen
   if (!transport) {
