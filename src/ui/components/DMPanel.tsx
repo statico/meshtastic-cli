@@ -42,6 +42,7 @@ interface DMPanelProps {
   height: number;
   width: number;
   deleteConfirm?: boolean;
+  meshViewConfirmedIds?: Set<number>;
 }
 
 // Left panel width: star(1) + space(1) + name(6) + space(1) + id(9) = 18
@@ -59,6 +60,7 @@ export function DMPanel({
   height,
   width,
   deleteConfirm,
+  meshViewConfirmedIds,
 }: DMPanelProps) {
   const selectedConvo = conversations[selectedConvoIndex];
   const listFocused = selectedMessageIndex < 0 && !inputFocused && !deleteConfirm;
@@ -171,6 +173,7 @@ export function DMPanel({
                   isOwn={msg.fromNode === myNodeNum}
                   isSelected={actualIndex === selectedMessageIndex && !inputFocused}
                   textWidth={rightPanelWidth - 25}
+                  meshViewConfirmedIds={meshViewConfirmedIds}
                 />
               );
             })
@@ -208,13 +211,15 @@ interface MessageRowProps {
   isOwn: boolean;
   isSelected: boolean;
   textWidth: number;
+  meshViewConfirmedIds?: Set<number>;
 }
 
-function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth }: MessageRowProps) {
+function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth, meshViewConfirmedIds }: MessageRowProps) {
   const fromName = nodeStore.getNodeName(message.fromNode);
   const time = new Date(message.timestamp * 1000).toLocaleTimeString("en-US", { hour12: false });
   const nameColor = isOwn ? theme.fg.accent : theme.packet.position;
   const [now, setNow] = useState(Date.now());
+  const isConfirmedByMeshView = message.packetId && meshViewConfirmedIds?.has(message.packetId);
 
   useEffect(() => {
     if (message.status !== "pending" || !isOwn) return;
@@ -259,6 +264,11 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth }: Messag
     }
   };
 
+  const getMeshViewIndicator = () => {
+    if (!isConfirmedByMeshView) return null;
+    return <Text color={theme.fg.muted}> [M]</Text>;
+  };
+
   const maxLen = Math.max(10, textWidth);
   // Remove carriage returns and other control characters that break terminal display
   const cleanText = message.text.replace(/[\r\x00-\x1f]/g, "");
@@ -273,6 +283,7 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth }: Messag
         <Text color={nameColor}>{fitVisual(fromName, 8)} </Text>
         <Text color={theme.fg.primary}>{displayText}</Text>
         {getStatusIndicator()}
+        {getMeshViewIndicator()}
       </Text>
     </Box>
   );

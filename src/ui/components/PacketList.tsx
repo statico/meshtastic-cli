@@ -37,6 +37,7 @@ interface PacketListProps {
   height?: number;
   isFollowing?: boolean;
   useFahrenheit?: boolean;
+  meshViewConfirmedIds?: Set<number>;
 }
 
 // Helper to convert and format temperature
@@ -65,7 +66,7 @@ function PacketListHeader() {
   );
 }
 
-export function PacketList({ packets, selectedIndex, nodeStore, height = 20, isFollowing, useFahrenheit = false }: PacketListProps) {
+export function PacketList({ packets, selectedIndex, nodeStore, height = 20, isFollowing, useFahrenheit = false, meshViewConfirmedIds }: PacketListProps) {
   // Account for LIVE indicator and header taking rows
   const visibleCount = Math.max(1, height - 3 - (isFollowing ? 1 : 0));
 
@@ -98,6 +99,7 @@ export function PacketList({ packets, selectedIndex, nodeStore, height = 20, isF
             nodeStore={nodeStore}
             isSelected={isSelected}
             useFahrenheit={useFahrenheit}
+            meshViewConfirmedIds={meshViewConfirmedIds}
           />
         );
       })}
@@ -345,11 +347,13 @@ interface PacketRowProps {
   nodeStore: NodeStore;
   isSelected: boolean;
   useFahrenheit: boolean;
+  meshViewConfirmedIds?: Set<number>;
 }
 
-function PacketRow({ packet, nodeStore, isSelected, useFahrenheit }: PacketRowProps) {
+function PacketRow({ packet, nodeStore, isSelected, useFahrenheit, meshViewConfirmedIds }: PacketRowProps) {
   const time = packet.timestamp.toLocaleTimeString("en-US", { hour12: false });
   const bgColor = isSelected ? theme.bg.selected : undefined;
+  const isConfirmedByMeshView = packet.meshPacket?.id && meshViewConfirmedIds?.has(packet.meshPacket.id);
 
   if (packet.decodeError) {
     return (
@@ -419,6 +423,7 @@ function PacketRow({ packet, nodeStore, isSelected, useFahrenheit }: PacketRowPr
           <Text color={theme.fg.muted}>{hops}</Text>
           {encryptedInfo}
           {renderPacketSummary(packet, nodeStore, useFahrenheit)}
+          {isConfirmedByMeshView && <Text color={theme.fg.muted}> [M]</Text>}
         </Text>
       </Box>
     );

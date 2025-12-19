@@ -59,6 +59,13 @@ export function initDb(session: string = "default") {
     // Column already exists
   }
 
+  // Migration: add public_key column if it doesn't exist
+  try {
+    db.run(`ALTER TABLE nodes ADD COLUMN public_key BLOB`);
+  } catch {
+    // Column already exists
+  }
+
   db.run(`
     CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -190,6 +197,7 @@ export interface DbNode {
   viaMqtt?: boolean;
   hopsAway?: number;
   isFavorite?: boolean;
+  publicKey?: Uint8Array;
 }
 
 export type MessageStatus = "pending" | "acked" | "delivered" | "error" | "received";
@@ -212,8 +220,8 @@ export interface DbMessage {
 
 export function upsertNode(node: DbNode) {
   db.run(`
-    INSERT INTO nodes (num, user_id, long_name, short_name, hw_model, role, latitude_i, longitude_i, altitude, snr, last_heard, battery_level, voltage, channel_utilization, air_util_tx, channel, via_mqtt, hops_away, is_favorite, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO nodes (num, user_id, long_name, short_name, hw_model, role, latitude_i, longitude_i, altitude, snr, last_heard, battery_level, voltage, channel_utilization, air_util_tx, channel, via_mqtt, hops_away, is_favorite, public_key, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(num) DO UPDATE SET
       user_id = COALESCE(excluded.user_id, user_id),
       long_name = COALESCE(excluded.long_name, long_name),
@@ -233,6 +241,7 @@ export function upsertNode(node: DbNode) {
       via_mqtt = COALESCE(excluded.via_mqtt, via_mqtt),
       hops_away = COALESCE(excluded.hops_away, hops_away),
       is_favorite = COALESCE(excluded.is_favorite, is_favorite),
+      public_key = COALESCE(excluded.public_key, public_key),
       updated_at = excluded.updated_at
   `, [
     node.num,
@@ -254,8 +263,13 @@ export function upsertNode(node: DbNode) {
     node.viaMqtt ? 1 : null,
     node.hopsAway ?? null,
     node.isFavorite ? 1 : null,
+    node.publicKey ?? null,
     Date.now(),
   ]);
+}
+
+export function updateNodePublicKey(num: number, publicKey: Uint8Array) {
+  db.run(`UPDATE nodes SET public_key = ?, updated_at = ? WHERE num = ?`, [publicKey, Date.now(), num]);
 }
 
 export function getNode(num: number): DbNode | null {
@@ -281,6 +295,7 @@ export function getNode(num: number): DbNode | null {
     viaMqtt: !!row.via_mqtt,
     hopsAway: row.hops_away,
     isFavorite: !!row.is_favorite,
+    publicKey: row.public_key ? new Uint8Array(row.public_key) : undefined,
   };
 }
 
@@ -306,6 +321,7 @@ export function getAllNodes(): DbNode[] {
     viaMqtt: !!row.via_mqtt,
     hopsAway: row.hops_away,
     isFavorite: !!row.is_favorite,
+    publicKey: row.public_key ? new Uint8Array(row.public_key) : undefined,
   }));
 }
 

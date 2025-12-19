@@ -76,6 +76,7 @@ interface ChatPanelProps {
   loraConfig?: Config.Config_LoRaConfig;
   filter?: string;
   filterInputActive?: boolean;
+  meshViewConfirmedIds?: Set<number>;
 }
 
 // Prefix width: [HH:MM:SS] (10) + space (1) + name (10) + space (1) = 22 chars
@@ -97,6 +98,7 @@ export function ChatPanel({
   loraConfig,
   filter,
   filterInputActive,
+  meshViewConfirmedIds,
 }: ChatPanelProps) {
   const hasFilter = filter && filter.length > 0;
   const filterRowHeight = (hasFilter || filterInputActive) ? 1 : 0;
@@ -235,6 +237,7 @@ export function ChatPanel({
                 isOwn={msg.fromNode === myNodeNum}
                 isSelected={actualIndex === selectedMessageIndex && !inputFocused}
                 width={width}
+                meshViewConfirmedIds={meshViewConfirmedIds}
               />
             );
           })
@@ -274,13 +277,15 @@ interface MessageRowProps {
   isOwn: boolean;
   isSelected: boolean;
   width: number;
+  meshViewConfirmedIds?: Set<number>;
 }
 
-function MessageRow({ message, nodeStore, isOwn, isSelected, width }: MessageRowProps) {
+function MessageRow({ message, nodeStore, isOwn, isSelected, width, meshViewConfirmedIds }: MessageRowProps) {
   const fromName = nodeStore.getNodeName(message.fromNode);
   const time = new Date(message.timestamp * 1000).toLocaleTimeString("en-US", { hour12: false });
   const nameColor = isOwn ? theme.fg.accent : theme.packet.position;
   const [now, setNow] = useState(Date.now());
+  const isConfirmedByMeshView = message.packetId && meshViewConfirmedIds?.has(message.packetId);
 
   useEffect(() => {
     if (message.status !== "pending" || !isOwn) return;
@@ -323,6 +328,11 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, width }: MessageRow
       default:
         return null;
     }
+  };
+
+  const getMeshViewIndicator = () => {
+    if (!isConfirmedByMeshView) return null;
+    return <Text color={theme.fg.muted}> [M]</Text>;
   };
 
   // Calculate available width for message text (width - prefix - padding - status indicator space)
@@ -369,6 +379,7 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, width }: MessageRow
           )}
           <Text color={theme.fg.primary}>{line}</Text>
           {lineIndex === lines.length - 1 && getStatusIndicator()}
+          {lineIndex === lines.length - 1 && getMeshViewIndicator()}
         </Box>
       ))}
     </Box>

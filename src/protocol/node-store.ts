@@ -22,6 +22,7 @@ export interface NodeData {
   hopsAway?: number;
   isFavorite?: boolean;
   isIgnored?: boolean;
+  publicKey?: Uint8Array;
 }
 
 type NodeListener = (nodes: NodeData[]) => void;
@@ -39,7 +40,7 @@ export class NodeStore {
   private loadFromDb() {
     const dbNodes = db.getAllNodes();
     for (const n of dbNodes) {
-      this.nodes.set(n.num, { ...n, lastHeard: n.lastHeard || 0 });
+      this.nodes.set(n.num, { ...n, lastHeard: n.lastHeard || 0, publicKey: n.publicKey });
     }
   }
 
@@ -223,6 +224,22 @@ export class NodeStore {
       existing.channelUtilization = metrics.channelUtilization ?? existing.channelUtilization;
       existing.airUtilTx = metrics.airUtilTx ?? existing.airUtilTx;
       this.saveNode(existing);
+      this.emit();
+    }
+  }
+
+  updatePublicKey(nodeNum: number, publicKey: Uint8Array) {
+    const existing = this.nodes.get(nodeNum);
+    if (existing) {
+      existing.publicKey = publicKey;
+      // Save directly to DB using the dedicated function
+      queueMicrotask(() => {
+        try {
+          db.updateNodePublicKey(nodeNum, publicKey);
+        } catch {
+          // Ignore DB errors
+        }
+      });
       this.emit();
     }
   }

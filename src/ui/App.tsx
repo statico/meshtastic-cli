@@ -19,7 +19,7 @@ import { QuitDialog } from "./components/QuitDialog";
 import { ResponseModal } from "./components/ResponseModal";
 import { LogPanel } from "./components/LogPanel";
 import { MeshViewPacketList, MeshViewInspector, MeshViewInspectorTab } from "./components/MeshViewPanel";
-import { MeshViewStore, MeshViewPacket, MeshViewApiResponse } from "../protocol/meshview";
+import { MeshViewStore, MeshViewPacket, MeshViewApiResponse, extractPublicKeyFromPayload } from "../protocol/meshview";
 import { RebootModal } from "./components/RebootModal";
 import { DeviceNotificationModal } from "./components/DeviceNotificationModal";
 import * as db from "../db";
@@ -237,6 +237,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const [meshViewPolling, setMeshViewPolling] = useState(false);
   const [meshViewError, setMeshViewError] = useState<string | null>(null);
   const meshViewStoreRef = useRef<MeshViewStore>(new MeshViewStore());
+  const meshViewConfirmedIdsRef = useRef<Set<number>>(new Set());
+  const [meshViewConfirmedIds, setMeshViewConfirmedIds] = useState<Set<number>>(new Set());
 
   const [batchEditMode, setBatchEditMode] = useState(false);
   const [batchEditCount, setBatchEditCount] = useState(0);
@@ -642,6 +644,81 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       clearInterval(interval);
     };
   }, [mode, localMeshViewUrl]);
+
+  // MeshView confirmation tracking - always-on polling to track confirmed packet IDs and sync public keys
+  // This runs regardless of current tab when meshViewUrl is configured
+  useEffect(() => {
+    if (!localMeshViewUrl) return;
+
+    let running = true;
+    let latestTime = 0;
+
+    const pollConfirmations = async () => {
+      if (!running) return;
+      try {
+        const url = latestTime
+          ? `${localMeshViewUrl}/api/packets?since=${latestTime}&limit=100`
+          : `${localMeshViewUrl}/api/packets?limit=100`;
+        const response = await fetch(url);
+        if (!response.ok) return;
+        const data: MeshViewApiResponse = await response.json();
+        if (data.packets?.length > 0) {
+          let hasNewConfirmed = false;
+          for (const pkt of data.packets) {
+            // Track confirmed packet IDs
+            if (!meshViewConfirmedIdsRef.current.has(pkt.id)) {
+              meshViewConfirmedIdsRef.current.add(pkt.id);
+              hasNewConfirmed = true;
+            }
+
+            // Process NODEINFO packets for public key sync
+            if (pkt.portnum === Portnums.PortNum.NODEINFO_APP) {
+              const existingNode = nodeStore.getNode(pkt.from_node_id);
+              if (existingNode) {
+                const publicKey = extractPublicKeyFromPayload(pkt.payload);
+                if (publicKey) {
+                  // Only update if we have a new key that's different from existing
+                  const existingKey = existingNode.publicKey;
+                  const keysMatch = existingKey && publicKey.length === existingKey.length &&
+                    publicKey.every((b, i) => b === existingKey[i]);
+                  if (!keysMatch) {
+                    nodeStore.updatePublicKey(pkt.from_node_id, publicKey);
+                  }
+                }
+              }
+            }
+          }
+
+          // Update state to trigger re-renders
+          if (hasNewConfirmed) {
+            setMeshViewConfirmedIds(new Set(meshViewConfirmedIdsRef.current));
+          }
+
+          // Update latest time for next poll
+          if (data.latest_import_time) {
+            latestTime = data.latest_import_time;
+          } else {
+            const lastPkt = data.packets[data.packets.length - 1];
+            if (lastPkt.import_time_us > latestTime) {
+              latestTime = lastPkt.import_time_us;
+            }
+          }
+        }
+      } catch {
+        // Ignore polling errors
+      }
+    };
+
+    // Initial poll
+    pollConfirmations();
+    // Poll every 5 seconds
+    const interval = setInterval(pollConfirmations, 5000);
+
+    return () => {
+      running = false;
+      clearInterval(interval);
+    };
+  }, [localMeshViewUrl, nodeStore]);
 
   // Start transport
   useEffect(() => {
@@ -2675,6 +2752,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
                   height={listHeight}
                   isFollowing={selectedPacketIndex === packets.length - 1}
                   useFahrenheit={useFahrenheit}
+                  meshViewConfirmedIds={meshViewConfirmedIds}
                 />
               </Box>
               <Box height={detailHeight} borderStyle="single" borderColor={theme.border.normal}>
@@ -2738,6 +2816,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               loraConfig={loraConfig}
               filter={chatFilter}
               filterInputActive={chatFilterInput}
+              meshViewConfirmedIds={meshViewConfirmedIds}
             />
           </Box>
         )}
@@ -2758,6 +2837,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
                 height={contentHeight - 2}
                 width={terminalWidth}
                 deleteConfirm={dmDeleteConfirm}
+                meshViewConfirmedIds={meshViewConfirmedIds}
               />
             </Box>
           );

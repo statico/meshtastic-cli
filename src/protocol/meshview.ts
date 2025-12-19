@@ -1,5 +1,69 @@
 // MeshView packet types and store for firehose data from MeshView server
 
+// Decode protobuf-style escaped string (handles \NNN octal and \xNN hex escapes)
+function decodeEscapedString(str: string): Uint8Array {
+  const bytes: number[] = [];
+  let i = 0;
+  while (i < str.length) {
+    if (str[i] === '\\' && i + 1 < str.length) {
+      const next = str[i + 1];
+      if (next >= '0' && next <= '7') {
+        // Octal escape: \NNN (1-3 octal digits)
+        let octal = '';
+        let j = i + 1;
+        while (j < str.length && j < i + 4 && str[j] >= '0' && str[j] <= '7') {
+          octal += str[j];
+          j++;
+        }
+        bytes.push(parseInt(octal, 8));
+        i = j;
+      } else if (next === 'x' && i + 3 < str.length) {
+        // Hex escape: \xNN
+        const hex = str.slice(i + 2, i + 4);
+        bytes.push(parseInt(hex, 16));
+        i += 4;
+      } else if (next === 'n') {
+        bytes.push(10);
+        i += 2;
+      } else if (next === 'r') {
+        bytes.push(13);
+        i += 2;
+      } else if (next === 't') {
+        bytes.push(9);
+        i += 2;
+      } else if (next === '\\') {
+        bytes.push(92);
+        i += 2;
+      } else {
+        bytes.push(str.charCodeAt(i));
+        i++;
+      }
+    } else {
+      bytes.push(str.charCodeAt(i));
+      i++;
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+// Extract public_key from MeshView NODEINFO payload (protobuf text format)
+export function extractPublicKeyFromPayload(payload: string): Uint8Array | null {
+  if (!payload) return null;
+
+  // Look for public_key: "..." in protobuf text format
+  const match = payload.match(/public_key:\s*"([^"]*)"/);
+  if (!match || !match[1]) return null;
+
+  const escapedKey = match[1];
+  if (!escapedKey) return null;
+
+  const decoded = decodeEscapedString(escapedKey);
+  // Public keys should be 32 bytes
+  if (decoded.length !== 32) return null;
+
+  return decoded;
+}
+
 export interface MeshViewPacket {
   id: number;
   import_time_us: number;
