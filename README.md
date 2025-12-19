@@ -62,6 +62,13 @@ Note: macOS binaries are not codesigned. You may need to right-click and select 
 docker run --rm -it -e TERM ghcr.io/statico/meshtastic-cli 192.168.1.100
 ```
 
+To persist the database between runs:
+
+```sh
+docker volume create meshtastic-cli-data
+docker run --rm -it -e TERM -v meshtastic-cli-data:/root/.config ghcr.io/statico/meshtastic-cli 192.168.1.100
+```
+
 ### Build from Source
 
 Requires [Bun](https://bun.sh).
