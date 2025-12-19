@@ -679,8 +679,7 @@ function renderPayloadFields(obj: Record<string, unknown>, indent: number = 0, k
         <Box key={uniqueKey}>
           <Text wrap="truncate">
             <Text>{pad}</Text>
-            <Text color={theme.data.channel} bold>{key}</Text>
-            <Text color={theme.fg.muted}>:</Text>
+            <Text color={theme.fg.muted}>{key}:</Text>
           </Text>
         </Box>
       );
@@ -690,8 +689,7 @@ function renderPayloadFields(obj: Record<string, unknown>, indent: number = 0, k
         <Box key={uniqueKey}>
           <Text wrap="truncate">
             <Text>{pad}</Text>
-            <Text color={theme.data.channel} bold>{key}</Text>
-            <Text color={theme.fg.muted}>: </Text>
+            <Text color={theme.fg.muted}>{key}: </Text>
             <Text color={theme.data.hops}>[{value.length} items]</Text>
           </Text>
         </Box>
@@ -702,8 +700,7 @@ function renderPayloadFields(obj: Record<string, unknown>, indent: number = 0, k
         <Box key={uniqueKey}>
           <Text wrap="truncate">
             <Text>{pad}</Text>
-            <Text color={theme.data.channel}>{key}</Text>
-            <Text color={theme.fg.muted}>: </Text>
+            <Text color={theme.fg.muted}>{key}: </Text>
             <Text color={valueColor}>{String(value)}</Text>
           </Text>
         </Box>
@@ -716,6 +713,9 @@ function renderPayloadFields(obj: Record<string, unknown>, indent: number = 0, k
 
 function MeshViewInfoView({ packet, height, scrollOffset, meshViewUrl, useFahrenheit }: { packet: MeshViewPacket; height: number; scrollOffset: number; meshViewUrl?: string; useFahrenheit: boolean }) {
   const allLines: React.ReactNode[] = [];
+
+  // Blank line at top
+  allLines.push(<Box key="spacer-top"><Text> </Text></Box>);
 
   // From info
   const fromName = packet.long_name || formatNodeId(packet.from_node_id);
@@ -781,12 +781,8 @@ function MeshViewInfoView({ packet, height, scrollOffset, meshViewUrl, useFahren
     );
   }
 
-  // Separator
-  allLines.push(
-    <Box key="sep">
-      <Text color={theme.fg.muted}>{"─".repeat(50)}</Text>
-    </Box>
-  );
+  // Blank line before payload
+  allLines.push(<Box key="spacer-payload"><Text> </Text></Box>);
 
   // Payload
   if (packet.payload) {
