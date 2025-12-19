@@ -122,6 +122,14 @@ const meshviewKeys = [
   { key: "c", desc: "Clear packets and refresh" },
 ];
 
+// Status indicators shown in chat/dm/packets views
+const statusIndicators = [
+  { indicator: "[...]", desc: "Pending - waiting for acknowledgment" },
+  { indicator: "[✓]", desc: "Acknowledged - recipient confirmed" },
+  { indicator: "[✗]", desc: "Failed - delivery failed or timed out" },
+  { indicator: "[M]", desc: "MeshView - packet seen on MeshView server" },
+];
+
 export function HelpDialog({ mode, meshViewUrl }: HelpDialogProps) {
   const globalKeys = getGlobalKeys(!!meshViewUrl);
 
@@ -143,6 +151,9 @@ export function HelpDialog({ mode, meshViewUrl }: HelpDialogProps) {
     : mode === "config" ? "CONFIG"
     : mode === "meshview" ? "MESHVIEW"
     : "LOG";
+
+  // Show status indicators for chat, dm, and packets modes
+  const showStatusIndicators = mode === "chat" || mode === "dm" || mode === "packets";
 
   return (
     <Box
@@ -180,6 +191,23 @@ export function HelpDialog({ mode, meshViewUrl }: HelpDialogProps) {
           </Box>
         );
       })}
+
+      {showStatusIndicators && (
+        <>
+          <Box marginY={1}>
+            <Text bold color={theme.data.channel}>STATUS INDICATORS</Text>
+          </Box>
+          {statusIndicators.map(({ indicator, desc }) => {
+            const disabled = indicator === "[M]" && !meshViewUrl;
+            return (
+              <Box key={indicator}>
+                <Text color={disabled ? theme.fg.muted : theme.data.nodeFrom}>{indicator.padEnd(12)}</Text>
+                <Text color={disabled ? theme.fg.muted : theme.fg.primary}>{desc}</Text>
+              </Box>
+            );
+          })}
+        </>
+      )}
 
       <Box marginTop={1} justifyContent="center">
         <Text color={theme.fg.muted}>Press ? to close</Text>
