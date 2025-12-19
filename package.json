@@ -1,6 +1,6 @@
 {
   "name": "@meshtastic/cli-viewer",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "type": "module",
   "scripts": {
     "dev": "bun run src/index.ts",
