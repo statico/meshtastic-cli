@@ -47,9 +47,10 @@ interface AppProps {
   skipNodes?: boolean;
   bruteForceDepth?: number;
   meshViewUrl?: string;
+  useFahrenheit?: boolean;
 }
 
-export function App({ address, packetStore, nodeStore, skipConfig = false, skipNodes = false, bruteForceDepth = 2, meshViewUrl }: AppProps) {
+export function App({ address, packetStore, nodeStore, skipConfig = false, skipNodes = false, bruteForceDepth = 2, meshViewUrl, useFahrenheit = false }: AppProps) {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const [transport, setTransport] = useState<Transport | null>(null);
@@ -2399,10 +2400,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
                   nodeStore={nodeStore}
                   height={listHeight}
                   isFollowing={selectedPacketIndex === packets.length - 1}
+                  useFahrenheit={useFahrenheit}
                 />
               </Box>
               <Box height={detailHeight} borderStyle="single" borderColor={theme.border.normal}>
-                <PacketInspector packet={selectedPacket} activeTab={inspectorTab} height={detailHeight - 2} nodeStore={nodeStore} scrollOffset={inspectorScrollOffset} bruteForceDepth={bruteForceDepth} meshViewUrl={localMeshViewUrl} />
+                <PacketInspector packet={selectedPacket} activeTab={inspectorTab} height={detailHeight - 2} nodeStore={nodeStore} scrollOffset={inspectorScrollOffset} bruteForceDepth={bruteForceDepth} meshViewUrl={localMeshViewUrl} useFahrenheit={useFahrenheit} />
               </Box>
             </>
           );

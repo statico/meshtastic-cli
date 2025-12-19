@@ -93,6 +93,7 @@ Options:
   --skip-nodes       Skip downloading node database (faster connect)
   --brute-force, -b  Brute force depth for encrypted packets (0-4, default: 0)
   --meshview, -m     MeshView URL for packet/node links
+  --fahrenheit, -F   Display temperatures in Fahrenheit
   --help, -h         Show help
 ```
 

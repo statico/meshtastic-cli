@@ -38,6 +38,7 @@ interface PacketInspectorProps {
   scrollOffset?: number;
   bruteForceDepth?: number;
   meshViewUrl?: string;
+  useFahrenheit?: boolean;
 }
 
 type BruteForceStatus = "idle" | "running" | "found" | "not_found";
@@ -48,7 +49,7 @@ interface BruteForceState {
   result: DecryptResult | null;
 }
 
-export function PacketInspector({ packet, activeTab, height = 12, nodeStore, scrollOffset = 0, bruteForceDepth = 2, meshViewUrl }: PacketInspectorProps) {
+export function PacketInspector({ packet, activeTab, height = 12, nodeStore, scrollOffset = 0, bruteForceDepth = 2, meshViewUrl, useFahrenheit = false }: PacketInspectorProps) {
   const [bruteForce, setBruteForce] = useState<BruteForceState>({
     status: "idle",
     progress: null,
@@ -152,6 +153,7 @@ export function PacketInspector({ packet, activeTab, height = 12, nodeStore, scr
           bruteForce={bruteForce}
           spinnerFrame={spinnerFrame}
           meshViewUrl={meshViewUrl}
+          useFahrenheit={useFahrenheit}
         />
       )}
       {activeTab === "json" && <JsonView packet={packet} height={height - 2} scrollOffset={scrollOffset} />}
@@ -187,7 +189,7 @@ function TabBar({ activeTab, scrollOffset = 0 }: { activeTab: InspectorTab; scro
 }
 
 // === INFO VIEW ===
-function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinnerFrame, meshViewUrl }: {
+function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinnerFrame, meshViewUrl, useFahrenheit }: {
   packet: DecodedPacket;
   nodeStore: NodeStore;
   height: number;
@@ -195,6 +197,7 @@ function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinner
   bruteForce?: BruteForceState;
   spinnerFrame?: number;
   meshViewUrl?: string;
+  useFahrenheit: boolean;
 }) {
   const mp = packet.meshPacket;
   const fr = packet.fromRadio;
@@ -361,7 +364,7 @@ function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinner
     }
 
     // Payload-specific details
-    const payloadDetails = renderPayloadDetails(packet, nodeStore);
+    const payloadDetails = renderPayloadDetails(packet, nodeStore, useFahrenheit);
     if (payloadDetails) {
       lines.push(<Box key="payload-separator" height={1} />);
       lines.push(...payloadDetails);
@@ -387,7 +390,7 @@ function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinner
   return <Box flexDirection="column">{lines.slice(scrollOffset, scrollOffset + height)}</Box>;
 }
 
-function renderPayloadDetails(packet: DecodedPacket, nodeStore: NodeStore): React.ReactNode[] | null {
+function renderPayloadDetails(packet: DecodedPacket, nodeStore: NodeStore, useFahrenheit: boolean): React.ReactNode[] | null {
   if (!packet.payload || typeof packet.payload !== "object") return null;
 
   const lines: React.ReactNode[] = [];
@@ -522,7 +525,7 @@ function renderPayloadDetails(packet: DecodedPacket, nodeStore: NodeStore): Reac
           {em.temperature != null && (
             <>
               <Text color={theme.fg.muted}>Temp: </Text>
-              <Text color={theme.fg.primary}>{em.temperature.toFixed(1)}°C</Text>
+              <Text color={theme.fg.primary}>{useFahrenheit ? `${(em.temperature * 9/5 + 32).toFixed(1)}°F` : `${em.temperature.toFixed(1)}°C`}</Text>
             </>
           )}
           {em.relativeHumidity != null && (

@@ -69,6 +69,7 @@ let session = "default";
 let clearSession = false;
 let bruteForceDepth = 0;
 let meshViewUrl: string | undefined;
+let useFahrenheit = false;
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
@@ -87,6 +88,8 @@ for (let i = 0; i < args.length; i++) {
     }
   } else if (arg === "--meshview" || arg === "-m") {
     meshViewUrl = args[++i];
+  } else if (arg === "--fahrenheit" || arg === "-F") {
+    useFahrenheit = true;
   } else if (arg === "--help" || arg === "-h") {
     console.log(`
 Meshtastic CLI Viewer
@@ -106,6 +109,7 @@ Options:
                      0=disabled, 1=256 keys, 2=65K keys, 3=16M keys, 4=4B keys
   --meshview, -m     MeshView URL for packet/node links (default: from settings or disabled)
                      Use "default" for ${DEFAULT_MESHVIEW_URL}
+  --fahrenheit, -F   Display temperatures in Fahrenheit instead of Celsius
   --help, -h         Show this help message
 `);
     process.exit(0);
@@ -147,6 +151,7 @@ const { waitUntilExit } = render(
     skipNodes,
     bruteForceDepth,
     meshViewUrl: resolvedMeshViewUrl,
+    useFahrenheit,
   })
 );
 

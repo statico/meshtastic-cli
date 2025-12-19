@@ -35,9 +35,18 @@ interface PacketListProps {
   nodeStore: NodeStore;
   height?: number;
   isFollowing?: boolean;
+  useFahrenheit?: boolean;
 }
 
-export function PacketList({ packets, selectedIndex, nodeStore, height = 20, isFollowing }: PacketListProps) {
+// Helper to convert and format temperature
+function formatTemp(celsius: number, useFahrenheit: boolean): string {
+  if (useFahrenheit) {
+    return `${(celsius * 9/5 + 32).toFixed(1)}°F`;
+  }
+  return `${celsius.toFixed(1)}°C`;
+}
+
+export function PacketList({ packets, selectedIndex, nodeStore, height = 20, isFollowing, useFahrenheit = false }: PacketListProps) {
   // Account for LIVE indicator taking one row when showing
   const visibleCount = Math.max(1, height - 2 - (isFollowing ? 1 : 0));
 
@@ -68,6 +77,7 @@ export function PacketList({ packets, selectedIndex, nodeStore, height = 20, isF
             packet={packet}
             nodeStore={nodeStore}
             isSelected={isSelected}
+            useFahrenheit={useFahrenheit}
           />
         );
       })}
@@ -90,7 +100,7 @@ function getPortColor(portnum?: Portnums.PortNum): string {
   }
 }
 
-function renderPacketSummary(packet: DecodedPacket, nodeStore: NodeStore): React.ReactNode {
+function renderPacketSummary(packet: DecodedPacket, nodeStore: NodeStore, useFahrenheit: boolean): React.ReactNode {
   if (!packet.payload) return null;
 
   // Text message
@@ -194,7 +204,7 @@ function renderPacketSummary(packet: DecodedPacket, nodeStore: NodeStore): React
       const em = telem.variant.value as Telemetry.EnvironmentMetrics;
       return (
         <>
-          {em.temperature != null && <Text color={theme.data.coords}> {em.temperature.toFixed(1)}°C</Text>}
+          {em.temperature != null && <Text color={theme.data.coords}> {formatTemp(em.temperature, useFahrenheit)}</Text>}
           {em.relativeHumidity != null && <Text color={theme.data.percent}> {em.relativeHumidity.toFixed(0)}%rh</Text>}
           {em.barometricPressure != null && <Text color={theme.data.voltage}> {em.barometricPressure.toFixed(0)}hPa</Text>}
         </>
@@ -314,9 +324,10 @@ interface PacketRowProps {
   packet: DecodedPacket;
   nodeStore: NodeStore;
   isSelected: boolean;
+  useFahrenheit: boolean;
 }
 
-function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
+function PacketRow({ packet, nodeStore, isSelected, useFahrenheit }: PacketRowProps) {
   const time = packet.timestamp.toLocaleTimeString("en-US", { hour12: false });
   const bgColor = isSelected ? theme.bg.selected : undefined;
 
@@ -387,7 +398,7 @@ function PacketRow({ packet, nodeStore, isSelected }: PacketRowProps) {
           <Text color={theme.data.nodeTo}>{toName.padEnd(10)}</Text>
           <Text color={theme.fg.muted}>{hops}</Text>
           {encryptedInfo}
-          {renderPacketSummary(packet, nodeStore)}
+          {renderPacketSummary(packet, nodeStore, useFahrenheit)}
         </Text>
       </Box>
     );
