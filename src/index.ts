@@ -83,7 +83,7 @@ for (let i = 0; i < args.length; i++) {
     clearSession = true;
   } else if (arg === "--brute-force" || arg === "-b") {
     const val = parseInt(args[++i], 10);
-    if (!isNaN(val) && val >= 0 && val <= 4) {
+    if (!isNaN(val) && val >= 0 && val <= 2) {
       bruteForceDepth = val;
     }
   } else if (arg === "--meshview" || arg === "-m") {
@@ -105,8 +105,8 @@ Options:
   --skip-config      Skip loading device configuration on startup (faster connect)
   --skip-nodes       Skip downloading node database on startup (much faster connect)
                      Uses magic nonce 69420 to request config without nodes
-  --brute-force, -b  Brute force depth for encrypted packets (0-4, default: 0)
-                     0=disabled, 1=256 keys, 2=65K keys, 3=16M keys, 4=4B keys
+  --brute-force, -b  Try to decrypt with default keys (0-2, default: 0)
+                     0=disabled, 1=simple keys 1-10, 2=all 256 single-byte keys
   --meshview, -m     MeshView URL for packet/node links (default: from settings or disabled)
                      Use "default" for ${DEFAULT_MESHVIEW_URL}
   --fahrenheit, -F   Display temperatures in Fahrenheit instead of Celsius

@@ -179,27 +179,21 @@ function extractPayload(data: Uint8Array): { portnum?: number; payload?: Uint8Ar
 }
 
 // Generator that yields key candidates for brute forcing
-// Yields 1-byte keys first (to try default template), then progressively longer keys
+// Only tries practically recoverable keys:
+// - Simple keys 1-10 (expand to default template - these are the main target)
+// - Optionally all 256 single-byte keys (for edge case of arbitrary byte like 0x42)
+// Multi-byte brute force (65K+ keys) is useless since real PSKs are 16/32 bytes
 function* keyGenerator(depth: number): Generator<Uint8Array> {
-  // First try 1-byte simple keys (will use default template via expandKey)
+  // First try simple keys 1-10 (will use default template via expandKey)
   for (let k = 1; k <= 10; k++) {
     yield new Uint8Array([k]);
   }
 
-  // Then try all keys up to the specified depth
-  for (let d = 1; d <= depth; d++) {
-    const maxKey = Math.pow(256, d);
-    for (let k = 0; k < maxKey; k++) {
-      // Skip 1-byte simple keys 1-10 (already tried above)
-      if (d === 1 && k >= 1 && k <= 10) continue;
-
-      const key = new Uint8Array(d);
-      let val = k;
-      for (let i = 0; i < d; i++) {
-        key[i] = val & 0xff;
-        val >>>= 8;
-      }
-      yield key;
+  // If depth >= 2, also try all 256 single-byte keys (edge case)
+  if (depth >= 2) {
+    for (let k = 0; k < 256; k++) {
+      if (k >= 1 && k <= 10) continue; // Already tried
+      yield new Uint8Array([k]);
     }
   }
 }
@@ -208,7 +202,7 @@ export interface BruteForceOptions {
   encrypted: Uint8Array;
   packetId: number;
   fromNode: number;
-  depth: number; // 1 = 256 keys, 2 = 65K keys, etc.
+  depth: number; // 1 = simple keys 1-10, 2 = all 256 single-byte keys
   onProgress?: (progress: BruteForceProgress) => void;
   signal?: { cancelled: boolean };
   chunkSize?: number;
@@ -219,15 +213,11 @@ export async function bruteForceDecrypt(
 ): Promise<DecryptResult | null> {
   const { encrypted, packetId, fromNode, depth, onProgress, signal, chunkSize = 1000 } = options;
 
-  if (depth <= 0 || depth > 4) return null;
+  if (depth <= 0 || depth > 2) return null;
 
   const nonce = buildNonce(packetId, fromNode);
-  // Total keys: 10 simple keys + sum of 256^d for d=1 to depth (minus 10 already counted)
-  let total = 10;
-  for (let d = 1; d <= depth; d++) {
-    total += Math.pow(256, d);
-  }
-  total -= 10; // Simple keys 1-10 are counted once, not in each depth
+  // Total keys: depth 1 = 10 simple keys, depth 2 = 256 single-byte keys
+  const total = depth === 1 ? 10 : 256;
   let current = 0;
   const startTime = Date.now();
 
