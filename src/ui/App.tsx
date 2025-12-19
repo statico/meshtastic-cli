@@ -1940,6 +1940,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         if (key.return) {
           if (chatInput.trim()) {
             sendMessage(chatInput);
+            setChatInputFocused(false);
           }
           return;
         }
