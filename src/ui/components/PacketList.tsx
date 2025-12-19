@@ -47,9 +47,27 @@ function formatTemp(celsius: number, useFahrenheit: boolean): string {
   return `${celsius.toFixed(1)}°C`;
 }
 
+// Column header for packet list
+function PacketListHeader() {
+  return (
+    <Box>
+      <Text wrap="truncate">
+        <Text color={theme.fg.muted}>{"TIME".padEnd(12)}</Text>
+        <Text color={theme.fg.muted}>  </Text>
+        <Text color={theme.fg.muted}>{"PORT".padEnd(14)} </Text>
+        <Text color={theme.fg.muted}>{"FROM".padEnd(10)}</Text>
+        <Text color={theme.fg.muted}>{"    "}</Text>
+        <Text color={theme.fg.muted}>{"TO".padEnd(10)}</Text>
+        <Text color={theme.fg.muted}>{"HOPS".padEnd(7)}</Text>
+        <Text color={theme.fg.muted}>DATA</Text>
+      </Text>
+    </Box>
+  );
+}
+
 export function PacketList({ packets, selectedIndex, nodeStore, height = 20, isFollowing, useFahrenheit = false }: PacketListProps) {
-  // Account for LIVE indicator taking one row when showing
-  const visibleCount = Math.max(1, height - 2 - (isFollowing ? 1 : 0));
+  // Account for LIVE indicator and header taking rows
+  const visibleCount = Math.max(1, height - 3 - (isFollowing ? 1 : 0));
 
   let startIndex = 0;
   if (packets.length > visibleCount) {
@@ -69,6 +87,7 @@ export function PacketList({ packets, selectedIndex, nodeStore, height = 20, isF
           <LiveIndicator />
         </Box>
       )}
+      <PacketListHeader />
       {visiblePackets.map((packet, i) => {
         const actualIndex = startIndex + i;
         const isSelected = actualIndex === selectedIndex;

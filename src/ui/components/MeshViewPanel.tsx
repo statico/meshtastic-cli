@@ -193,14 +193,32 @@ interface MeshViewPacketListProps {
   error?: string | null;
 }
 
+// Column header for MeshView packet list
+function MeshViewPacketListHeader() {
+  return (
+    <Box>
+      <Text wrap="truncate">
+        <Text color={theme.fg.muted}>{"TIME".padEnd(12)}</Text>
+        <Text color={theme.fg.muted}>  </Text>
+        <Text color={theme.fg.muted}>{"PORT".padEnd(14)} </Text>
+        <Text color={theme.fg.muted}>{"FROM".padEnd(6)}</Text>
+        <Text color={theme.fg.muted}>{"    "}</Text>
+        <Text color={theme.fg.muted}>{"TO".padEnd(6)}</Text>
+        <Text color={theme.fg.muted}>{" CH".padEnd(6)}</Text>
+        <Text color={theme.fg.muted}>DATA</Text>
+      </Text>
+    </Box>
+  );
+}
+
 export function MeshViewPacketList({
   packets,
   selectedIndex,
   height = 20,
   error
 }: MeshViewPacketListProps) {
-  // Reserve space for LIVE indicator
-  const visibleCount = Math.max(1, height - 2);
+  // Reserve space for LIVE indicator and header
+  const visibleCount = Math.max(1, height - 3);
 
   let startIndex = 0;
   if (packets.length > visibleCount) {
@@ -218,6 +236,7 @@ export function MeshViewPacketList({
       <Box justifyContent="center">
         <LiveIndicator error={error} />
       </Box>
+      <MeshViewPacketListHeader />
       {visiblePackets.map((packet, i) => {
         const actualIndex = startIndex + i;
         const isSelected = actualIndex === selectedIndex;
