@@ -36,10 +36,10 @@ A terminal UI for monitoring and configuring Meshtastic mesh networks. Connects 
 - **Chat view** - Send and receive channel messages with emoji support
 - **DM view** - Direct messages with delivery confirmation and resend support
 - **Config view** - View and edit device configuration with batch mode
-- **Log view** - Position and traceroute response history
-- **Node commands** - Traceroute, position/telemetry request, direct ping, DM, MeshView lookup
+- **Log view** - Position, traceroute, and nodeinfo response history
+- **Node commands** - Traceroute, position/telemetry/nodeinfo request, direct ping, DM
+- **ACK notifications** - Visual feedback when nodes acknowledge your packets
 - **MeshView integration** - Update node info from a MeshView server
-- **Device notifications** - Auto-dismissing modal for device alerts
 - **Persistent storage** - SQLite database for nodes, messages, and packets
 - **Session support** - Multiple named sessions for different radios
 
@@ -98,6 +98,7 @@ Options:
 |-----|--------|
 | 1-6 | Switch to view |
 | [ / ] | Previous / Next view |
+| Ctrl+L | Redraw screen |
 | q | Quit |
 | ? | Toggle help |
 
@@ -168,6 +169,13 @@ Options:
 | Enter | Focus input |
 | Escape | Back / Unfocus |
 | # | Delete conversation |
+
+### Log View
+
+| Key | Action |
+|-----|--------|
+| j/k | Navigate responses |
+| g/G | First/last response |
 
 ### Config View
 
