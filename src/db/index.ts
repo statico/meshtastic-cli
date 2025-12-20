@@ -105,6 +105,13 @@ export function initDb(session: string = "default") {
     // Column already exists
   }
 
+  // Migration: add error_reason column if it doesn't exist
+  try {
+    db.run(`ALTER TABLE messages ADD COLUMN error_reason TEXT`);
+  } catch {
+    // Column already exists
+  }
+
   db.run(`
     CREATE TABLE IF NOT EXISTS packets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -232,6 +239,7 @@ export interface DbMessage {
   status?: MessageStatus;
   replyId?: number;
   seenOnMesh?: boolean;
+  errorReason?: string;
 }
 
 export function upsertNode(node: DbNode) {
@@ -373,8 +381,12 @@ export function insertMessage(msg: DbMessage) {
   ]);
 }
 
-export function updateMessageStatus(packetId: number, status: MessageStatus) {
-  db.run(`UPDATE messages SET status = ? WHERE packet_id = ?`, [status, packetId]);
+export function updateMessageStatus(packetId: number, status: MessageStatus, errorReason?: string) {
+  if (errorReason) {
+    db.run(`UPDATE messages SET status = ?, error_reason = ? WHERE packet_id = ?`, [status, errorReason, packetId]);
+  } else {
+    db.run(`UPDATE messages SET status = ? WHERE packet_id = ?`, [status, packetId]);
+  }
 }
 
 export function markMessageSeenOnMesh(packetId: number) {
@@ -403,6 +415,7 @@ export function getMessages(channel?: number, limit = 100): DbMessage[] {
     status: row.status as MessageStatus,
     replyId: row.reply_id ?? undefined,
     seenOnMesh: !!row.seen_on_mesh,
+    errorReason: row.error_reason ?? undefined,
   }));
 }
 
@@ -425,6 +438,7 @@ export function getMessageByPacketId(packetId: number): DbMessage | null {
     status: row.status as MessageStatus,
     replyId: row.reply_id ?? undefined,
     seenOnMesh: !!row.seen_on_mesh,
+    errorReason: row.error_reason ?? undefined,
   };
 }
 
@@ -692,6 +706,7 @@ export function getDMMessages(myNodeNum: number, otherNodeNum: number, limit = 1
     status: row.status as MessageStatus,
     replyId: row.reply_id ?? undefined,
     seenOnMesh: !!row.seen_on_mesh,
+    errorReason: row.error_reason ?? undefined,
   }));
 }
 

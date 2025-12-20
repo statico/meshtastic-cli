@@ -459,10 +459,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         if (routing.variant?.case === "errorReason" && routing.variant.value !== undefined) {
           const isAck = routing.variant.value === Mesh.Routing_Error.NONE;
           const newStatus: db.MessageStatus = isAck ? "acked" : "error";
-          db.updateMessageStatus(packet.requestId, newStatus);
+          const errorReason = isAck ? undefined : (Mesh.Routing_Error[routing.variant.value] || `error_${routing.variant.value}`);
+          db.updateMessageStatus(packet.requestId, newStatus, errorReason);
           setMessages((prev) =>
             prev.map((m) =>
-              m.packetId === packet.requestId ? { ...m, status: newStatus } : m
+              m.packetId === packet.requestId ? { ...m, status: newStatus, errorReason } : m
             )
           );
           // Show ACK notification (but not for self-to-self)
