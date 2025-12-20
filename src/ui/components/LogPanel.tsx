@@ -74,9 +74,7 @@ function LogList({ responses, selectedIndex, height, nodeStore }: {
   return (
     <>
       <Text color={theme.fg.muted}>
-        {"TYPE".padEnd(12)}
-        {"FROM".padEnd(12)}
-        {"TIME"}
+        {"  "}{"TYPE".padEnd(12)}{"FROM".padEnd(12)}{"TIME"}
       </Text>
       {visibleResponses.map((response, i) => (
         <LogRow
