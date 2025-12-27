@@ -28,6 +28,7 @@ import { formatNodeId, getHardwareModelName } from "../utils";
 import { exec } from "child_process";
 import { setSetting } from "../settings";
 import packageJson from "../../package.json";
+import { Logger } from "../logger";
 
 const BROADCAST_ADDR = 0xFFFFFFFF;
 
@@ -104,21 +105,29 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   // Connect to device
   useEffect(() => {
     let cancelled = false;
+    Logger.info("App", "Initiating device connection", { address });
     (async () => {
       try {
         const t = await HttpTransport.create(address);
         if (!cancelled) {
+          Logger.info("App", "Transport created successfully", { address });
           setTransport(t);
         }
       } catch (e) {
         if (!cancelled) {
           const msg = e instanceof Error ? e.message : String(e);
+          Logger.error("App", "Connection failed", e as Error, { address });
           console.error(`Connection failed: ${msg}`);
           process.exit(1);
         }
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      if (cancelled) {
+        Logger.debug("App", "Connection effect cancelled");
+      }
+      cancelled = true;
+    };
   }, [address]);
 
   // Track terminal resize
@@ -314,16 +323,19 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
 
     if (fr.payloadVariant.case === "myInfo") {
       const myInfo = fr.payloadVariant.value as Mesh.MyNodeInfo;
+      Logger.info("App", "Received myInfo", { myNodeNum: myInfo.myNodeNum });
       setMyNodeNum(myInfo.myNodeNum);
     }
 
     if (fr.payloadVariant.case === "nodeInfo") {
       const nodeInfo = fr.payloadVariant.value;
+      Logger.debug("App", "Received nodeInfo", { num: nodeInfo.num });
       nodeStore.updateFromNodeInfo(nodeInfo);
     }
 
     if (fr.payloadVariant.case === "channel") {
       const channel = fr.payloadVariant.value as Mesh.Channel;
+      Logger.debug("App", "Received channel", { index: channel.index, name: channel.settings?.name, role: channel.role });
       setChannels((prev) => {
         const next = new Map(prev);
         next.set(channel.index, {
@@ -340,6 +352,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     if (fr.payloadVariant.case === "clientNotification") {
       const notif = fr.payloadVariant.value as { level?: number; message?: string };
       if (notif.message) {
+        Logger.info("App", "Received device notification", { message: notif.message, level: notif.level });
         setDeviceNotification({ message: notif.message, level: notif.level });
         setDeviceNotificationRemaining(5);
       }
@@ -422,6 +435,13 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       }
 
       if (packet.portnum === Portnums.PortNum.TEXT_MESSAGE_APP && typeof packet.payload === "string") {
+        Logger.info("App", "Received text message", {
+          from: mp.from,
+          to: mp.to,
+          channel: mp.channel,
+          isBroadcast: mp.to === BROADCAST_ADDR,
+          textLength: packet.payload.length,
+        });
         const msg: db.DbMessage = {
           packetId: mp.id,
           fromNode: mp.from,
@@ -460,6 +480,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           const isAck = routing.variant.value === Mesh.Routing_Error.NONE;
           const newStatus: db.MessageStatus = isAck ? "acked" : "error";
           const errorReason = isAck ? undefined : (Mesh.Routing_Error[routing.variant.value] || `error_${routing.variant.value}`);
+          Logger.info("App", "Received routing response", {
+            requestId: packet.requestId,
+            from: mp.from,
+            isAck,
+            errorReason,
+          });
           db.updateMessageStatus(packet.requestId, newStatus, errorReason);
           setMessages((prev) =>
             prev.map((m) =>
@@ -477,6 +503,10 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       // Handle admin responses for config
       if (packet.portnum === Portnums.PortNum.ADMIN_APP && mp.to === myNodeNum && packet.payload) {
         const adminMsg = packet.payload as Admin.AdminMessage;
+        Logger.info("App", "Received admin response", {
+          from: mp.from,
+          variantCase: adminMsg.payloadVariant.case,
+        });
         setConfigLoading(false);
 
         switch (adminMsg.payloadVariant.case) {
@@ -587,7 +617,14 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
 
   useEffect(() => {
     const unsubscribe = packetStore.onPacket((packet) => {
-      processPacketRef.current(packet);
+      try {
+        processPacketRef.current(packet);
+      } catch (error) {
+        Logger.error("App", "Error processing packet", error as Error, {
+          packetId: packet.id,
+          hasFromRadio: !!packet.fromRadio,
+        });
+      }
       setPackets((prev) => {
         const next = [...prev, packet].slice(-5000);
         // Auto-scroll only if exactly at the last packet (not just near it)
@@ -732,21 +769,38 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     let configRequested = false;
 
     (async () => {
-      for await (const output of transport.fromDevice) {
-        if (!running) break;
-        if (output.type === "status") {
-          setStatus(output.status);
-          if (output.status === "connected" && !configRequested) {
-            configRequested = true;
-            if (!skipConfig) {
-              requestConfig(skipNodes);
+      try {
+        for await (const output of transport.fromDevice) {
+          if (!running) break;
+          if (output.type === "status") {
+            Logger.info("App", "Status changed", {
+              status: output.status,
+              reason: (output as any).reason,
+            });
+            setStatus(output.status);
+            if (output.status === "connected" && !configRequested) {
+              Logger.info("App", "Connected - requesting config", { skipConfig, skipNodes });
+              configRequested = true;
+              if (!skipConfig) {
+                requestConfig(skipNodes);
+              }
+              fetchOwnerFallback();
             }
-            fetchOwnerFallback();
+          } else if (output.type === "packet") {
+            Logger.debug("App", "Processing packet from device");
+            try {
+              const { decodeFromRadio } = await import("../protocol/decoder");
+              const decoded = decodeFromRadio(output.data);
+              packetStore.add(decoded);
+            } catch (error) {
+              Logger.error("App", "Error decoding/storing packet", error as Error);
+            }
           }
-        } else if (output.type === "packet") {
-          const { decodeFromRadio } = await import("../protocol/decoder");
-          const decoded = decodeFromRadio(output.data);
-          packetStore.add(decoded);
+        }
+      } catch (error) {
+        Logger.error("App", "Transport reading loop error", error as Error);
+        if (running) {
+          console.error("Transport error:", error);
         }
       }
     })();

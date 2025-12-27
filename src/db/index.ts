@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import { join } from "path";
 import { homedir } from "os";
 import { mkdirSync, existsSync, unlinkSync } from "fs";
+import { Logger } from "../logger";
 
 const DB_DIR = join(homedir(), ".config", "meshtastic-cli");
 const BROADCAST_ADDR = 0xFFFFFFFF;
@@ -15,17 +16,21 @@ export function getDbPath(session: string): string {
 
 export function initDb(session: string = "default") {
   currentSession = session;
+  const dbPath = getDbPath(session);
+  Logger.info("Database", "Initializing database", { session, path: dbPath });
 
   if (!existsSync(DB_DIR)) {
+    Logger.debug("Database", "Creating database directory", { dir: DB_DIR });
     mkdirSync(DB_DIR, { recursive: true });
   }
 
-  const dbPath = getDbPath(session);
   db = new Database(dbPath);
+  Logger.info("Database", "Database opened", { path: dbPath });
 
   // Enable WAL mode for better concurrent access
   db.run("PRAGMA journal_mode = WAL");
   db.run("PRAGMA busy_timeout = 5000");
+  Logger.debug("Database", "WAL mode and busy_timeout configured");
 
   db.run(`
     CREATE TABLE IF NOT EXISTS nodes (
@@ -169,6 +174,10 @@ export function initDb(session: string = "default") {
     )
   `);
   db.run(`CREATE INDEX IF NOT EXISTS idx_nodeinfo_responses_timestamp ON nodeinfo_responses(timestamp)`);
+
+  Logger.info("Database", "Database initialized successfully", {
+    tables: ["nodes", "messages", "packets", "position_responses", "traceroute_responses", "nodeinfo_responses"]
+  });
 }
 
 export function clearDb(session: string = "default") {
@@ -235,6 +244,12 @@ export interface DbMessage {
 }
 
 export function upsertNode(node: DbNode) {
+  Logger.debug("Database", "Upserting node", {
+    num: node.num,
+    userId: node.userId,
+    longName: node.longName,
+    shortName: node.shortName,
+  });
   db.run(`
     INSERT INTO nodes (num, user_id, long_name, short_name, hw_model, role, latitude_i, longitude_i, altitude, snr, last_heard, battery_level, voltage, channel_utilization, air_util_tx, channel, via_mqtt, hops_away, is_favorite, public_key, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -316,7 +331,9 @@ export function getNode(num: number): DbNode | null {
 }
 
 export function getAllNodes(): DbNode[] {
+  Logger.debug("Database", "Querying all nodes");
   const rows = db.query(`SELECT * FROM nodes ORDER BY hops_away ASC, last_heard DESC`).all() as any[];
+  Logger.debug("Database", "Query complete", { nodeCount: rows.length });
   return rows.map((row) => ({
     num: row.num,
     userId: row.user_id,
@@ -352,6 +369,13 @@ export function deleteNode(num: number) {
 }
 
 export function insertMessage(msg: DbMessage) {
+  Logger.debug("Database", "Inserting message", {
+    packetId: msg.packetId,
+    fromNode: msg.fromNode,
+    toNode: msg.toNode,
+    channel: msg.channel,
+    textLength: msg.text?.length,
+  });
   db.run(`
     INSERT INTO messages (packet_id, from_node, to_node, channel, text, timestamp, rx_time, rx_snr, rx_rssi, hop_limit, hop_start, status, reply_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -442,6 +466,14 @@ export interface DbPacket {
 }
 
 export function insertPacket(packet: DbPacket) {
+  Logger.debug("Database", "Inserting packet", {
+    packetId: packet.packetId,
+    fromNode: packet.fromNode,
+    toNode: packet.toNode,
+    channel: packet.channel,
+    portnum: packet.portnum,
+    rawSize: packet.raw.byteLength,
+  });
   db.run(`
     INSERT INTO packets (packet_id, from_node, to_node, channel, portnum, timestamp, rx_time, rx_snr, rx_rssi, raw)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

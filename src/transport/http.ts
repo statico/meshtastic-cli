@@ -1,4 +1,5 @@
 import type { DeviceOutput, DeviceStatus, Transport } from "./types";
+import { Logger } from "../logger";
 
 const POLL_INTERVAL_MS = 3000;
 const TIMEOUT_MS = 5000;
@@ -16,17 +17,25 @@ export class HttpTransport implements Transport {
 
   static async create(address: string, tls = false): Promise<HttpTransport> {
     const url = `${tls ? "https" : "http"}://${address}`;
-    await fetch(`${url}/api/v1/fromradio`, {
-      method: "GET",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    const transport = new HttpTransport(url);
-    transport.startPolling();
-    return transport;
+    Logger.info("HttpTransport", "Attempting connection", { address, tls, url });
+    try {
+      await fetch(`${url}/api/v1/fromradio`, {
+        method: "GET",
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      Logger.info("HttpTransport", "Connection successful", { url });
+      const transport = new HttpTransport(url);
+      transport.startPolling();
+      return transport;
+    } catch (error) {
+      Logger.error("HttpTransport", "Connection failed", error as Error, { url });
+      throw error;
+    }
   }
 
   private startPolling() {
     this.running = true;
+    Logger.info("HttpTransport", "Starting polling", { url: this.url, interval: POLL_INTERVAL_MS });
     this.emit({ type: "status", status: "connecting" });
     this.poll();
   }
@@ -38,19 +47,24 @@ export class HttpTransport implements Transport {
         let gotPacket = true;
         let batchCount = 0;
         while (gotPacket && this.running && batchCount < 50) {
+          Logger.debug("HttpTransport", "Polling for packets", { url: `${this.url}/api/v1/fromradio` });
           const response = await fetch(`${this.url}/api/v1/fromradio?all=false`, {
             method: "GET",
             headers: { Accept: "application/x-protobuf" },
             signal: AbortSignal.timeout(TIMEOUT_MS),
           });
 
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          if (!response.ok) {
+            Logger.warn("HttpTransport", "HTTP error response", { status: response.status, statusText: response.statusText });
+            throw new Error(`HTTP ${response.status}`);
+          }
 
           this.emit({ type: "status", status: "connected" });
 
           const buffer = await response.arrayBuffer();
           if (buffer.byteLength > 0) {
             const data = new Uint8Array(buffer);
+            Logger.info("HttpTransport", "Packet received", { size: data.byteLength, batchCount: batchCount + 1 });
             this.emit({ type: "packet", data, raw: data });
             batchCount++;
             // Small delay between packets to let UI breathe
@@ -58,11 +72,16 @@ export class HttpTransport implements Transport {
               await new Promise((r) => setTimeout(r, 50));
             }
           } else {
+            Logger.debug("HttpTransport", "No packets available");
             gotPacket = false;
           }
         }
+        if (batchCount > 0) {
+          Logger.info("HttpTransport", "Batch complete", { totalPackets: batchCount });
+        }
       } catch (e) {
         if (this.running) {
+          Logger.error("HttpTransport", "Poll error", e as Error);
           this.emit({
             type: "status",
             status: "disconnected",
@@ -104,33 +123,49 @@ export class HttpTransport implements Transport {
   }
 
   async send(data: Uint8Array): Promise<void> {
-    const response = await fetch(`${this.url}/api/v1/toradio`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/x-protobuf" },
-      body: Buffer.from(data),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    Logger.info("HttpTransport", "Sending packet", { size: data.byteLength, url: `${this.url}/api/v1/toradio` });
+    try {
+      const response = await fetch(`${this.url}/api/v1/toradio`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/x-protobuf" },
+        body: Buffer.from(data),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        Logger.error("HttpTransport", "Send failed", undefined, { status: response.status, statusText: response.statusText });
+        throw new Error(`HTTP ${response.status}`);
+      }
+      Logger.info("HttpTransport", "Packet sent successfully", { size: data.byteLength });
+    } catch (error) {
+      Logger.error("HttpTransport", "Send error", error as Error);
+      throw error;
+    }
   }
 
   async disconnect(): Promise<void> {
+    Logger.info("HttpTransport", "Disconnecting", { url: this.url });
     this.running = false;
     this.emit({ type: "status", status: "disconnected", reason: "user" });
     for (const resolver of this.resolvers) {
       resolver({ value: undefined as any, done: true });
     }
     this.resolvers = [];
+    Logger.info("HttpTransport", "Disconnected");
   }
 
   async fetchOwner(): Promise<{ id: string; longName: string; shortName: string; hwModel: string; myNodeNum: number } | null> {
     // Try /json/nodes endpoint to find local node (node with hopsAway=0 or smallest num)
+    Logger.debug("HttpTransport", "Fetching owner info", { url: `${this.url}/json/nodes` });
     try {
       const response = await fetch(`${this.url}/json/nodes`, {
         method: "GET",
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
-      if (!response.ok) return null;
+      if (!response.ok) {
+        Logger.warn("HttpTransport", "Failed to fetch owner", { status: response.status });
+        return null;
+      }
       const data = await response.json();
       // nodes endpoint returns { nodes: { "!hex": {...}, ... } } or array
       const nodes = data.nodes || data;
@@ -148,16 +183,20 @@ export class HttpTransport implements Transport {
 
       if (localNode) {
         const user = localNode.user || localNode;
-        return {
+        const owner = {
           id: user.id || localNode.id || "",
           longName: user.longName || localNode.longName || "",
           shortName: user.shortName || localNode.shortName || "",
           hwModel: user.hwModel || localNode.hwModel || "",
           myNodeNum: localNode.num || parseInt(localNode.id?.replace("!", ""), 16) || 0,
         };
+        Logger.info("HttpTransport", "Owner info fetched", owner);
+        return owner;
       }
+      Logger.warn("HttpTransport", "No local node found");
       return null;
-    } catch {
+    } catch (error) {
+      Logger.error("HttpTransport", "Error fetching owner", error as Error);
       return null;
     }
   }

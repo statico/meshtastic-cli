@@ -7,6 +7,7 @@ import { PacketStore, NodeStore } from "./protocol";
 import { App } from "./ui/App";
 import { initDb, clearDb, getDbPath } from "./db";
 import { getSetting } from "./settings";
+import { Logger } from "./logger";
 
 // Global error handler - append errors to log file
 const ERROR_LOG_DIR = join(homedir(), ".config", "meshtastic-cli");
@@ -69,6 +70,7 @@ let session = "default";
 let clearSession = false;
 let meshViewUrl: string | undefined;
 let useFahrenheit = false;
+let enableLogging = false;
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
@@ -84,6 +86,8 @@ for (let i = 0; i < args.length; i++) {
     meshViewUrl = args[++i];
   } else if (arg === "--fahrenheit" || arg === "-F") {
     useFahrenheit = true;
+  } else if (arg === "--enable-logging" || arg === "-L") {
+    enableLogging = true;
   } else if (arg === "--help" || arg === "-h") {
     console.log(`
 Meshtastic CLI Viewer
@@ -94,13 +98,14 @@ Arguments:
   address            Device address (default: 192.168.0.123)
 
 Options:
-  --session, -s      Session name for database (default: default)
-  --clear            Clear the database for the session and exit
-  --skip-config, -C  Skip loading device configuration on startup (faster connect)
-  --skip-nodes, -N   Skip downloading node database on startup (much faster connect)
-  --meshview, -m     MeshView URL for packet/node links (default: from settings or disabled)
-  --fahrenheit, -F   Display temperatures in Fahrenheit instead of Celsius
-  --help, -h         Show this help message
+  --session, -s         Session name for database (default: default)
+  --clear               Clear the database for the session and exit
+  --skip-config, -C     Skip loading device configuration on startup (faster connect)
+  --skip-nodes, -N      Skip downloading node database on startup (much faster connect)
+  --meshview, -m        MeshView URL for packet/node links (default: from settings or disabled)
+  --fahrenheit, -F      Display temperatures in Fahrenheit instead of Celsius
+  --enable-logging, -L  Enable verbose logging to ~/.config/meshtastic-cli/log
+  --help, -h            Show this help message
 `);
     process.exit(0);
   } else if (!arg.startsWith("-")) {
@@ -118,6 +123,19 @@ if (clearSession) {
 
 // Resolve meshview URL: CLI flag > settings > undefined
 const resolvedMeshViewUrl = meshViewUrl || getSetting("meshViewUrl");
+
+// Initialize logger
+Logger.init(enableLogging);
+if (enableLogging) {
+  Logger.info("Main", "Logging enabled", {
+    address,
+    session,
+    skipConfig,
+    skipNodes,
+    meshViewUrl: resolvedMeshViewUrl,
+    useFahrenheit,
+  });
+}
 
 // Initialize database
 initDb(session);
