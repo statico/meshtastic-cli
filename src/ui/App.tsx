@@ -2841,7 +2841,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     );
   }
 
-  const banner = terminalWidth <= 90 ? "▓ MESHTASTIC ▓" : "▓▓▓ MESHTASTIC ▓▓▓";
+  const banner = terminalWidth < 65 ? "" : terminalWidth <= 90 ? "▓ MESHTASTIC ▓" : "▓▓▓ MESHTASTIC ▓▓▓";
+
+  // Truncate node name to fit small screens
+  const nodeName = myShortName || (myNodeNum ? nodeStore.getNodeName(myNodeNum) : "???");
+  const maxNodeNameLength = terminalWidth < 65 ? 10 : 20;
+  const truncatedNodeName = nodeName.length > maxNodeNameLength ? nodeName.slice(0, maxNodeNameLength - 1) + "…" : nodeName;
 
   return (
     <Box flexDirection="column" width="100%" height="100%">
@@ -2853,12 +2858,15 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         paddingX={2}
         justifyContent="space-between"
         alignItems="center"
+        flexWrap="nowrap"
       >
-        <Text bold color={theme.fg.accent}>{banner}</Text>
-        <Text color={theme.fg.secondary}>
-          {myShortName || (myNodeNum ? nodeStore.getNodeName(myNodeNum) : "???")} <Text color={theme.fg.muted}>{formatNodeId(myNodeNum)}</Text>
+        {banner && <Text bold color={theme.fg.accent}>{banner}</Text>}
+        <Text color={theme.fg.secondary} flexShrink={1}>
+          {truncatedNodeName} <Text color={theme.fg.muted}>{formatNodeId(myNodeNum)}</Text>
         </Text>
-        {getModeLabel()}
+        <Box flexShrink={0}>
+          {getModeLabel()}
+        </Box>
       </Box>
 
       {/* Main content */}
