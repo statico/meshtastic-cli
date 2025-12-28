@@ -174,6 +174,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     return () => clearInterval(interval);
   }, [showRebootModal]);
 
+  // Trigger full redraw when switching tabs/modes
+  useEffect(() => {
+    setRefreshKey(k => k + 1);
+  }, [mode]);
+
   // Auto-dismiss reboot modal when connection is restored
   useEffect(() => {
     if (showRebootModal && status === "connected") {
@@ -2870,7 +2875,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       </Box>
 
       {/* Main content */}
-      <Box flexGrow={1} flexDirection="column">
+      <Box key={refreshKey} flexGrow={1} flexDirection="column">
         {mode === "packets" && (() => {
           const listHeight = inspectorExpanded
             ? Math.floor((terminalHeight - 7) * 0.2)
