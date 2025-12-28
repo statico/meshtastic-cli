@@ -2877,14 +2877,15 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       {/* Main content */}
       <Box key={refreshKey} flexGrow={1} flexDirection="column">
         {mode === "packets" && (() => {
+          const contentHeight = terminalHeight - 4;
           const listHeight = inspectorExpanded
-            ? Math.floor((terminalHeight - 7) * 0.2)
-            : terminalHeight - inspectorHeight - 7;
+            ? Math.floor(contentHeight * 0.2)
+            : contentHeight - inspectorHeight;
           const detailHeight = inspectorExpanded
-            ? Math.floor((terminalHeight - 7) * 0.8)
+            ? Math.floor(contentHeight * 0.8)
             : inspectorHeight;
           return (
-            <Box flexGrow={1} flexDirection="column">
+            <Box height={contentHeight} flexDirection="column">
               <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
                 <PacketList
                   packets={packets}
