@@ -2814,7 +2814,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const statusColor = status === "connected" ? theme.status.online : theme.status.offline;
   const nodeCount = nodes.length;
 
-  const helpHint = `v${packageJson.version} | [?] Help`;
+  const helpHint = terminalWidth < 65 ? "[?]" : terminalWidth <= 90 ? `v${packageJson.version} | [?]` : `v${packageJson.version} | [?] Help`;
 
   // Show connecting screen
   if (!transport) {
@@ -3068,16 +3068,18 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       </Box>
 
       {/* Status bar */}
-      <Box height={1} paddingX={1}>
+      <Box height={1} paddingX={1} flexWrap="nowrap" overflow="hidden">
         <Text color={statusColor}>{status.toUpperCase()}</Text>
         <Text color={theme.fg.muted}> | </Text>
         <Text color={theme.fg.secondary}>{packets.length} pkts</Text>
         <Text color={theme.fg.muted}> | </Text>
         <Text color={theme.fg.secondary}>{nodeCount} nodes</Text>
         <Text color={theme.fg.muted}> | </Text>
-        <Text color={notification ? (notification.color || theme.fg.accent) : theme.fg.muted}>
-          {notification?.message || helpHint}
-        </Text>
+        <Box flexGrow={1} flexShrink={1} overflow="hidden">
+          <Text color={notification ? (notification.color || theme.fg.accent) : theme.fg.muted}>
+            {notification?.message || helpHint}
+          </Text>
+        </Box>
       </Box>
 
       {/* Help dialog overlay */}
