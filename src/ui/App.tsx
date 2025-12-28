@@ -2929,6 +2929,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
                 filterInputActive={nodesFilterInput}
                 sortKey={nodesSortKey}
                 sortAscending={nodesSortAscending}
+                terminalWidth={terminalWidth}
               />
             </Box>
           );

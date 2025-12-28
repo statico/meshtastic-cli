@@ -24,9 +24,10 @@ interface NodesPanelProps {
   filterInputActive?: boolean;
   sortKey?: NodeSortKey;
   sortAscending?: boolean;
+  terminalWidth?: number;
 }
 
-export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight = 10, filter, filterInputActive, sortKey = "hops", sortAscending = true }: NodesPanelProps) {
+export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight = 10, filter, filterInputActive, sortKey = "hops", sortAscending = true, terminalWidth = 100 }: NodesPanelProps) {
   const hasFilter = filter && filter.length > 0;
   const filterRowHeight = (hasFilter || filterInputActive) ? 1 : 0;
 
@@ -99,15 +100,15 @@ export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight 
         {/* Header - sorted column is highlighted */}
         <Box paddingX={1}>
           <Text color={theme.fg.muted}>{"NAME".padEnd(8)}</Text>
-          <Text color={theme.fg.muted}>{"ID".padEnd(11)}</Text>
+          {terminalWidth > 90 && <Text color={theme.fg.muted}>{"ID".padEnd(11)}</Text>}
           <Text color={sortKey === "favorites" ? theme.fg.accent : theme.fg.muted}>{"★ "}</Text>
           <Text color={sortKey === "hops" ? theme.fg.accent : theme.fg.muted}>{"HOP".padEnd(4)}</Text>
-          <Text color={sortKey === "snr" ? theme.fg.accent : theme.fg.muted}>{"SNR".padStart(7)} </Text>
+          <Text color={sortKey === "snr" ? theme.fg.accent : theme.fg.muted}>{"SNR".padStart(terminalWidth > 90 ? 7 : 4)} </Text>
           <Text color={sortKey === "battery" ? theme.fg.accent : theme.fg.muted}>{"BAT".padEnd(5)}</Text>
           <Text color={sortKey === "time" ? theme.fg.accent : theme.fg.muted}>{"AGE".padEnd(6)}</Text>
           <Text color={theme.fg.muted}>{"R "}</Text>
           <Box flexGrow={1}><Text color={theme.fg.muted}>LONG NAME</Text></Box>
-          <Box width={16}><Text color={theme.fg.muted}>MODEL</Text></Box>
+          {terminalWidth > 90 && <Box width={16}><Text color={theme.fg.muted}>MODEL</Text></Box>}
         </Box>
 
         {/* Node rows */}
@@ -116,6 +117,7 @@ export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight 
             key={node.num}
             node={node}
             isSelected={startIndex + i === selectedIndex}
+            terminalWidth={terminalWidth}
           />
         ))}
       </Box>
@@ -134,15 +136,18 @@ export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight 
 interface NodeRowProps {
   node: NodeData;
   isSelected: boolean;
+  terminalWidth?: number;
 }
 
-function NodeRow({ node, isSelected }: NodeRowProps) {
+function NodeRow({ node, isSelected, terminalWidth = 100 }: NodeRowProps) {
   const bgColor = isSelected ? theme.bg.selected : undefined;
 
   const name = node.shortName || "???";
   const nodeId = formatNodeId(node.num);
   const hops = node.hopsAway !== undefined ? `${node.hopsAway}` : "-";
-  const snr = node.snr !== undefined ? `${node.snr.toFixed(1)}dB` : "-";
+  const snr = node.snr !== undefined
+    ? (terminalWidth > 90 ? `${node.snr.toFixed(1)}dB` : `${Math.round(node.snr)}dB`)
+    : "-";
   const battery = getBatteryDisplay(node.batteryLevel, node.voltage);
   const lastHeard = formatLastHeard(node.lastHeard);
   const longName = node.longName || "";
@@ -157,18 +162,20 @@ function NodeRow({ node, isSelected }: NodeRowProps) {
     : "";
   const role = formatRoleChar(node.role);
 
+  const snrPadding = terminalWidth > 90 ? 7 : 4;
+
   return (
     <Box backgroundColor={bgColor} paddingX={1}>
       <Text color={nameColor}>{padEndVisual(displayName, 8)}</Text>
-      <Text color={theme.fg.muted}>{nodeId.padEnd(11)}</Text>
+      {terminalWidth > 90 && <Text color={theme.fg.muted}>{nodeId.padEnd(11)}</Text>}
       <Text color="#ffcc00">{favStar}</Text><Text>{" "}</Text>
       <Text color={getHopsColor(node.hopsAway)}>{hops.padEnd(4)}</Text>
-      <Text color={getSnrColor(node.snr)}>{snr.padStart(7)} </Text>
+      <Text color={getSnrColor(node.snr)}>{snr.padStart(snrPadding)} </Text>
       <Text color={getBatteryColor(node.batteryLevel, node.voltage)}>{battery.padEnd(5)}</Text>
       <Text color={theme.fg.secondary}>{lastHeard.padEnd(6)}</Text>
       <Text color={getRoleColor(node.role)}>{role} </Text>
       <Box flexGrow={1}><Text color={theme.fg.primary} wrap="truncate">{longName}</Text></Box>
-      <Box width={16}><Text color={theme.data.hardware} wrap="truncate">{hwModel}</Text></Box>
+      {terminalWidth > 90 && <Box width={16}><Text color={theme.data.hardware} wrap="truncate">{hwModel}</Text></Box>}
     </Box>
   );
 }
