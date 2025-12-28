@@ -82,6 +82,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Reboot modal state
   const [showRebootModal, setShowRebootModal] = useState(false);
@@ -130,17 +131,32 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     };
   }, [address]);
 
-  // Track terminal resize
+  // Track terminal resize with 500ms debounce
   useEffect(() => {
     const updateSize = () => {
       setTerminalHeight(stdout?.rows || 24);
       setTerminalWidth(stdout?.columns || 80);
     };
+
+    const debouncedResize = () => {
+      // Clear existing timeout
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
+      // Set new timeout for 500ms after last resize
+      resizeTimeoutRef.current = setTimeout(() => {
+        updateSize();
+      }, 500);
+    };
+
     // Update immediately on mount to get correct initial size
     updateSize();
-    stdout?.on("resize", updateSize);
+    stdout?.on("resize", debouncedResize);
     return () => {
-      stdout?.off("resize", updateSize);
+      stdout?.off("resize", debouncedResize);
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
     };
   }, [stdout]);
 
@@ -2771,25 +2787,26 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     const cfg = mode === "config";
     const l = mode === "log";
     const mv = mode === "meshview";
+    const compact = terminalWidth <= 90;
     return (
       <Text>
-        <Text color={p ? theme.fg.accent : theme.fg.muted} bold={p}>[PACKETS]</Text>
+        <Text color={p ? theme.fg.accent : theme.fg.muted} bold={p}>{compact ? "[P]" : "[PACKETS]"}</Text>
         {" "}
-        <Text color={n ? theme.fg.accent : theme.fg.muted} bold={n}>[NODES]</Text>
+        <Text color={n ? theme.fg.accent : theme.fg.muted} bold={n}>{compact ? "[N]" : "[NODES]"}</Text>
         {" "}
-        <Text color={c ? theme.fg.accent : theme.fg.muted} bold={c}>[CHAT]</Text>
+        <Text color={c ? theme.fg.accent : theme.fg.muted} bold={c}>{compact ? "[C]" : "[CHAT]"}</Text>
         {" "}
-        <Text color={d ? theme.fg.accent : theme.fg.muted} bold={d}>[DM]</Text>
+        <Text color={d ? theme.fg.accent : theme.fg.muted} bold={d}>{compact ? "[D]" : "[DM]"}</Text>
         {" "}
-        <Text color={l ? theme.fg.accent : theme.fg.muted} bold={l}>[LOG]</Text>
+        <Text color={l ? theme.fg.accent : theme.fg.muted} bold={l}>{compact ? "[L]" : "[LOG]"}</Text>
         {localMeshViewUrl && (
           <>
             {" "}
-            <Text color={mv ? theme.fg.accent : theme.fg.muted} bold={mv}>[MESHVIEW]</Text>
+            <Text color={mv ? theme.fg.accent : theme.fg.muted} bold={mv}>{compact ? "[M]" : "[MESHVIEW]"}</Text>
           </>
         )}
         {" "}
-        <Text color={cfg ? theme.fg.accent : theme.fg.muted} bold={cfg}>[CONFIG]</Text>
+        <Text color={cfg ? theme.fg.accent : theme.fg.muted} bold={cfg}>{compact ? "[CFG]" : "[CONFIG]"}</Text>
       </Text>
     );
   };
@@ -2801,10 +2818,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
 
   // Show connecting screen
   if (!transport) {
+    const banner = terminalWidth <= 90 ? "▓ MESHTASTIC ▓" : "▓▓▓ MESHTASTIC ▓▓▓";
     return (
       <Box flexDirection="column" width="100%" height="100%" justifyContent="center" alignItems="center">
         <Box flexDirection="column" alignItems="center">
-          <Text bold color={theme.fg.accent}>{"▓▓▓ MESHTASTIC ▓▓▓"}</Text>
+          <Text bold color={theme.fg.accent}>{banner}</Text>
           <Text> </Text>
           {connectError ? (
             <>
@@ -2823,6 +2841,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     );
   }
 
+  const banner = terminalWidth <= 90 ? "▓ MESHTASTIC ▓" : "▓▓▓ MESHTASTIC ▓▓▓";
+
   return (
     <Box flexDirection="column" width="100%" height="100%">
       {/* Header */}
@@ -2834,7 +2854,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         justifyContent="space-between"
         alignItems="center"
       >
-        <Text bold color={theme.fg.accent}>{"▓▓▓ MESHTASTIC ▓▓▓"}</Text>
+        <Text bold color={theme.fg.accent}>{banner}</Text>
         <Text color={theme.fg.secondary}>
           {myShortName || (myNodeNum ? nodeStore.getNodeName(myNodeNum) : "???")} <Text color={theme.fg.muted}>{formatNodeId(myNodeNum)}</Text>
         </Text>
