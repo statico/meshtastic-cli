@@ -382,19 +382,36 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, width, meshViewConf
   const repliedMessage = message.replyId
     ? allMessages.find(m => m.packetId === message.replyId)
     : null;
-  const replyPreview = repliedMessage
-    ? repliedMessage.text.slice(0, 25) + (repliedMessage.text.length > 25 ? "..." : "")
-    : null;
+
+  // Build reply indicator with proper width constraints
+  const replyIndicator = repliedMessage ? (() => {
+    const replyPrefix = `${continuationPadding}┌ replying to `;
+    const replyName = nodeStore.getNodeName(repliedMessage.fromNode);
+    const quoteSuffix = ': "';
+    const quoteEnd = '"';
+
+    // Calculate available width for the preview text
+    const prefixLength = replyPrefix.length + replyName.length + quoteSuffix.length;
+    const availableWidth = textWidth - prefixLength - quoteEnd.length;
+
+    // Truncate the preview if needed
+    const cleanReplyText = repliedMessage.text.replace(/[\r\n\x00-\x1f]/g, " ");
+    const replyPreview = availableWidth > 10
+      ? (cleanReplyText.length > availableWidth
+          ? cleanReplyText.slice(0, availableWidth - 3) + "..."
+          : cleanReplyText)
+      : "...";
+
+    return { prefix: replyPrefix, name: replyName, preview: replyPreview };
+  })() : null;
 
   return (
     <Box flexDirection="column" backgroundColor={isSelected ? theme.bg.selected : undefined}>
-      {repliedMessage && (
+      {replyIndicator && (
         <Box>
-          <Text color={theme.fg.muted}>
-            {continuationPadding}┌ replying to{" "}
-          </Text>
-          <Text color={theme.fg.secondary}>{nodeStore.getNodeName(repliedMessage.fromNode)}</Text>
-          <Text color={theme.fg.muted}>: "{replyPreview}"</Text>
+          <Text color={theme.fg.muted}>{replyIndicator.prefix}</Text>
+          <Text color={theme.fg.secondary}>{replyIndicator.name}</Text>
+          <Text color={theme.fg.muted}>: "{replyIndicator.preview}"</Text>
         </Box>
       )}
       {lines.map((line, lineIndex) => (
