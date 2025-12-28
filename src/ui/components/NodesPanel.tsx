@@ -99,13 +99,13 @@ export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight 
       <Box height={listHeight} flexDirection="column">
         {/* Header - sorted column is highlighted */}
         <Box paddingX={1}>
-          <Text color={theme.fg.muted}>{"NAME".padEnd(8)}</Text>
+          <Text color={theme.fg.muted}>{"NAME".padEnd(terminalWidth > 90 ? 8 : 5)}</Text>
           {terminalWidth > 90 && <Text color={theme.fg.muted}>{"ID".padEnd(11)}</Text>}
-          <Text color={sortKey === "favorites" ? theme.fg.accent : theme.fg.muted}>{"★ "}</Text>
-          <Text color={sortKey === "hops" ? theme.fg.accent : theme.fg.muted}>{"HOP".padEnd(4)}</Text>
-          <Text color={sortKey === "snr" ? theme.fg.accent : theme.fg.muted}>{"SNR".padStart(terminalWidth > 90 ? 7 : 4)} </Text>
-          <Text color={sortKey === "battery" ? theme.fg.accent : theme.fg.muted}>{"BAT".padEnd(5)}</Text>
-          <Text color={sortKey === "time" ? theme.fg.accent : theme.fg.muted}>{"AGE".padEnd(6)}</Text>
+          <Text color={sortKey === "favorites" ? theme.fg.accent : theme.fg.muted}>{"★"}</Text>
+          <Text color={sortKey === "hops" ? theme.fg.accent : theme.fg.muted}>{terminalWidth > 90 ? "HOP".padEnd(4) : "H".padEnd(2)}</Text>
+          <Text color={sortKey === "snr" ? theme.fg.accent : theme.fg.muted}>{terminalWidth > 90 ? "SNR".padStart(7) : "SNR".padStart(4)} </Text>
+          <Text color={sortKey === "battery" ? theme.fg.accent : theme.fg.muted}>{(terminalWidth > 90 ? "BAT".padEnd(5) : "B".padEnd(4)) + " "}</Text>
+          <Text color={sortKey === "time" ? theme.fg.accent : theme.fg.muted}>{(terminalWidth > 90 ? "AGE".padEnd(6) : "AGE".padEnd(4)) + " "}</Text>
           <Text color={theme.fg.muted}>{"R "}</Text>
           <Box flexGrow={1}><Text color={theme.fg.muted}>LONG NAME</Text></Box>
           {terminalWidth > 90 && <Box width={16}><Text color={theme.fg.muted}>MODEL</Text></Box>}
@@ -141,12 +141,13 @@ interface NodeRowProps {
 
 function NodeRow({ node, isSelected, terminalWidth = 100 }: NodeRowProps) {
   const bgColor = isSelected ? theme.bg.selected : undefined;
+  const isCompact = terminalWidth <= 90;
 
   const name = node.shortName || "???";
   const nodeId = formatNodeId(node.num);
   const hops = node.hopsAway !== undefined ? `${node.hopsAway}` : "-";
   const snr = node.snr !== undefined
-    ? (terminalWidth > 90 ? `${node.snr.toFixed(1)}dB` : `${Math.round(node.snr)}dB`)
+    ? (isCompact ? `${Math.round(node.snr)}dB` : `${node.snr.toFixed(1)}dB`)
     : "-";
   const battery = getBatteryDisplay(node.batteryLevel, node.voltage);
   const lastHeard = formatLastHeard(node.lastHeard);
@@ -154,7 +155,9 @@ function NodeRow({ node, isSelected, terminalWidth = 100 }: NodeRowProps) {
 
   const nameColor = node.hopsAway === 0 ? theme.fg.accent : theme.fg.primary;
 
-  const displayName = truncateVisual(name, 6);
+  // Smaller name width for compact mode
+  const nameWidth = isCompact ? 5 : 8;
+  const displayName = truncateVisual(name, isCompact ? 4 : 6);
 
   const favStar = node.isFavorite ? "★" : " ";
   const hwModel = node.hwModel !== undefined
@@ -162,20 +165,23 @@ function NodeRow({ node, isSelected, terminalWidth = 100 }: NodeRowProps) {
     : "";
   const role = formatRoleChar(node.role);
 
-  const snrPadding = terminalWidth > 90 ? 7 : 4;
+  const hopsPadding = isCompact ? 2 : 4;
+  const snrPadding = isCompact ? 4 : 7;
+  const batteryPadding = isCompact ? 4 : 5;
+  const agePadding = isCompact ? 4 : 6;
 
   return (
     <Box backgroundColor={bgColor} paddingX={1}>
-      <Text color={nameColor}>{padEndVisual(displayName, 8)}</Text>
-      {terminalWidth > 90 && <Text color={theme.fg.muted}>{nodeId.padEnd(11)}</Text>}
-      <Text color="#ffcc00">{favStar}</Text><Text>{" "}</Text>
-      <Text color={getHopsColor(node.hopsAway)}>{hops.padEnd(4)}</Text>
+      <Text color={nameColor}>{padEndVisual(displayName, nameWidth)}</Text>
+      {!isCompact && <Text color={theme.fg.muted}>{nodeId.padEnd(11)}</Text>}
+      <Text color="#ffcc00">{favStar}</Text>
+      <Text color={getHopsColor(node.hopsAway)}>{hops.padEnd(hopsPadding)}</Text>
       <Text color={getSnrColor(node.snr)}>{snr.padStart(snrPadding)} </Text>
-      <Text color={getBatteryColor(node.batteryLevel, node.voltage)}>{battery.padEnd(5)}</Text>
-      <Text color={theme.fg.secondary}>{lastHeard.padEnd(6)}</Text>
+      <Text color={getBatteryColor(node.batteryLevel, node.voltage)}>{battery.padEnd(batteryPadding)} </Text>
+      <Text color={theme.fg.secondary}>{lastHeard.padEnd(agePadding)} </Text>
       <Text color={getRoleColor(node.role)}>{role} </Text>
       <Box flexGrow={1}><Text color={theme.fg.primary} wrap="truncate">{longName}</Text></Box>
-      {terminalWidth > 90 && <Box width={16}><Text color={theme.data.hardware} wrap="truncate">{hwModel}</Text></Box>}
+      {!isCompact && <Box width={16}><Text color={theme.data.hardware} wrap="truncate">{hwModel}</Text></Box>}
     </Box>
   );
 }
