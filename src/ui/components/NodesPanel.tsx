@@ -145,7 +145,9 @@ function NodeRow({ node, isSelected, terminalWidth = 100 }: NodeRowProps) {
 
   const name = node.shortName || "???";
   const nodeId = formatNodeId(node.num);
-  const hops = node.hopsAway !== undefined ? `${node.hopsAway}` : "-";
+  const hops = node.hopsAway !== undefined
+    ? (node.hopsAway < 0 ? "?" : `${node.hopsAway}`)
+    : "-";
   const snr = node.snr !== undefined
     ? (isCompact ? `${Math.round(node.snr)}dB` : `${node.snr.toFixed(1)}dB`)
     : "-";
@@ -378,7 +380,7 @@ function formatLastHeard(timestamp: number): string {
 }
 
 function getHopsColor(hops?: number): string {
-  if (hops === undefined) return theme.fg.muted;
+  if (hops === undefined || hops < 0) return theme.fg.muted;
   if (hops === 0) return theme.packet.direct;
   if (hops === 1) return theme.fg.accent;
   if (hops <= 3) return theme.packet.telemetry;
