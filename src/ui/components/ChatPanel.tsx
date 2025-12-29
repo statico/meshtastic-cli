@@ -296,7 +296,7 @@ export function ChatPanel({
             <Text color={theme.fg.muted}>No messages on channel {channel}</Text>
           )
         ) : (
-          visibleMessages.map((msg, i) => {
+          visibleMessages.filter(msg => msg != null).map((msg, i) => {
             const actualIndex = filteredMessages.indexOf(msg);
             return (
               <MessageRow

@@ -166,7 +166,7 @@ export function DMPanel({
           ) : messages.length === 0 ? (
             <Text color={theme.fg.muted}>No messages yet. Start the conversation!</Text>
           ) : (
-            visibleMessages.map((msg, i) => {
+            visibleMessages.filter(msg => msg != null).map((msg, i) => {
               const actualIndex = msgScrollOffset + i;
               return (
                 <MessageRow
