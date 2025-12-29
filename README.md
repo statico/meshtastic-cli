@@ -8,18 +8,22 @@
 <table>
   <tr>
     <td>
-      <img width="945" height="801" alt="1" src="https://github.com/user-attachments/assets/51d5dab7-4b50-4d1e-8d92-21502ac32be7" />
+      <h3>Live Packet View</h3>
+      <img width="799" height="815" alt="CleanShot 2025-12-28 at 17 10 17" src="https://github.com/user-attachments/assets/c1862da1-5088-453f-8a14-ed324e2f6edf" />
     </td>
     <td>
-      <img width="945" height="801" alt="2" src="https://github.com/user-attachments/assets/250c3e9b-e58f-48b7-8e38-5a142d362a4d" />
+      <h3>Node List</h3>
+      <img width="799" height="815" alt="CleanShot 2025-12-28 at 17 10 30" src="https://github.com/user-attachments/assets/3315ba85-2bf0-46a1-aecd-d69770cccf95" />
     </td>
   </tr>
   <tr>
     <td>
-      <img width="945" height="801" alt="3" src="https://github.com/user-attachments/assets/b329736b-45f3-465e-8a11-a58cb0013744" />
+      <h3>Chat Channels</h3>
+      <img width="799" height="815" alt="CleanShot 2025-12-28 at 17 11 04" src="https://github.com/user-attachments/assets/345982b9-dac1-4783-8a30-a52c3df92cce" />
     </td>
     <td>
-      <img width="945" height="801" alt="4" src="https://github.com/user-attachments/assets/460645ad-abca-4c64-a5a7-00efd0c96de2" />
+      <h3>Interactive Help</h3>
+      <img width="799" height="815" alt="CleanShot 2025-12-28 at 17 12 58" src="https://github.com/user-attachments/assets/71cdf736-1c95-40e6-a689-8f50682ebc7d" />\
     </td>
   </tr>
 </table>
@@ -39,7 +43,7 @@ A terminal UI for monitoring and configuring Meshtastic mesh networks. Connects 
 - **Log view** - Position, traceroute, and nodeinfo response history
 - **Node commands** - Traceroute, position/telemetry/nodeinfo request, direct ping, DM
 - **ACK notifications** - Visual feedback when nodes acknowledge your packets
-- **MeshView integration** - Update node info from a MeshView server
+- **MeshView integration** - Update node info from a MeshView server, view live MeshView traffic
 - **Persistent storage** - SQLite database for nodes, messages, and packets
 - **Session support** - Multiple named sessions for different radios
 
