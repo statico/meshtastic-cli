@@ -13,7 +13,7 @@
     </td>
     <td>
       <h3>Node List</h3>
-      <img width="799" height="815" alt="CleanShot 2025-12-28 at 17 10 30" src="https://github.com/user-attachments/assets/3315ba85-2bf0-46a1-aecd-d69770cccf95" />
+      <img width="849" height="720" alt="CleanShot 2025-12-28 at 17 16 44" src="https://github.com/user-attachments/assets/9bcbaea4-3f50-4dd4-a338-3834b89bd2c6" />
     </td>
   </tr>
   <tr>
