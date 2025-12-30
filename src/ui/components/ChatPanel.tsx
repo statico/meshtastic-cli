@@ -425,7 +425,7 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, width, meshViewConf
         return (
           <Text>
             {" "}<Text color={theme.fg.muted}>[</Text>
-            <Text color={theme.status.offline}>X {formatErrorReason(message.errorReason)}</Text>
+            <Text color={theme.status.offline}>✗ {formatErrorReason(message.errorReason)}</Text>
             <Text color={theme.fg.muted}>]</Text>
           </Text>
         );

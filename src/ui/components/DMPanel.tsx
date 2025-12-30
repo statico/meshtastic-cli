@@ -270,7 +270,13 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth, meshView
       case "pending": {
         const elapsed = now - message.timestamp * 1000;
         if (elapsed > MESSAGE_TIMEOUT_MS) {
-          return <Text color={theme.status.offline}> timeout</Text>;
+          return (
+            <Text>
+              {" "}<Text color={theme.fg.muted}>[</Text>
+              <Text color={theme.status.offline}>✗ timeout</Text>
+              <Text color={theme.fg.muted}>]</Text>
+            </Text>
+          );
         }
         return <AnimatedDots />;
       }
@@ -286,7 +292,7 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth, meshView
         return (
           <Text>
             {" "}<Text color={theme.fg.muted}>[</Text>
-            <Text color={theme.status.offline}>X {formatErrorReason(message.errorReason)}</Text>
+            <Text color={theme.status.offline}>✗ {formatErrorReason(message.errorReason)}</Text>
             <Text color={theme.fg.muted}>]</Text>
           </Text>
         );
