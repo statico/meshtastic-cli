@@ -373,6 +373,30 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, width, meshViewConf
     return () => clearInterval(interval);
   }, [message.status, isOwn]);
 
+  // Format error reason to human-readable short form
+  // Based on Routing.Error enum from mesh.proto
+  const formatErrorReason = (reason?: string): string => {
+    if (!reason) return "failed";
+    const lowerReason = reason.toLowerCase().replace(/_/g, " ");
+    if (lowerReason.includes("max retransmit")) return "max retries";
+    if (lowerReason.includes("no route")) return "no route";
+    if (lowerReason.includes("got nak")) return "rejected";
+    if (lowerReason.includes("timeout")) return "timeout";
+    if (lowerReason.includes("no interface")) return "no interface";
+    if (lowerReason.includes("too large")) return "too large";
+    if (lowerReason.includes("no channel")) return "no channel";
+    if (lowerReason.includes("duty cycle")) return "duty limit";
+    if (lowerReason.includes("bad request")) return "bad request";
+    if (lowerReason.includes("not authorized")) return "no auth";
+    if (lowerReason.includes("no response")) return "no response";
+    if (lowerReason.includes("pki")) return "pki failed";
+    if (lowerReason.includes("public key")) return "unknown key";
+    if (lowerReason.includes("admin") && lowerReason.includes("session")) return "bad session";
+    if (lowerReason.includes("admin") && lowerReason.includes("unauthorized")) return "admin no auth";
+    if (lowerReason.includes("rate limit")) return "rate limited";
+    return lowerReason.slice(0, 12);
+  };
+
   const getStatusIndicator = () => {
     if (!isOwn) return null;
     switch (message.status) {
@@ -401,7 +425,7 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, width, meshViewConf
         return (
           <Text>
             {" "}<Text color={theme.fg.muted}>[</Text>
-            <Text color={theme.status.offline}>✗</Text>
+            <Text color={theme.status.offline}>X {formatErrorReason(message.errorReason)}</Text>
             <Text color={theme.fg.muted}>]</Text>
           </Text>
         );

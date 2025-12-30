@@ -255,8 +255,12 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth, meshView
     if (lowerReason.includes("duty cycle")) return "duty limit";
     if (lowerReason.includes("bad request")) return "bad request";
     if (lowerReason.includes("not authorized")) return "no auth";
+    if (lowerReason.includes("no response")) return "no response";
     if (lowerReason.includes("pki")) return "pki failed";
     if (lowerReason.includes("public key")) return "unknown key";
+    if (lowerReason.includes("admin") && lowerReason.includes("session")) return "bad session";
+    if (lowerReason.includes("admin") && lowerReason.includes("unauthorized")) return "admin no auth";
+    if (lowerReason.includes("rate limit")) return "rate limited";
     return lowerReason.slice(0, 12);
   };
 
@@ -279,7 +283,13 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth, meshView
           </Text>
         );
       case "error":
-        return <Text color={theme.status.offline}> {formatErrorReason(message.errorReason)}</Text>;
+        return (
+          <Text>
+            {" "}<Text color={theme.fg.muted}>[</Text>
+            <Text color={theme.status.offline}>X {formatErrorReason(message.errorReason)}</Text>
+            <Text color={theme.fg.muted}>]</Text>
+          </Text>
+        );
       default:
         return null;
     }
