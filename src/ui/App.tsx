@@ -954,12 +954,14 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       db.insertMessage(newMsg);
       setMessages((prev) => [...prev, newMsg].slice(-100));
 
-      // Refresh DM conversations and keep selection on same conversation
-      const newConvos = db.getDMConversations(myNodeNum);
-      const newIndex = newConvos.findIndex(c => c.nodeNum === msg.toNode);
-      setDmConversations(newConvos);
-      if (newIndex >= 0) setSelectedDMConvoIndex(newIndex);
-      setDmMessages(db.getDMMessages(myNodeNum, msg.toNode));
+      // Refresh DM conversations and keep selection on same conversation (only for DMs)
+      if (msg.channel === 0) {
+        const newConvos = db.getDMConversations(myNodeNum);
+        const newIndex = newConvos.findIndex(c => c.nodeNum === msg.toNode);
+        setDmConversations(newConvos);
+        if (newIndex >= 0) setSelectedDMConvoIndex(newIndex);
+        setDmMessages(db.getDMMessages(myNodeNum, msg.toNode));
+      }
 
       showNotification("Message resent");
     } catch {
