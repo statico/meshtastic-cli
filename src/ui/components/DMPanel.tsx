@@ -356,13 +356,17 @@ function formatLastHeard(timestamp?: number): string {
   return `${Math.floor(diff / 86400)}d`;
 }
 
-function formatPublicKeyHex(pk?: Uint8Array): string {
-  if (!pk || pk.length === 0) return "None";
-  const hex = Array.from(pk, b => b.toString(16).padStart(2, "0")).join("");
-  if (hex.length > 32) {
-    return `0x${hex.slice(0, 16)}...${hex.slice(-8)}`;
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
   }
-  return `0x${hex}`;
+  return btoa(binary);
+}
+
+function formatPublicKey(pk?: Uint8Array): string {
+  if (!pk || pk.length === 0) return "None";
+  return uint8ArrayToBase64(pk);
 }
 
 interface NodeInfoHeaderProps {
@@ -425,7 +429,7 @@ function NodeInfoHeader({ nodeNum, nodeStore, deleteConfirm }: NodeInfoHeaderPro
       <Box paddingX={1}>
         {/* Line 3: Public key */}
         <Text color={theme.fg.muted}>PubKey: </Text>
-        <Text color={theme.fg.secondary}>{formatPublicKeyHex(node?.publicKey)}</Text>
+        <Text color={theme.fg.secondary}>{formatPublicKey(node?.publicKey)}</Text>
       </Box>
       {/* Separator */}
       <Box borderStyle="single" borderColor={theme.border.normal} borderTop borderBottom={false} borderLeft={false} borderRight={false} />
