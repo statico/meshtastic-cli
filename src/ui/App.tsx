@@ -2210,8 +2210,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         // 'R' to resend failed message
         if (input === "R") {
           const selectedMsg = filteredMessages[selectedChatMessageIndex];
-          if (selectedMsg && selectedMsg.fromNode === myNodeNum && selectedMsg.status === "error") {
-            resendMessage(selectedMsg);
+          if (selectedMsg && selectedMsg.fromNode === myNodeNum) {
+            const elapsed = Date.now() - selectedMsg.timestamp * 1000;
+            const isTimedOut = selectedMsg.status === "pending" && elapsed > 30000;
+            if (selectedMsg.status === "error" || isTimedOut) {
+              resendMessage(selectedMsg);
+            }
           }
           return;
         }
@@ -2340,8 +2344,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         // 'R' to resend failed message
         if (input === "R" && dmMessages[selectedDMMessageIndex]) {
           const msg = dmMessages[selectedDMMessageIndex];
-          if (msg.fromNode === myNodeNum && msg.status === "error") {
-            resendMessage(msg);
+          if (msg.fromNode === myNodeNum) {
+            const elapsed = Date.now() - msg.timestamp * 1000;
+            const isTimedOut = msg.status === "pending" && elapsed > 30000;
+            if (msg.status === "error" || isTimedOut) {
+              resendMessage(msg);
+            }
           }
           return;
         }
