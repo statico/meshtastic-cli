@@ -2300,6 +2300,16 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           setSelectedDMMessageIndex(-1);
           return;
         }
+        // Page up/down
+        const dmPageSize = Math.max(1, terminalHeight - 12);
+        if ((key.ctrl && input === "d") || key.pageDown) {
+          setSelectedDMMessageIndex((i) => Math.min(i + dmPageSize, dmMessages.length - 1));
+          return;
+        }
+        if ((key.ctrl && input === "u") || key.pageUp) {
+          setSelectedDMMessageIndex((i) => Math.max(i - dmPageSize, 0));
+          return;
+        }
         // Home/End
         const isDmMsgHome = input === "g" || input === "\x1b[H" || input === "\x1b[1~" || input === "\x1bOH";
         const isDmMsgEnd = input === "G" || input === "\x1b[F" || input === "\x1b[4~" || input === "\x1bOF";
@@ -2395,11 +2405,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       }
       // 'n' to go to selected conversation's node
       if (input === "n" && selectedConvo) {
-        const nodeIndex = nodes.findIndex((n) => n.num === selectedConvo.nodeNum);
-        if (nodeIndex >= 0) {
-          setMode("nodes");
-          setSelectedNodeIndex(nodeIndex);
-        }
+        navigateToNode(selectedConvo.nodeNum);
         return;
       }
       // 'u' to update selected conversation's node from MeshView
