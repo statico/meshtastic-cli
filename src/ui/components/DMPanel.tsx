@@ -245,22 +245,28 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth, meshView
   const formatErrorReason = (reason?: string): string => {
     if (!reason) return "failed";
     const lowerReason = reason.toLowerCase().replace(/_/g, " ");
-    if (lowerReason.includes("max retransmit")) return "max retries";
-    if (lowerReason.includes("no route")) return "no route";
-    if (lowerReason.includes("got nak")) return "rejected";
-    if (lowerReason.includes("timeout")) return "timeout";
-    if (lowerReason.includes("no interface")) return "no interface";
-    if (lowerReason.includes("too large")) return "too large";
-    if (lowerReason.includes("no channel")) return "no channel";
-    if (lowerReason.includes("duty cycle")) return "duty limit";
-    if (lowerReason.includes("bad request")) return "bad request";
-    if (lowerReason.includes("not authorized")) return "no auth";
-    if (lowerReason.includes("no response")) return "no response";
-    if (lowerReason.includes("pki")) return "pki failed";
-    if (lowerReason.includes("public key")) return "unknown key";
-    if (lowerReason.includes("admin") && lowerReason.includes("session")) return "bad session";
-    if (lowerReason.includes("admin") && lowerReason.includes("unauthorized")) return "admin no auth";
+
+    // Direct enum name matches
+    if (lowerReason === "max retransmit") return "max retries";
+    if (lowerReason === "no route") return "no route";
+    if (lowerReason === "got nak") return "rejected";
+    if (lowerReason === "timeout") return "timeout";
+    if (lowerReason === "no interface") return "no interface";
+    if (lowerReason === "too large") return "too large";
+    if (lowerReason === "no channel") return "no channel";
+    if (lowerReason === "no response") return "no response";
+    if (lowerReason === "duty cycle limit") return "duty limit";
+    if (lowerReason === "bad request") return "bad request";
+    if (lowerReason === "not authorized") return "no auth";
+    if (lowerReason === "pki failed") return "pki failed";
+    if (lowerReason === "pki unknown pubkey") return "unknown key";
+    if (lowerReason === "admin bad session key") return "bad session";
+    if (lowerReason === "admin public key unauthorized") return "admin no auth";
+    if (lowerReason === "rate limit exceeded") return "rate limited";
+
+    // Fallback to substring matches for legacy reasons
     if (lowerReason.includes("rate limit")) return "rate limited";
+
     return lowerReason.slice(0, 12);
   };
 

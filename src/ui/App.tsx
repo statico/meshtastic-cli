@@ -32,6 +32,27 @@ import { Logger } from "../logger";
 
 const BROADCAST_ADDR = 0xFFFFFFFF;
 
+// Map error codes to enum names for routing errors
+const ROUTING_ERROR_NAMES: Record<number, string> = {
+  0: "NONE",
+  1: "NO_ROUTE",
+  2: "GOT_NAK",
+  3: "TIMEOUT",
+  4: "NO_INTERFACE",
+  5: "MAX_RETRANSMIT",
+  6: "NO_CHANNEL",
+  7: "TOO_LARGE",
+  8: "NO_RESPONSE",
+  9: "DUTY_CYCLE_LIMIT",
+  32: "BAD_REQUEST",
+  33: "NOT_AUTHORIZED",
+  34: "PKI_FAILED",
+  35: "PKI_UNKNOWN_PUBKEY",
+  36: "ADMIN_BAD_SESSION_KEY",
+  37: "ADMIN_PUBLIC_KEY_UNAUTHORIZED",
+  38: "RATE_LIMIT_EXCEEDED",
+};
+
 type AppMode = "packets" | "nodes" | "chat" | "dm" | "config" | "log" | "meshview";
 
 export interface ChannelInfo {
@@ -500,7 +521,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         if (routing.variant?.case === "errorReason" && routing.variant.value !== undefined) {
           const isAck = routing.variant.value === Mesh.Routing_Error.NONE;
           const newStatus: db.MessageStatus = isAck ? "acked" : "error";
-          const errorReason = isAck ? undefined : (Mesh.Routing_Error[routing.variant.value] || `error_${routing.variant.value}`);
+          const errorReason = isAck ? undefined : (ROUTING_ERROR_NAMES[routing.variant.value] || `error_${routing.variant.value}`);
           Logger.info("App", "Received routing response", {
             requestId: packet.requestId,
             from: mp.from,
