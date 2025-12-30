@@ -4,10 +4,11 @@ import * as db from "../db";
 
 export class PacketStore {
   private packets: DecodedPacket[] = [];
-  private maxSize = 1000;
+  private maxSize: number;
   private listeners: Array<(packet: DecodedPacket) => void> = [];
 
-  constructor() {
+  constructor(maxSize = 50000) {
+    this.maxSize = maxSize;
     this.loadFromDb();
   }
 

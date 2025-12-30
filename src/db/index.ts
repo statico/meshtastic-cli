@@ -9,9 +9,15 @@ const BROADCAST_ADDR = 0xFFFFFFFF;
 
 let db: Database;
 let currentSession = "default";
+let packetRetentionLimit = 50000;
 
 export function getDbPath(session: string): string {
   return join(DB_DIR, `${session}.db`);
+}
+
+export function setPacketRetentionLimit(limit: number) {
+  packetRetentionLimit = limit;
+  Logger.debug("Database", "Packet retention limit set", { limit });
 }
 
 export function initDb(session: string = "default") {
@@ -509,10 +515,10 @@ export function getPackets(limit = 1000): DbPacket[] {
   }));
 }
 
-export function prunePackets(maxPackets = 1000) {
+export function prunePackets() {
   const count = (db.query(`SELECT COUNT(*) as count FROM packets`).get() as any).count;
-  if (count > maxPackets) {
-    db.run(`DELETE FROM packets WHERE id IN (SELECT id FROM packets ORDER BY timestamp ASC LIMIT ?)`, [count - maxPackets]);
+  if (count > packetRetentionLimit) {
+    db.run(`DELETE FROM packets WHERE id IN (SELECT id FROM packets ORDER BY timestamp ASC LIMIT ?)`, [count - packetRetentionLimit]);
   }
 }
 

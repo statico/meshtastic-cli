@@ -5,7 +5,7 @@ import { join } from "path";
 import { homedir } from "os";
 import { PacketStore, NodeStore } from "./protocol";
 import { App } from "./ui/App";
-import { initDb, clearDb, getDbPath } from "./db";
+import * as db from "./db";
 import { getSetting } from "./settings";
 import { Logger } from "./logger";
 
@@ -71,6 +71,7 @@ let clearSession = false;
 let meshViewUrl: string | undefined;
 let useFahrenheit = false;
 let enableLogging = false;
+let packetLimit = 50000;
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
@@ -88,6 +89,11 @@ for (let i = 0; i < args.length; i++) {
     useFahrenheit = true;
   } else if (arg === "--enable-logging" || arg === "-L") {
     enableLogging = true;
+  } else if (arg === "--packet-limit" || arg === "-p") {
+    const limit = parseInt(args[++i], 10);
+    if (!isNaN(limit) && limit > 0) {
+      packetLimit = limit;
+    }
   } else if (arg === "--help" || arg === "-h") {
     console.log(`
 Meshtastic CLI Viewer
@@ -104,6 +110,7 @@ Options:
   --skip-nodes, -N      Skip downloading node database on startup (much faster connect)
   --meshview, -m        MeshView URL for packet/node links (default: from settings or disabled)
   --fahrenheit, -F      Display temperatures in Fahrenheit instead of Celsius
+  --packet-limit, -p    Maximum packets to store in database (default: 50000)
   --enable-logging, -L  Enable verbose logging to ~/.config/meshtastic-cli/log
   --help, -h            Show this help message
 `);
@@ -115,8 +122,8 @@ Options:
 
 // Handle --clear option
 if (clearSession) {
-  const dbPath = getDbPath(session);
-  clearDb(session);
+  const dbPath = db.getDbPath(session);
+  db.clearDb(session);
   console.log(`Cleared database for session "${session}" (${dbPath})`);
   process.exit(0);
 }
@@ -138,9 +145,10 @@ if (enableLogging) {
 }
 
 // Initialize database
-initDb(session);
+db.initDb(session);
+db.setPacketRetentionLimit(packetLimit);
 
-const packetStore = new PacketStore();
+const packetStore = new PacketStore(packetLimit);
 const nodeStore = new NodeStore();
 
 const { waitUntilExit } = render(
