@@ -839,6 +839,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
             }
           }
         }
+        // Log when transport loop exits normally
+        Logger.warn("App", "Transport loop exited", { running });
+        if (running) {
+          console.error("CRITICAL: Transport iterator completed unexpectedly while running=true");
+          Logger.error("App", "TRANSPORT_LOOP_EXIT: Transport loop exited while running=true", new Error("Transport loop exited"));
+        }
       } catch (error) {
         Logger.error("App", "Transport reading loop error", error as Error);
         if (running) {

@@ -59,6 +59,26 @@ process.on("uncaughtException", (error) => {
 
 process.on("unhandledRejection", (reason) => {
   logError("UNHANDLED REJECTION", reason);
+  console.error("Unhandled promise rejection:", reason);
+  process.exit(1);
+});
+
+process.on("SIGTERM", () => {
+  logError("SIGTERM", new Error("Received SIGTERM"));
+  Logger.shutdown();
+  process.exit(0);
+});
+
+process.on("SIGINT", () => {
+  logError("SIGINT", new Error("Received SIGINT"));
+  Logger.shutdown();
+  process.exit(0);
+});
+
+process.on("SIGHUP", () => {
+  logError("SIGHUP", new Error("Received SIGHUP"));
+  Logger.shutdown();
+  process.exit(0);
 });
 
 // Parse CLI arguments
@@ -70,7 +90,7 @@ let session = "default";
 let clearSession = false;
 let meshViewUrl: string | undefined;
 let useFahrenheit = false;
-let enableLogging = false;
+let enableLogging = true;
 let packetLimit = 50000;
 
 for (let i = 0; i < args.length; i++) {

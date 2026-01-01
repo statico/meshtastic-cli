@@ -41,8 +41,14 @@ export class HttpTransport implements Transport {
   }
 
   private async poll() {
+    let iterationCount = 0;
     while (this.running) {
       try {
+        iterationCount++;
+        // Heartbeat every 60 iterations (~3 minutes at 3s per iteration)
+        if (iterationCount % 60 === 0) {
+          Logger.info("HttpTransport", `Poll heartbeat: ${iterationCount} iterations`);
+        }
         // Drain available packets with a small delay between each
         let gotPacket = true;
         let batchCount = 0;
