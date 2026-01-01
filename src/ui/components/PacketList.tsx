@@ -112,12 +112,38 @@ export function PacketList({ packets, selectedIndex, nodeStore, height = 20, isF
 function getPortColor(portnum?: Portnums.PortNum): string {
   if (portnum === undefined) return theme.packet.encrypted;
   switch (portnum) {
+    case Portnums.PortNum.UNKNOWN_APP: return theme.packet.unknown;
     case Portnums.PortNum.TEXT_MESSAGE_APP: return theme.packet.message;
+    case Portnums.PortNum.REMOTE_HARDWARE_APP: return theme.packet.remoteHardware;
     case Portnums.PortNum.POSITION_APP: return theme.packet.position;
-    case Portnums.PortNum.TELEMETRY_APP: return theme.packet.telemetry;
     case Portnums.PortNum.NODEINFO_APP: return theme.packet.nodeinfo;
     case Portnums.PortNum.ROUTING_APP: return theme.packet.routing;
+    case Portnums.PortNum.ADMIN_APP: return theme.packet.admin;
+    case Portnums.PortNum.TEXT_MESSAGE_COMPRESSED_APP: return theme.packet.compressed;
+    case Portnums.PortNum.WAYPOINT_APP: return theme.packet.waypoint;
+    case Portnums.PortNum.AUDIO_APP: return theme.packet.audio;
+    case Portnums.PortNum.DETECTION_SENSOR_APP: return theme.packet.detectionSensor;
+    case Portnums.PortNum.ALERT_APP: return theme.packet.alert;
+    case Portnums.PortNum.KEY_VERIFICATION_APP: return theme.packet.keyVerification;
+    case Portnums.PortNum.REPLY_APP: return theme.packet.reply;
+    case Portnums.PortNum.IP_TUNNEL_APP: return theme.packet.ipTunnel;
+    case Portnums.PortNum.PAXCOUNTER_APP: return theme.packet.paxcounter;
+    case Portnums.PortNum.STORE_FORWARD_PLUSPLUS_APP: return theme.packet.storeForwardPP;
+    case Portnums.PortNum.SERIAL_APP: return theme.packet.serial;
+    case Portnums.PortNum.STORE_FORWARD_APP: return theme.packet.storeForward;
+    case Portnums.PortNum.RANGE_TEST_APP: return theme.packet.rangeTest;
+    case Portnums.PortNum.TELEMETRY_APP: return theme.packet.telemetry;
+    case Portnums.PortNum.ZPS_APP: return theme.packet.zps;
+    case Portnums.PortNum.SIMULATOR_APP: return theme.packet.simulator;
     case Portnums.PortNum.TRACEROUTE_APP: return theme.packet.traceroute;
+    case Portnums.PortNum.NEIGHBORINFO_APP: return theme.packet.neighborinfo;
+    case Portnums.PortNum.ATAK_PLUGIN: return theme.packet.atakPlugin;
+    case Portnums.PortNum.MAP_REPORT_APP: return theme.packet.mapReport;
+    case Portnums.PortNum.POWERSTRESS_APP: return theme.packet.powerstress;
+    case Portnums.PortNum.RETICULUM_TUNNEL_APP: return theme.packet.reticulumTunnel;
+    case Portnums.PortNum.CAYENNE_APP: return theme.packet.cayenne;
+    case Portnums.PortNum.PRIVATE_APP: return theme.packet.privateApp;
+    case Portnums.PortNum.ATAK_FORWARDER: return theme.packet.atakForwarder;
     default: return theme.packet.unknown;
   }
 }

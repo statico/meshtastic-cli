@@ -18,9 +18,35 @@ export const theme = {
     routing: "#666666",
     traceroute: "#ffff00",
     encrypted: "#ff0040",
-    unknown: "#404040",
+    unknown: "#ff00ff",
     direct: "#00ff00",
     config: "#8080ff",
+    // Additional port type colors - cypherpunk neon palette
+    remoteHardware: "#ff0099",     // Hot pink for hardware control
+    admin: "#ff3300",              // Red-orange for admin commands
+    compressed: "#00ff66",         // Bright green for compressed messages
+    waypoint: "#00ccff",           // Cyan for waypoints
+    audio: "#ff00cc",              // Magenta for audio
+    detectionSensor: "#ffcc00",    // Gold for sensors
+    alert: "#ff0000",              // Bright red for alerts
+    keyVerification: "#00ff00",    // Lime for security
+    reply: "#99ff00",              // Yellow-green for replies
+    ipTunnel: "#0099ff",           // Blue for network tunnels
+    paxcounter: "#ff9933",         // Orange for paxcounter
+    storeForwardPP: "#9900ff",     // Purple for S&F++
+    serial: "#00ffcc",             // Turquoise for serial
+    storeForward: "#cc00ff",       // Violet for S&F
+    rangeTest: "#ffff33",          // Yellow for range tests
+    zps: "#33ff99",                // Mint for position estimation
+    simulator: "#ff3399",          // Pink for simulator
+    neighborinfo: "#ff6600",       // Bright orange for neighbors
+    atakPlugin: "#009933",         // Dark green for ATAK
+    mapReport: "#0066ff",          // Blue for map reports
+    powerstress: "#ff6666",        // Light red for power testing
+    reticulumTunnel: "#6600ff",    // Deep purple for reticulum
+    cayenne: "#ff9900",            // Orange for Cayenne
+    privateApp: "#666666",         // Gray for private apps
+    atakForwarder: "#00cc66",      // Sea green for ATAK forwarder
   },
   // Cypherpunk palette for data differentiation
   data: {
