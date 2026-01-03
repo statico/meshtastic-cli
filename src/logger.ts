@@ -56,7 +56,12 @@ class Logger {
   static shutdown(): void {
     if (Logger.instance) {
       Logger.instance.stopFlushTimer();
-      Logger.instance.flushNow();
+      // Flush synchronously to ensure logs are written before exit
+      if (Logger.instance.writeQueue.length > 0) {
+        const entries = Logger.instance.writeQueue.join("");
+        Logger.instance.writeQueue = [];
+        Logger.instance.flushSync(entries);
+      }
       Logger.instance = null;
     }
   }
@@ -102,14 +107,18 @@ class Logger {
     this.writeQueue = [];
 
     queueMicrotask(() => {
-      try {
-        appendFileSync(LOG_PATH, entries);
-        this.rotateLogIfNeeded();
-      } catch (error) {
-        // Can't log errors in the logger, just output to console
-        console.error("Failed to write log:", error);
-      }
+      this.flushSync(entries);
     });
+  }
+
+  private flushSync(entries: string): void {
+    try {
+      appendFileSync(LOG_PATH, entries);
+      this.rotateLogIfNeeded();
+    } catch (error) {
+      // Can't log errors in the logger, just output to console
+      console.error("Failed to write log:", error);
+    }
   }
 
   private rotateLogIfNeeded(): void {

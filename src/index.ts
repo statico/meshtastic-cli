@@ -52,6 +52,8 @@ truncateLogIfNeeded();
 
 process.on("uncaughtException", (error) => {
   logError("UNCAUGHT EXCEPTION", error);
+  Logger.error("Process", "Uncaught exception", error);
+  Logger.shutdown();
   console.error("Fatal error:", error.message);
   console.error(`Stack trace saved to ${ERROR_LOG_PATH}`);
   process.exit(1);
@@ -59,6 +61,10 @@ process.on("uncaughtException", (error) => {
 
 process.on("unhandledRejection", (reason) => {
   logError("UNHANDLED REJECTION", reason);
+  Logger.error("Process", "Unhandled rejection", reason instanceof Error ? reason : undefined, {
+    reason: String(reason)
+  });
+  Logger.shutdown();
   console.error("Unhandled promise rejection:", reason);
   process.exit(1);
 });
@@ -79,6 +85,11 @@ process.on("SIGHUP", () => {
   logError("SIGHUP", new Error("Received SIGHUP"));
   Logger.shutdown();
   process.exit(0);
+});
+
+// Final safety net - flush logs on any exit
+process.on("exit", (code) => {
+  Logger.shutdown();
 });
 
 // Parse CLI arguments
