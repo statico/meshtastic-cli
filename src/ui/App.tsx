@@ -2286,6 +2286,18 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           fetchNodeFromMeshView(msg.fromNode);
           return;
         }
+        // 'p' to go to packet
+        if (input === "p" && filteredMessages[selectedChatMessageIndex]) {
+          const msg = filteredMessages[selectedChatMessageIndex];
+          const packetIndex = packets.findIndex(p => p.meshPacket?.id === msg.packetId);
+          if (packetIndex >= 0) {
+            setSelectedPacketIndex(packetIndex);
+            setMode("packets");
+          } else {
+            showNotification("Packet not found in history", theme.status.offline);
+          }
+          return;
+        }
       }
     } else if (mode === "dm") {
       const selectedConvo = dmConversations[selectedDMConvoIndex];
@@ -2391,6 +2403,18 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         if (input === "u" && dmMessages[selectedDMMessageIndex]) {
           const msg = dmMessages[selectedDMMessageIndex];
           fetchNodeFromMeshView(msg.fromNode);
+          return;
+        }
+        // 'p' to go to packet
+        if (input === "p" && dmMessages[selectedDMMessageIndex]) {
+          const msg = dmMessages[selectedDMMessageIndex];
+          const packetIndex = packets.findIndex(p => p.meshPacket?.id === msg.packetId);
+          if (packetIndex >= 0) {
+            setSelectedPacketIndex(packetIndex);
+            setMode("packets");
+          } else {
+            showNotification("Packet not found in history", theme.status.offline);
+          }
           return;
         }
         return;

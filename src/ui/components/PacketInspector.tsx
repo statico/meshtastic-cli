@@ -269,8 +269,9 @@ function InfoView({ packet, nodeStore, height, scrollOffset, bruteForce, spinner
             <>
               <Text color={theme.fg.muted}>  Hops: </Text>
               <Text color={mp.hopStart - mp.hopLimit === 0 ? theme.packet.direct : theme.fg.primary}>
-                {mp.hopStart - mp.hopLimit}/{mp.hopStart}
+                {mp.hopStart - mp.hopLimit === 0 ? "direct" : mp.hopStart - mp.hopLimit}
               </Text>
+              <Text color={theme.fg.muted}> (max {mp.hopStart})</Text>
             </>
           )}
         </Box>
