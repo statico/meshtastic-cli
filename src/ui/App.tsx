@@ -25,10 +25,10 @@ import { DeviceNotificationModal } from "./components/DeviceNotificationModal";
 import * as db from "../db";
 import { toBinary, create } from "@bufbuild/protobuf";
 import { formatNodeId, getHardwareModelName } from "../utils";
-import { exec } from "child_process";
 import { setSetting } from "../settings";
 import packageJson from "../../package.json";
 import { Logger } from "../logger";
+import { safeOpenUrl, validateUrl } from "../utils/safe-exec";
 
 const BROADCAST_ADDR = 0xFFFFFFFF;
 
@@ -1850,7 +1850,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         if (pos.latitudeI && pos.longitudeI) {
           const lat = pos.latitudeI / 1e7;
           const lon = pos.longitudeI / 1e7;
-          exec(`open "https://www.google.com/maps?q=${lat},${lon}"`);
+          try {
+            safeOpenUrl(`https://www.google.com/maps?q=${lat},${lon}`);
+          } catch (error) {
+            Logger.error("App", "Failed to open maps URL", error as Error);
+            showNotification("Failed to open maps", theme.status.error);
+          }
         }
       }
       // Jump to node from packet
@@ -1883,7 +1888,14 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         }
         const packetId = selectedPacket.meshPacket.id;
         if (packetId !== 0) {
-          exec(`open "${localMeshViewUrl}/packet/${packetId}"`);
+          try {
+            const url = `${localMeshViewUrl}/packet/${packetId}`;
+            validateUrl(url); // Validate before opening
+            safeOpenUrl(url);
+          } catch (error) {
+            Logger.error("App", "Failed to open MeshView URL", error as Error);
+            showNotification("Failed to open MeshView URL", theme.status.error);
+          }
         }
       }
     } else if (mode === "nodes") {
@@ -2006,15 +2018,25 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       if (input === "l" && selectedNode?.hwModel) {
         const hwName = getHardwareModelName(selectedNode.hwModel);
         if (hwName && hwName !== "Unknown") {
-          const query = encodeURIComponent(`Meshtastic ${hwName}`);
-          exec(`open "https://www.google.com/search?q=${query}"`);
+          try {
+            const query = encodeURIComponent(`Meshtastic ${hwName}`);
+            safeOpenUrl(`https://www.google.com/search?q=${query}`);
+          } catch (error) {
+            Logger.error("App", "Failed to open search URL", error as Error);
+            showNotification("Failed to open search", theme.status.error);
+          }
         }
       }
       if (input === "m" && selectedNode) {
         if (selectedNode.latitudeI != null && selectedNode.longitudeI != null) {
-          const lat = selectedNode.latitudeI / 1e7;
-          const lon = selectedNode.longitudeI / 1e7;
-          exec(`open "https://www.google.com/maps?q=${lat},${lon}"`);
+          try {
+            const lat = selectedNode.latitudeI / 1e7;
+            const lon = selectedNode.longitudeI / 1e7;
+            safeOpenUrl(`https://www.google.com/maps?q=${lat},${lon}`);
+          } catch (error) {
+            Logger.error("App", "Failed to open maps URL", error as Error);
+            showNotification("Failed to open maps", theme.status.error);
+          }
         } else {
           showNotification("No position data for this node");
         }
@@ -2857,7 +2879,14 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         }
         const packet = meshViewPackets[selectedMeshViewIndex];
         if (packet) {
-          exec(`open "${localMeshViewUrl}/packet/${packet.id}"`);
+          try {
+            const url = `${localMeshViewUrl}/packet/${packet.id}`;
+            validateUrl(url); // Validate before opening
+            safeOpenUrl(url);
+          } catch (error) {
+            Logger.error("App", "Failed to open MeshView URL", error as Error);
+            showNotification("Failed to open MeshView URL", theme.status.error);
+          }
         }
       }
 
