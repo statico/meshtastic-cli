@@ -53,6 +53,28 @@ export function initDb(session: string = "default") {
   db.run("PRAGMA busy_timeout = 5000");
   Logger.debug("Database", "WAL mode and busy_timeout configured");
 
+  // Create schema version table for migration tracking
+  db.run(`
+    CREATE TABLE IF NOT EXISTS schema_version (
+      version INTEGER PRIMARY KEY,
+      applied_at INTEGER NOT NULL
+    )
+  `);
+
+  // Get current schema version
+  const getSchemaVersion = (): number => {
+    const row = db.query(`SELECT MAX(version) as version FROM schema_version`).get() as { version: number | null } | undefined;
+    return row?.version ?? 0;
+  };
+
+  // Record schema version
+  const setSchemaVersion = (version: number): void => {
+    db.run(`INSERT OR REPLACE INTO schema_version (version, applied_at) VALUES (?, ?)`, [version, Date.now()]);
+  };
+
+  const currentVersion = getSchemaVersion();
+  Logger.debug("Database", "Current schema version", { version: currentVersion });
+
   db.run(`
     CREATE TABLE IF NOT EXISTS nodes (
       num INTEGER PRIMARY KEY,
@@ -78,31 +100,37 @@ export function initDb(session: string = "default") {
     )
   `);
 
-  // Migration: add role column if it doesn't exist
-  try {
-    db.run(`ALTER TABLE nodes ADD COLUMN role INTEGER`);
-    Logger.debug("Database", "Added role column to nodes table");
-  } catch (error: any) {
-    // Check if error is due to column already existing
-    if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
-      Logger.debug("Database", "Role column already exists");
-    } else {
-      Logger.error("Database", "Error adding role column", error);
-      throw error; // Re-throw if it's a different error
+  // Migration 1: add role column to nodes
+  if (currentVersion < 1) {
+    try {
+      db.run(`ALTER TABLE nodes ADD COLUMN role INTEGER`);
+      setSchemaVersion(1);
+      Logger.info("Database", "Migration 1 applied: added role column to nodes");
+    } catch (error: any) {
+      if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
+        setSchemaVersion(1);
+        Logger.debug("Database", "Role column already exists, marking migration 1 as applied");
+      } else {
+        Logger.error("Database", "Error applying migration 1 (role column)", error);
+        throw error;
+      }
     }
   }
 
-  // Migration: add public_key column if it doesn't exist
-  try {
-    db.run(`ALTER TABLE nodes ADD COLUMN public_key BLOB`);
-    Logger.debug("Database", "Added public_key column to nodes table");
-  } catch (error: any) {
-    // Check if error is due to column already existing
-    if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
-      Logger.debug("Database", "Public_key column already exists");
-    } else {
-      Logger.error("Database", "Error adding public_key column", error);
-      throw error; // Re-throw if it's a different error
+  // Migration 2: add public_key column to nodes
+  if (currentVersion < 2) {
+    try {
+      db.run(`ALTER TABLE nodes ADD COLUMN public_key BLOB`);
+      setSchemaVersion(2);
+      Logger.info("Database", "Migration 2 applied: added public_key column to nodes");
+    } catch (error: any) {
+      if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
+        setSchemaVersion(2);
+        Logger.debug("Database", "Public_key column already exists, marking migration 2 as applied");
+      } else {
+        Logger.error("Database", "Error applying migration 2 (public_key column)", error);
+        throw error;
+      }
     }
   }
 
@@ -124,42 +152,54 @@ export function initDb(session: string = "default") {
     )
   `);
 
-  // Add status column if it doesn't exist (migration)
-  try {
-    db.run(`ALTER TABLE messages ADD COLUMN status TEXT DEFAULT 'received'`);
-    Logger.debug("Database", "Added status column to messages table");
-  } catch (error: any) {
-    if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
-      Logger.debug("Database", "Status column already exists");
-    } else {
-      Logger.error("Database", "Error adding status column", error);
-      throw error;
+  // Migration 3: add status column to messages
+  if (currentVersion < 3) {
+    try {
+      db.run(`ALTER TABLE messages ADD COLUMN status TEXT DEFAULT 'received'`);
+      setSchemaVersion(3);
+      Logger.info("Database", "Migration 3 applied: added status column to messages");
+    } catch (error: any) {
+      if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
+        setSchemaVersion(3);
+        Logger.debug("Database", "Status column already exists, marking migration 3 as applied");
+      } else {
+        Logger.error("Database", "Error applying migration 3 (status column)", error);
+        throw error;
+      }
     }
   }
 
-  // Migration: add reply_id column if it doesn't exist
-  try {
-    db.run(`ALTER TABLE messages ADD COLUMN reply_id INTEGER`);
-    Logger.debug("Database", "Added reply_id column to messages table");
-  } catch (error: any) {
-    if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
-      Logger.debug("Database", "Reply_id column already exists");
-    } else {
-      Logger.error("Database", "Error adding reply_id column", error);
-      throw error;
+  // Migration 4: add reply_id column to messages
+  if (currentVersion < 4) {
+    try {
+      db.run(`ALTER TABLE messages ADD COLUMN reply_id INTEGER`);
+      setSchemaVersion(4);
+      Logger.info("Database", "Migration 4 applied: added reply_id column to messages");
+    } catch (error: any) {
+      if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
+        setSchemaVersion(4);
+        Logger.debug("Database", "Reply_id column already exists, marking migration 4 as applied");
+      } else {
+        Logger.error("Database", "Error applying migration 4 (reply_id column)", error);
+        throw error;
+      }
     }
   }
 
-  // Migration: add error_reason column if it doesn't exist
-  try {
-    db.run(`ALTER TABLE messages ADD COLUMN error_reason TEXT`);
-    Logger.debug("Database", "Added error_reason column to messages table");
-  } catch (error: any) {
-    if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
-      Logger.debug("Database", "Error_reason column already exists");
-    } else {
-      Logger.error("Database", "Error adding error_reason column", error);
-      throw error;
+  // Migration 5: add error_reason column to messages
+  if (currentVersion < 5) {
+    try {
+      db.run(`ALTER TABLE messages ADD COLUMN error_reason TEXT`);
+      setSchemaVersion(5);
+      Logger.info("Database", "Migration 5 applied: added error_reason column to messages");
+    } catch (error: any) {
+      if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
+        setSchemaVersion(5);
+        Logger.debug("Database", "Error_reason column already exists, marking migration 5 as applied");
+      } else {
+        Logger.error("Database", "Error applying migration 5 (error_reason column)", error);
+        throw error;
+      }
     }
   }
 
