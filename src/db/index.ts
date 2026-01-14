@@ -11,6 +11,7 @@ const BROADCAST_ADDR = 0xFFFFFFFF;
 let db: Database;
 let currentSession = "default";
 let packetRetentionLimit = 50000;
+let pruningInProgress = false;
 
 export function getDbPath(session: string): string {
   // Validate session name to prevent path traversal attacks
@@ -537,9 +538,25 @@ export function getPackets(limit = 1000): DbPacket[] {
 }
 
 export function prunePackets() {
-  const count = (db.query(`SELECT COUNT(*) as count FROM packets`).get() as any).count;
-  if (count > packetRetentionLimit) {
-    db.run(`DELETE FROM packets WHERE id IN (SELECT id FROM packets ORDER BY timestamp ASC LIMIT ?)`, [count - packetRetentionLimit]);
+  // Prevent concurrent pruning operations
+  if (pruningInProgress) {
+    Logger.debug("Database", "Pruning already in progress, skipping");
+    return;
+  }
+
+  pruningInProgress = true;
+  try {
+    const count = (db.query(`SELECT COUNT(*) as count FROM packets`).get() as any).count;
+    if (count > packetRetentionLimit) {
+      const toDelete = count - packetRetentionLimit;
+      Logger.debug("Database", "Pruning packets", { current: count, limit: packetRetentionLimit, toDelete });
+      db.run(`DELETE FROM packets WHERE id IN (SELECT id FROM packets ORDER BY timestamp ASC LIMIT ?)`, [toDelete]);
+      Logger.debug("Database", "Packets pruned", { deleted: toDelete });
+    }
+  } catch (error) {
+    Logger.error("Database", "Error pruning packets", error as Error);
+  } finally {
+    pruningInProgress = false;
   }
 }
 
