@@ -1,5 +1,6 @@
 import type { DeviceOutput, DeviceStatus, Transport } from "./types";
 import { Logger } from "../logger";
+import { validateUrl } from "../utils/safe-exec";
 
 const POLL_INTERVAL_MS = 3000;
 const TIMEOUT_MS = 5000;
@@ -16,7 +17,27 @@ export class HttpTransport implements Transport {
   }
 
   static async create(address: string, tls = false): Promise<HttpTransport> {
+    // Validate address format
+    try {
+      // Basic validation - address should not contain protocol
+      if (address.includes("://")) {
+        throw new Error("Address should not include protocol (http:// or https://)");
+      }
+    } catch (error) {
+      Logger.error("HttpTransport", "Invalid address format", error as Error, { address });
+      throw error;
+    }
+
     const url = `${tls ? "https" : "http"}://${address}`;
+    
+    // Validate the constructed URL
+    try {
+      validateUrl(url);
+    } catch (error) {
+      Logger.error("HttpTransport", "Invalid URL", error as Error, { url, address, tls });
+      throw error;
+    }
+
     Logger.info("HttpTransport", "Attempting connection", { address, tls, url });
     try {
       await fetch(`${url}/api/v1/fromradio`, {

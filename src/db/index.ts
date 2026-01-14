@@ -3,6 +3,7 @@ import { join } from "path";
 import { homedir } from "os";
 import { mkdirSync, existsSync, unlinkSync } from "fs";
 import { Logger } from "../logger";
+import { validateSessionName } from "../utils/safe-exec";
 
 const DB_DIR = join(homedir(), ".config", "meshtastic-cli");
 const BROADCAST_ADDR = 0xFFFFFFFF;
@@ -12,7 +13,9 @@ let currentSession = "default";
 let packetRetentionLimit = 50000;
 
 export function getDbPath(session: string): string {
-  return join(DB_DIR, `${session}.db`);
+  // Validate session name to prevent path traversal attacks
+  const validatedSession = validateSessionName(session);
+  return join(DB_DIR, `${validatedSession}.db`);
 }
 
 export function setPacketRetentionLimit(limit: number) {

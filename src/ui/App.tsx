@@ -691,6 +691,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       setMeshViewPolling(true);
       try {
         const since = meshViewStoreRef.current.getLatestImportTime();
+        // Validate URL before fetching
+        validateUrl(localMeshViewUrl);
         const url = since
           ? `${localMeshViewUrl}/api/packets?since=${since}&limit=100`
           : `${localMeshViewUrl}/api/packets?limit=100`;
@@ -739,6 +741,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     const pollConfirmations = async () => {
       if (!running) return;
       try {
+        // Validate URL before fetching
+        validateUrl(localMeshViewUrl);
         const url = latestTime
           ? `${localMeshViewUrl}/api/packets?since=${latestTime}&limit=100`
           : `${localMeshViewUrl}/api/packets?limit=100`;
@@ -1277,7 +1281,10 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     } else {
       showNotification("Fetching from MeshView...");
       try {
-        const response = await fetch(`${localMeshViewUrl}/api/nodes?days_active=30`);
+        // Validate URL before fetching
+        validateUrl(localMeshViewUrl);
+        const url = `${localMeshViewUrl}/api/nodes?days_active=30`;
+        const response = await fetch(url);
         if (!response.ok) {
           showNotification(`MeshView error: ${response.status}`);
           return;
@@ -1336,7 +1343,10 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     } else {
       showNotification("Fetching all from MeshView...");
       try {
-        const response = await fetch(`${localMeshViewUrl}/api/nodes?days_active=30`);
+        // Validate URL before fetching
+        validateUrl(localMeshViewUrl);
+        const url = `${localMeshViewUrl}/api/nodes?days_active=30`;
+        const response = await fetch(url);
         if (!response.ok) {
           showNotification(`MeshView error: ${response.status}`);
           return;

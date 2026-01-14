@@ -8,6 +8,7 @@ import { App } from "./ui/App";
 import * as db from "./db";
 import { getSetting } from "./settings";
 import { Logger } from "./logger";
+import { validateAddress, validateSessionName, validateUrl } from "./utils/safe-exec";
 
 // Global error handler - append errors to log file
 const ERROR_LOG_DIR = join(homedir(), ".config", "meshtastic-cli");
@@ -111,20 +112,37 @@ for (let i = 0; i < args.length; i++) {
   } else if (arg === "--skip-nodes" || arg === "-N") {
     skipNodes = true;
   } else if (arg === "--session" || arg === "-s") {
-    session = args[++i] || "default";
+    const sessionArg = args[++i] || "default";
+    try {
+      session = validateSessionName(sessionArg);
+    } catch (error) {
+      console.error(`Invalid session name: ${error instanceof Error ? error.message : String(error)}`);
+      process.exit(1);
+    }
   } else if (arg === "--clear") {
     clearSession = true;
   } else if (arg === "--meshview" || arg === "-m") {
-    meshViewUrl = args[++i];
+    const urlArg = args[++i];
+    if (urlArg) {
+      try {
+        validateUrl(urlArg); // Validate URL format and protocol
+        meshViewUrl = urlArg;
+      } catch (error) {
+        console.error(`Invalid MeshView URL: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      }
+    }
   } else if (arg === "--fahrenheit" || arg === "-F") {
     useFahrenheit = true;
   } else if (arg === "--enable-logging" || arg === "-L") {
     enableLogging = true;
   } else if (arg === "--packet-limit" || arg === "-p") {
     const limit = parseInt(args[++i], 10);
-    if (!isNaN(limit) && limit > 0) {
-      packetLimit = limit;
+    if (isNaN(limit) || limit < 1 || limit > 1000000) {
+      console.error("Packet limit must be between 1 and 1,000,000");
+      process.exit(1);
     }
+    packetLimit = limit;
   } else if (arg === "--help" || arg === "-h") {
     console.log(`
 Meshtastic CLI Viewer
@@ -147,7 +165,12 @@ Options:
 `);
     process.exit(0);
   } else if (!arg.startsWith("-")) {
-    address = arg;
+    try {
+      address = validateAddress(arg);
+    } catch (error) {
+      console.error(`Invalid address: ${error instanceof Error ? error.message : String(error)}`);
+      process.exit(1);
+    }
   }
 }
 
@@ -160,7 +183,19 @@ if (clearSession) {
 }
 
 // Resolve meshview URL: CLI flag > settings > undefined
-const resolvedMeshViewUrl = meshViewUrl || getSetting("meshViewUrl");
+let resolvedMeshViewUrl = meshViewUrl || getSetting("meshViewUrl");
+// Validate MeshView URL from settings if present
+if (resolvedMeshViewUrl) {
+  try {
+    validateUrl(resolvedMeshViewUrl);
+  } catch (error) {
+    Logger.warn("Main", "Invalid MeshView URL in settings, ignoring", {
+      url: resolvedMeshViewUrl,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    resolvedMeshViewUrl = undefined;
+  }
+}
 
 // Initialize logger
 Logger.init(enableLogging);
