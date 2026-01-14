@@ -64,6 +64,10 @@ export interface ChannelInfo {
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
+// MeshView rate limiting constants
+const MESHVIEW_RATE_LIMIT_MS = 1000; // Minimum time between requests (1 second)
+const MESHVIEW_MAX_REQUESTS_PER_MINUTE = 60; // Maximum requests per minute
+
 interface AppProps {
   address: string;
   packetStore: PacketStore;
@@ -290,6 +294,10 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const [meshViewPolling, setMeshViewPolling] = useState(false);
   const [meshViewError, setMeshViewError] = useState<string | null>(null);
   const meshViewStoreRef = useRef<MeshViewStore>(new MeshViewStore());
+  const meshViewRequestRef = useRef<{ lastRequest: number; requestCount: number }>({
+    lastRequest: 0,
+    requestCount: 0,
+  });
   const meshViewConfirmedIdsRef = useRef<Set<number>>(new Set());
   const [meshViewConfirmedIds, setMeshViewConfirmedIds] = useState<Set<number>>(new Set());
 
