@@ -14,10 +14,21 @@ const DEFAULT_PACKET_RETENTION_LIMIT = 50000;
 const MAX_PACKET_RETENTION_LIMIT = 1000000;
 const MIN_PACKET_RETENTION_LIMIT = 1;
 
-let db: Database;
+let db: Database | null = null;
 let currentSession = "default";
 let packetRetentionLimit = DEFAULT_PACKET_RETENTION_LIMIT;
 let pruningInProgress = false;
+
+/**
+ * Ensures the database is initialized
+ * @throws Error if database is not initialized
+ */
+function ensureDb(): Database {
+  if (!db) {
+    throw new Error("Database not initialized. Call initDb() first.");
+  }
+  return db;
+}
 
 export function getDbPath(session: string): string {
   // Validate session name to prevent path traversal attacks
@@ -43,6 +54,15 @@ export function initDb(session: string = "default") {
   if (!existsSync(DB_DIR)) {
     Logger.debug("Database", "Creating database directory", { dir: DB_DIR });
     mkdirSync(DB_DIR, { recursive: true });
+  }
+
+  // Close existing connection if any
+  if (db) {
+    try {
+      db.close();
+    } catch (error) {
+      Logger.warn("Database", "Error closing existing database", error as Error);
+    }
   }
 
   db = new Database(dbPath);
@@ -281,7 +301,7 @@ export function clearDb(session: string = "default") {
   // Close db if it's the current session
   if (db && currentSession === session) {
     db.close();
-    db = null as any; // Reset to allow re-initialization
+    db = null; // Reset to allow re-initialization
   }
 
   // Delete database files
@@ -302,7 +322,7 @@ export function closeDb(): void {
     } catch (error) {
       Logger.error("Database", "Error closing database", error as Error);
     } finally {
-      db = null as any;
+      db = null;
     }
   }
 }
@@ -361,7 +381,7 @@ export function upsertNode(node: DbNode) {
     longName: node.longName,
     shortName: node.shortName,
   });
-  db.run(`
+  ensureDb().run(`
     INSERT INTO nodes (num, user_id, long_name, short_name, hw_model, role, latitude_i, longitude_i, altitude, snr, last_heard, battery_level, voltage, channel_utilization, air_util_tx, channel, via_mqtt, hops_away, is_favorite, public_key, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(num) DO UPDATE SET
@@ -411,11 +431,11 @@ export function upsertNode(node: DbNode) {
 }
 
 export function updateNodePublicKey(num: number, publicKey: Uint8Array) {
-  db.run(`UPDATE nodes SET public_key = ?, updated_at = ? WHERE num = ?`, [publicKey, Date.now(), num]);
+  ensureDb().run(`UPDATE nodes SET public_key = ?, updated_at = ? WHERE num = ?`, [publicKey, Date.now(), num]);
 }
 
 export function getNode(num: number): DbNode | null {
-  const row = db.query(`SELECT * FROM nodes WHERE num = ?`).get(num) as DbNodeRow | undefined;
+  const row = ensureDb().query(`SELECT * FROM nodes WHERE num = ?`).get(num) as DbNodeRow | undefined;
   if (!row) return null;
   return {
     num: row.num,
@@ -443,7 +463,7 @@ export function getNode(num: number): DbNode | null {
 
 export function getAllNodes(): DbNode[] {
   Logger.debug("Database", "Querying all nodes");
-  const rows = db.query(`SELECT * FROM nodes ORDER BY hops_away ASC, last_heard DESC`).all() as DbNodeRow[];
+  const rows = ensureDb().query(`SELECT * FROM nodes ORDER BY hops_away ASC, last_heard DESC`).all() as DbNodeRow[];
   Logger.debug("Database", "Query complete", { nodeCount: rows.length });
   return rows.map((row) => ({
     num: row.num,
@@ -470,13 +490,13 @@ export function getAllNodes(): DbNode[] {
 }
 
 export function getNodeName(num: number): string | null {
-  const row = db.query(`SELECT short_name, long_name FROM nodes WHERE num = ?`).get(num) as { short_name: string | null; long_name: string | null } | undefined;
+  const row = ensureDb().query(`SELECT short_name, long_name FROM nodes WHERE num = ?`).get(num) as { short_name: string | null; long_name: string | null } | undefined;
   if (!row) return null;
   return row.short_name || row.long_name || null;
 }
 
 export function deleteNode(num: number) {
-  db.run(`DELETE FROM nodes WHERE num = ?`, [num]);
+  ensureDb().run(`DELETE FROM nodes WHERE num = ?`, [num]);
 }
 
 export function insertMessage(msg: DbMessage) {
@@ -487,7 +507,7 @@ export function insertMessage(msg: DbMessage) {
     channel: msg.channel,
     textLength: msg.text?.length,
   });
-  db.run(`
+  ensureDb().run(`
     INSERT INTO messages (packet_id, from_node, to_node, channel, text, timestamp, rx_time, rx_snr, rx_rssi, hop_limit, hop_start, status, reply_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
@@ -508,18 +528,20 @@ export function insertMessage(msg: DbMessage) {
 }
 
 export function updateMessageStatus(packetId: number, status: MessageStatus, errorReason?: string) {
+  const database = ensureDb();
   if (errorReason) {
-    db.run(`UPDATE messages SET status = ?, error_reason = ? WHERE packet_id = ?`, [status, errorReason, packetId]);
+    database.run(`UPDATE messages SET status = ?, error_reason = ? WHERE packet_id = ?`, [status, errorReason, packetId]);
   } else {
-    db.run(`UPDATE messages SET status = ? WHERE packet_id = ?`, [status, packetId]);
+    database.run(`UPDATE messages SET status = ? WHERE packet_id = ?`, [status, packetId]);
   }
 }
 
 export function getMessages(channel?: number, limit = 100): DbMessage[] {
   // Only get broadcast messages (channel chat), exclude DMs
+  const database = ensureDb();
   const query = channel !== undefined
-    ? db.query(`SELECT * FROM messages WHERE channel = ? AND to_node = ? ORDER BY timestamp DESC LIMIT ?`)
-    : db.query(`SELECT * FROM messages WHERE to_node = ? ORDER BY timestamp DESC LIMIT ?`);
+    ? database.query(`SELECT * FROM messages WHERE channel = ? AND to_node = ? ORDER BY timestamp DESC LIMIT ?`)
+    : database.query(`SELECT * FROM messages WHERE to_node = ? ORDER BY timestamp DESC LIMIT ?`);
   const rows = (channel !== undefined ? query.all(channel, BROADCAST_ADDR, limit) : query.all(BROADCAST_ADDR, limit)) as DbMessageRow[];
   return rows.reverse().map((row) => ({
     id: row.id,
@@ -541,7 +563,7 @@ export function getMessages(channel?: number, limit = 100): DbMessage[] {
 }
 
 export function getMessageByPacketId(packetId: number): DbMessage | null {
-  const row = db.query(`SELECT * FROM messages WHERE packet_id = ?`).get(packetId) as DbMessageRow | undefined;
+  const row = ensureDb().query(`SELECT * FROM messages WHERE packet_id = ?`).get(packetId) as DbMessageRow | undefined;
   if (!row) return null;
   return {
     id: row.id,
@@ -585,7 +607,7 @@ export function insertPacket(packet: DbPacket) {
     portnum: packet.portnum,
     rawSize: packet.raw.byteLength,
   });
-  db.run(`
+  ensureDb().run(`
     INSERT INTO packets (packet_id, from_node, to_node, channel, portnum, timestamp, rx_time, rx_snr, rx_rssi, raw)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
@@ -604,7 +626,7 @@ export function insertPacket(packet: DbPacket) {
 }
 
 export function getPackets(limit = 1000): DbPacket[] {
-  const rows = db.query(`SELECT * FROM packets ORDER BY timestamp DESC LIMIT ?`).all(limit) as DbPacketRow[];
+  const rows = ensureDb().query(`SELECT * FROM packets ORDER BY timestamp DESC LIMIT ?`).all(limit) as DbPacketRow[];
   return rows.reverse().map((row) => ({
     id: row.id,
     packetId: row.packet_id,
@@ -629,11 +651,12 @@ export function prunePackets() {
 
   pruningInProgress = true;
   try {
-    const count = (db.query(`SELECT COUNT(*) as count FROM packets`).get() as DbCountResult).count;
+    const database = ensureDb();
+    const count = (database.query(`SELECT COUNT(*) as count FROM packets`).get() as DbCountResult).count;
     if (count > packetRetentionLimit) {
       const toDelete = count - packetRetentionLimit;
       Logger.debug("Database", "Pruning packets", { current: count, limit: packetRetentionLimit, toDelete });
-      db.run(`DELETE FROM packets WHERE id IN (SELECT id FROM packets ORDER BY timestamp ASC LIMIT ?)`, [toDelete]);
+      database.run(`DELETE FROM packets WHERE id IN (SELECT id FROM packets ORDER BY timestamp ASC LIMIT ?)`, [toDelete]);
       Logger.debug("Database", "Packets pruned", { deleted: toDelete });
     }
   } catch (error) {
@@ -644,7 +667,7 @@ export function prunePackets() {
 }
 
 export function getPacketCount(): number {
-  return (db.query(`SELECT COUNT(*) as count FROM packets`).get() as DbCountResult).count;
+  return (ensureDb().query(`SELECT COUNT(*) as count FROM packets`).get() as DbCountResult).count;
 }
 
 // Position and Traceroute response types
@@ -687,7 +710,7 @@ export interface DbNodeInfoResponse {
 export type LogResponse = DbPositionResponse | DbTracerouteResponse | DbNodeInfoResponse;
 
 export function insertPositionResponse(response: DbPositionResponse) {
-  db.run(`
+  ensureDb().run(`
     INSERT INTO position_responses (packet_id, from_node, requested_by, latitude_i, longitude_i, altitude, sats_in_view, timestamp)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `, [
@@ -703,7 +726,7 @@ export function insertPositionResponse(response: DbPositionResponse) {
 }
 
 export function insertTracerouteResponse(response: DbTracerouteResponse) {
-  db.run(`
+  ensureDb().run(`
     INSERT INTO traceroute_responses (packet_id, from_node, requested_by, route, snr_towards, snr_back, hop_limit, timestamp)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `, [
@@ -719,7 +742,7 @@ export function insertTracerouteResponse(response: DbTracerouteResponse) {
 }
 
 export function getPositionResponses(limit = 100): DbPositionResponse[] {
-  const rows = db.query(`SELECT * FROM position_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as Array<{
+  const rows = ensureDb().query(`SELECT * FROM position_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as Array<{
     id: number;
     packet_id: number;
     from_node: number;
@@ -760,7 +783,7 @@ function safeJsonParse<T>(json: string | null | undefined, defaultValue: T): T {
 }
 
 export function getTracerouteResponses(limit = 100): DbTracerouteResponse[] {
-  const rows = db.query(`SELECT * FROM traceroute_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as Array<{
+  const rows = ensureDb().query(`SELECT * FROM traceroute_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as Array<{
     id: number;
     packet_id: number;
     from_node: number;
@@ -785,7 +808,7 @@ export function getTracerouteResponses(limit = 100): DbTracerouteResponse[] {
 }
 
 export function insertNodeInfoResponse(response: DbNodeInfoResponse) {
-  db.run(`
+  ensureDb().run(`
     INSERT INTO nodeinfo_responses (packet_id, from_node, requested_by, long_name, short_name, hw_model, timestamp)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `, [
@@ -800,7 +823,7 @@ export function insertNodeInfoResponse(response: DbNodeInfoResponse) {
 }
 
 export function getNodeInfoResponses(limit = 100): DbNodeInfoResponse[] {
-  const rows = db.query(`SELECT * FROM nodeinfo_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as Array<{
+  const rows = ensureDb().query(`SELECT * FROM nodeinfo_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as Array<{
     id: number;
     packet_id: number;
     from_node: number;
@@ -845,7 +868,7 @@ export interface DMConversation {
 export function getDMConversations(myNodeNum: number): DMConversation[] {
   // Get all unique nodes we've had DM conversations with
   // A DM is either: to_node = myNodeNum (received) or from_node = myNodeNum AND to_node != broadcast (sent)
-    const rows = db.query(`
+    const rows = ensureDb().query(`
     SELECT
       CASE
         WHEN from_node = ? THEN to_node
@@ -876,7 +899,7 @@ export function getDMConversations(myNodeNum: number): DMConversation[] {
 
 export function getDMMessages(myNodeNum: number, otherNodeNum: number, limit = 100): DbMessage[] {
   // Get messages between myNodeNum and otherNodeNum (excluding broadcast)
-  const rows = db.query(`
+  const rows = ensureDb().query(`
     SELECT * FROM messages
     WHERE to_node != ?
       AND ((from_node = ? AND to_node = ?) OR (from_node = ? AND to_node = ?))
@@ -910,7 +933,7 @@ export function markDMsAsRead(myNodeNum: number, otherNodeNum: number) {
 
 export function deleteDMConversation(myNodeNum: number, otherNodeNum: number) {
   // Delete all DM messages between myNodeNum and otherNodeNum
-  db.run(`
+  ensureDb().run(`
     DELETE FROM messages
     WHERE to_node != ?
       AND ((from_node = ? AND to_node = ?) OR (from_node = ? AND to_node = ?))
