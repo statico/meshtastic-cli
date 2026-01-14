@@ -1894,7 +1894,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           const lat = pos.latitudeI / 1e7;
           const lon = pos.longitudeI / 1e7;
           try {
-            safeOpenUrl(`https://www.google.com/maps?q=${lat},${lon}`);
+            const url = new URL("https://www.google.com/maps");
+            url.searchParams.set("q", `${lat},${lon}`);
+            safeOpenUrl(url.toString());
           } catch (error) {
             Logger.error("App", "Failed to open maps URL", error as Error);
             showNotification("Failed to open maps", theme.status.error);
@@ -2062,8 +2064,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         const hwName = getHardwareModelName(selectedNode.hwModel);
         if (hwName && hwName !== "Unknown") {
           try {
-            const query = encodeURIComponent(`Meshtastic ${hwName}`);
-            safeOpenUrl(`https://www.google.com/search?q=${query}`);
+            const url = new URL("https://www.google.com/search");
+            url.searchParams.set("q", `Meshtastic ${hwName}`);
+            safeOpenUrl(url.toString());
           } catch (error) {
             Logger.error("App", "Failed to open search URL", error as Error);
             showNotification("Failed to open search", theme.status.error);
@@ -2075,7 +2078,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           try {
             const lat = selectedNode.latitudeI / 1e7;
             const lon = selectedNode.longitudeI / 1e7;
-            safeOpenUrl(`https://www.google.com/maps?q=${lat},${lon}`);
+            const url = new URL("https://www.google.com/maps");
+            url.searchParams.set("q", `${lat},${lon}`);
+            safeOpenUrl(url.toString());
           } catch (error) {
             Logger.error("App", "Failed to open maps URL", error as Error);
             showNotification("Failed to open maps", theme.status.error);
