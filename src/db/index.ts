@@ -4,13 +4,19 @@ import { homedir } from "os";
 import { mkdirSync, existsSync, unlinkSync } from "fs";
 import { Logger } from "../logger";
 import { validateSessionName } from "../utils/safe-exec";
+import type { DbNodeRow, DbMessageRow, DbPacketRow, DbCountResult } from "./types";
 
 const DB_DIR = join(homedir(), ".config", "meshtastic-cli");
 const BROADCAST_ADDR = 0xFFFFFFFF;
 
+// Constants
+const DEFAULT_PACKET_RETENTION_LIMIT = 50000;
+const MAX_PACKET_RETENTION_LIMIT = 1000000;
+const MIN_PACKET_RETENTION_LIMIT = 1;
+
 let db: Database;
 let currentSession = "default";
-let packetRetentionLimit = 50000;
+let packetRetentionLimit = DEFAULT_PACKET_RETENTION_LIMIT;
 let pruningInProgress = false;
 
 export function getDbPath(session: string): string {
@@ -20,6 +26,11 @@ export function getDbPath(session: string): string {
 }
 
 export function setPacketRetentionLimit(limit: number) {
+  if (limit < MIN_PACKET_RETENTION_LIMIT || limit > MAX_PACKET_RETENTION_LIMIT) {
+    throw new Error(
+      `Packet retention limit must be between ${MIN_PACKET_RETENTION_LIMIT} and ${MAX_PACKET_RETENTION_LIMIT}`
+    );
+  }
   packetRetentionLimit = limit;
   Logger.debug("Database", "Packet retention limit set", { limit });
 }
@@ -364,7 +375,7 @@ export function updateNodePublicKey(num: number, publicKey: Uint8Array) {
 }
 
 export function getNode(num: number): DbNode | null {
-  const row = db.query(`SELECT * FROM nodes WHERE num = ?`).get(num) as any;
+  const row = db.query(`SELECT * FROM nodes WHERE num = ?`).get(num) as DbNodeRow | undefined;
   if (!row) return null;
   return {
     num: row.num,
@@ -392,7 +403,7 @@ export function getNode(num: number): DbNode | null {
 
 export function getAllNodes(): DbNode[] {
   Logger.debug("Database", "Querying all nodes");
-  const rows = db.query(`SELECT * FROM nodes ORDER BY hops_away ASC, last_heard DESC`).all() as any[];
+  const rows = db.query(`SELECT * FROM nodes ORDER BY hops_away ASC, last_heard DESC`).all() as DbNodeRow[];
   Logger.debug("Database", "Query complete", { nodeCount: rows.length });
   return rows.map((row) => ({
     num: row.num,
@@ -419,7 +430,7 @@ export function getAllNodes(): DbNode[] {
 }
 
 export function getNodeName(num: number): string | null {
-  const row = db.query(`SELECT short_name, long_name FROM nodes WHERE num = ?`).get(num) as any;
+  const row = db.query(`SELECT short_name, long_name FROM nodes WHERE num = ?`).get(num) as { short_name: string | null; long_name: string | null } | undefined;
   if (!row) return null;
   return row.short_name || row.long_name || null;
 }
@@ -469,7 +480,7 @@ export function getMessages(channel?: number, limit = 100): DbMessage[] {
   const query = channel !== undefined
     ? db.query(`SELECT * FROM messages WHERE channel = ? AND to_node = ? ORDER BY timestamp DESC LIMIT ?`)
     : db.query(`SELECT * FROM messages WHERE to_node = ? ORDER BY timestamp DESC LIMIT ?`);
-  const rows = (channel !== undefined ? query.all(channel, BROADCAST_ADDR, limit) : query.all(BROADCAST_ADDR, limit)) as any[];
+  const rows = (channel !== undefined ? query.all(channel, BROADCAST_ADDR, limit) : query.all(BROADCAST_ADDR, limit)) as DbMessageRow[];
   return rows.reverse().map((row) => ({
     id: row.id,
     packetId: row.packet_id,
@@ -490,7 +501,7 @@ export function getMessages(channel?: number, limit = 100): DbMessage[] {
 }
 
 export function getMessageByPacketId(packetId: number): DbMessage | null {
-  const row = db.query(`SELECT * FROM messages WHERE packet_id = ?`).get(packetId) as any;
+  const row = db.query(`SELECT * FROM messages WHERE packet_id = ?`).get(packetId) as DbMessageRow | undefined;
   if (!row) return null;
   return {
     id: row.id,
@@ -553,7 +564,7 @@ export function insertPacket(packet: DbPacket) {
 }
 
 export function getPackets(limit = 1000): DbPacket[] {
-  const rows = db.query(`SELECT * FROM packets ORDER BY timestamp DESC LIMIT ?`).all(limit) as any[];
+  const rows = db.query(`SELECT * FROM packets ORDER BY timestamp DESC LIMIT ?`).all(limit) as DbPacketRow[];
   return rows.reverse().map((row) => ({
     id: row.id,
     packetId: row.packet_id,
@@ -578,7 +589,7 @@ export function prunePackets() {
 
   pruningInProgress = true;
   try {
-    const count = (db.query(`SELECT COUNT(*) as count FROM packets`).get() as any).count;
+    const count = (db.query(`SELECT COUNT(*) as count FROM packets`).get() as DbCountResult).count;
     if (count > packetRetentionLimit) {
       const toDelete = count - packetRetentionLimit;
       Logger.debug("Database", "Pruning packets", { current: count, limit: packetRetentionLimit, toDelete });
@@ -593,7 +604,7 @@ export function prunePackets() {
 }
 
 export function getPacketCount(): number {
-  return (db.query(`SELECT COUNT(*) as count FROM packets`).get() as any).count;
+  return (db.query(`SELECT COUNT(*) as count FROM packets`).get() as DbCountResult).count;
 }
 
 // Position and Traceroute response types
@@ -668,7 +679,17 @@ export function insertTracerouteResponse(response: DbTracerouteResponse) {
 }
 
 export function getPositionResponses(limit = 100): DbPositionResponse[] {
-  const rows = db.query(`SELECT * FROM position_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as any[];
+  const rows = db.query(`SELECT * FROM position_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as Array<{
+    id: number;
+    packet_id: number;
+    from_node: number;
+    requested_by: number;
+    latitude_i: number | null;
+    longitude_i: number | null;
+    altitude: number | null;
+    sats_in_view: number | null;
+    timestamp: number;
+  }>;
   return rows.reverse().map((row) => ({
     id: row.id,
     packetId: row.packet_id,
@@ -699,7 +720,17 @@ function safeJsonParse<T>(json: string | null | undefined, defaultValue: T): T {
 }
 
 export function getTracerouteResponses(limit = 100): DbTracerouteResponse[] {
-  const rows = db.query(`SELECT * FROM traceroute_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as any[];
+  const rows = db.query(`SELECT * FROM traceroute_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as Array<{
+    id: number;
+    packet_id: number;
+    from_node: number;
+    requested_by: number;
+    route: string;
+    snr_towards: string | null;
+    snr_back: string | null;
+    hop_limit: number;
+    timestamp: number;
+  }>;
   return rows.reverse().map((row) => ({
     id: row.id,
     packetId: row.packet_id,
@@ -729,7 +760,16 @@ export function insertNodeInfoResponse(response: DbNodeInfoResponse) {
 }
 
 export function getNodeInfoResponses(limit = 100): DbNodeInfoResponse[] {
-  const rows = db.query(`SELECT * FROM nodeinfo_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as any[];
+  const rows = db.query(`SELECT * FROM nodeinfo_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as Array<{
+    id: number;
+    packet_id: number;
+    from_node: number;
+    requested_by: number;
+    long_name: string | null;
+    short_name: string | null;
+    hw_model: number | null;
+    timestamp: number;
+  }>;
   return rows.reverse().map((row) => ({
     id: row.id,
     packetId: row.packet_id,
@@ -765,7 +805,7 @@ export interface DMConversation {
 export function getDMConversations(myNodeNum: number): DMConversation[] {
   // Get all unique nodes we've had DM conversations with
   // A DM is either: to_node = myNodeNum (received) or from_node = myNodeNum AND to_node != broadcast (sent)
-  const rows = db.query(`
+    const rows = db.query(`
     SELECT
       CASE
         WHEN from_node = ? THEN to_node
@@ -779,7 +819,12 @@ export function getDMConversations(myNodeNum: number): DMConversation[] {
       AND (from_node = ? OR to_node = ?)
     GROUP BY other_node
     ORDER BY last_timestamp DESC
-  `).all(myNodeNum, myNodeNum, BROADCAST_ADDR, myNodeNum, myNodeNum) as any[];
+  `).all(myNodeNum, myNodeNum, BROADCAST_ADDR, myNodeNum, myNodeNum) as Array<{
+    other_node: number;
+    last_message: string;
+    last_timestamp: number;
+    unread_count: number;
+  }>;
 
   return rows.map((row) => ({
     nodeNum: row.other_node,
@@ -797,7 +842,7 @@ export function getDMMessages(myNodeNum: number, otherNodeNum: number, limit = 1
       AND ((from_node = ? AND to_node = ?) OR (from_node = ? AND to_node = ?))
     ORDER BY timestamp DESC
     LIMIT ?
-  `).all(BROADCAST_ADDR, myNodeNum, otherNodeNum, otherNodeNum, myNodeNum, limit) as any[];
+  `).all(BROADCAST_ADDR, myNodeNum, otherNodeNum, otherNodeNum, myNodeNum, limit) as DbMessageRow[];
 
   return rows.reverse().map((row) => ({
     id: row.id,

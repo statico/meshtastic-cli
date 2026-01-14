@@ -13,7 +13,7 @@ import { validateAddress, validateSessionName, validateUrl } from "./utils/safe-
 // Global error handler - append errors to log file
 const ERROR_LOG_DIR = join(homedir(), ".config", "meshtastic-cli");
 const ERROR_LOG_PATH = join(ERROR_LOG_DIR, "error.log");
-const MAX_LOG_SIZE = 1024 * 1024; // 1 MB
+const MAX_LOG_SIZE = 1024 * 1024; // 1 MB - extracted to constant
 
 // Truncate log file if it exceeds max size
 function truncateLogIfNeeded() {
