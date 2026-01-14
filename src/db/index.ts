@@ -650,6 +650,22 @@ export function getPositionResponses(limit = 100): DbPositionResponse[] {
   }));
 }
 
+/**
+ * Safely parses JSON with a fallback value
+ */
+function safeJsonParse<T>(json: string | null | undefined, defaultValue: T): T {
+  if (!json) return defaultValue;
+  try {
+    return JSON.parse(json);
+  } catch (error) {
+    Logger.warn("Database", "Failed to parse JSON, using default", { 
+      error: error instanceof Error ? error.message : String(error),
+      defaultValue: typeof defaultValue
+    });
+    return defaultValue;
+  }
+}
+
 export function getTracerouteResponses(limit = 100): DbTracerouteResponse[] {
   const rows = db.query(`SELECT * FROM traceroute_responses ORDER BY timestamp DESC LIMIT ?`).all(limit) as any[];
   return rows.reverse().map((row) => ({
@@ -657,9 +673,9 @@ export function getTracerouteResponses(limit = 100): DbTracerouteResponse[] {
     packetId: row.packet_id,
     fromNode: row.from_node,
     requestedBy: row.requested_by,
-    route: JSON.parse(row.route || "[]"),
-    snrTowards: row.snr_towards ? JSON.parse(row.snr_towards) : undefined,
-    snrBack: row.snr_back ? JSON.parse(row.snr_back) : undefined,
+    route: safeJsonParse<number[]>(row.route, []),
+    snrTowards: row.snr_towards ? safeJsonParse<number[]>(row.snr_towards, []) : undefined,
+    snrBack: row.snr_back ? safeJsonParse<number[]>(row.snr_back, []) : undefined,
     hopLimit: row.hop_limit,
     timestamp: row.timestamp,
   }));
