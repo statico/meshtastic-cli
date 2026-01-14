@@ -70,15 +70,29 @@ export function initDb(session: string = "default") {
   // Migration: add role column if it doesn't exist
   try {
     db.run(`ALTER TABLE nodes ADD COLUMN role INTEGER`);
-  } catch {
-    // Column already exists
+    Logger.debug("Database", "Added role column to nodes table");
+  } catch (error: any) {
+    // Check if error is due to column already existing
+    if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
+      Logger.debug("Database", "Role column already exists");
+    } else {
+      Logger.error("Database", "Error adding role column", error);
+      throw error; // Re-throw if it's a different error
+    }
   }
 
   // Migration: add public_key column if it doesn't exist
   try {
     db.run(`ALTER TABLE nodes ADD COLUMN public_key BLOB`);
-  } catch {
-    // Column already exists
+    Logger.debug("Database", "Added public_key column to nodes table");
+  } catch (error: any) {
+    // Check if error is due to column already existing
+    if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
+      Logger.debug("Database", "Public_key column already exists");
+    } else {
+      Logger.error("Database", "Error adding public_key column", error);
+      throw error; // Re-throw if it's a different error
+    }
   }
 
   db.run(`
@@ -102,22 +116,40 @@ export function initDb(session: string = "default") {
   // Add status column if it doesn't exist (migration)
   try {
     db.run(`ALTER TABLE messages ADD COLUMN status TEXT DEFAULT 'received'`);
-  } catch {
-    // Column already exists
+    Logger.debug("Database", "Added status column to messages table");
+  } catch (error: any) {
+    if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
+      Logger.debug("Database", "Status column already exists");
+    } else {
+      Logger.error("Database", "Error adding status column", error);
+      throw error;
+    }
   }
 
   // Migration: add reply_id column if it doesn't exist
   try {
     db.run(`ALTER TABLE messages ADD COLUMN reply_id INTEGER`);
-  } catch {
-    // Column already exists
+    Logger.debug("Database", "Added reply_id column to messages table");
+  } catch (error: any) {
+    if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
+      Logger.debug("Database", "Reply_id column already exists");
+    } else {
+      Logger.error("Database", "Error adding reply_id column", error);
+      throw error;
+    }
   }
 
   // Migration: add error_reason column if it doesn't exist
   try {
     db.run(`ALTER TABLE messages ADD COLUMN error_reason TEXT`);
-  } catch {
-    // Column already exists
+    Logger.debug("Database", "Added error_reason column to messages table");
+  } catch (error: any) {
+    if (error?.message?.includes("duplicate column") || error?.message?.includes("already exists")) {
+      Logger.debug("Database", "Error_reason column already exists");
+    } else {
+      Logger.error("Database", "Error adding error_reason column", error);
+      throw error;
+    }
   }
 
   db.run(`

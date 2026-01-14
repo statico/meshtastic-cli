@@ -688,6 +688,27 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     let running = true;
     const poll = async () => {
       if (!running) return;
+      
+      // Rate limiting check
+      const now = Date.now();
+      const timeSinceLastRequest = now - meshViewRequestRef.current.lastRequest;
+      if (timeSinceLastRequest < MESHVIEW_RATE_LIMIT_MS) {
+        Logger.debug("App", "Rate limiting MeshView request", { timeSinceLastRequest });
+        return;
+      }
+
+      // Reset request count if a minute has passed
+      if (timeSinceLastRequest > 60000) {
+        meshViewRequestRef.current.requestCount = 0;
+      }
+
+      if (meshViewRequestRef.current.requestCount >= MESHVIEW_MAX_REQUESTS_PER_MINUTE) {
+        Logger.warn("App", "MeshView rate limit exceeded", { 
+          requestCount: meshViewRequestRef.current.requestCount 
+        });
+        return;
+      }
+
       setMeshViewPolling(true);
       try {
         const since = meshViewStoreRef.current.getLatestImportTime();
@@ -696,6 +717,10 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         const url = since
           ? `${localMeshViewUrl}/api/packets?since=${since}&limit=100`
           : `${localMeshViewUrl}/api/packets?limit=100`;
+        
+        meshViewRequestRef.current.lastRequest = now;
+        meshViewRequestRef.current.requestCount++;
+        
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data: MeshViewApiResponse = await response.json();

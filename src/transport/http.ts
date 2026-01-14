@@ -2,8 +2,17 @@ import type { DeviceOutput, DeviceStatus, Transport } from "./types";
 import { Logger } from "../logger";
 import { validateUrl } from "../utils/safe-exec";
 
-const POLL_INTERVAL_MS = 3000;
-const TIMEOUT_MS = 5000;
+// Configurable timeouts - can be overridden via environment variables
+const POLL_INTERVAL_MS = parseInt(process.env.MESHTASTIC_POLL_INTERVAL_MS || "3000", 10);
+const TIMEOUT_MS = parseInt(process.env.MESHTASTIC_TIMEOUT_MS || "5000", 10);
+
+// Validate timeout values
+if (isNaN(POLL_INTERVAL_MS) || POLL_INTERVAL_MS < 100 || POLL_INTERVAL_MS > 60000) {
+  throw new Error(`Invalid POLL_INTERVAL_MS: ${process.env.MESHTASTIC_POLL_INTERVAL_MS}. Must be between 100 and 60000`);
+}
+if (isNaN(TIMEOUT_MS) || TIMEOUT_MS < 1000 || TIMEOUT_MS > 60000) {
+  throw new Error(`Invalid TIMEOUT_MS: ${process.env.MESHTASTIC_TIMEOUT_MS}. Must be between 1000 and 60000`);
+}
 
 export class HttpTransport implements Transport {
   private url: string;

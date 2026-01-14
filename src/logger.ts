@@ -127,15 +127,29 @@ class Logger {
 
       const stats = statSync(LOG_PATH);
       if (stats.size > MAX_LOG_SIZE) {
-        // Keep the last 2.5MB of logs (half the max size)
-        const content = readFileSync(LOG_PATH, "utf-8");
-        const lines = content.split("\n");
+        // Use streaming approach for large files to avoid memory issues
+        // Read file in chunks and keep the last portion
+        const keepSize = Math.floor(MAX_LOG_SIZE / 2); // Keep half the max size
+        const fs = require("fs");
+        const fd = fs.openSync(LOG_PATH, "r");
+        const fileSize = stats.size;
+        const startPos = Math.max(0, fileSize - keepSize);
+        
+        // Read from startPos to end
+        const buffer = Buffer.alloc(fileSize - startPos);
+        fs.readSync(fd, buffer, 0, buffer.length, startPos);
+        fs.closeSync(fd);
 
-        // Keep approximately half the file by line count
-        const keepLines = Math.floor(lines.length / 2);
-        const truncated = lines.slice(-keepLines).join("\n");
+        // Find first complete line (starts with newline + timestamp)
+        const content = buffer.toString("utf-8");
+        const firstEntry = content.indexOf("\n[");
+        const truncated = firstEntry > 0 ? content.slice(firstEntry + 1) : content;
 
         writeFileSync(LOG_PATH, truncated);
+        Logger.debug("Logger", "Log rotated", { 
+          originalSize: fileSize, 
+          newSize: truncated.length 
+        });
       }
     } catch (error) {
       console.error("Failed to rotate log:", error);
