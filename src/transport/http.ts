@@ -11,6 +11,9 @@ export class HttpTransport implements Transport {
   private outputs: DeviceOutput[] = [];
   private resolvers: Array<(value: IteratorResult<DeviceOutput>) => void> = [];
   private lastStatus: DeviceStatus = "disconnected";
+  private readonly MAX_QUEUE_SIZE = 1000;
+  private consecutiveErrors = 0;
+  private readonly MAX_CONSECUTIVE_ERRORS = 10;
 
   constructor(url: string) {
     this.url = url.replace(/\/$/, "");
@@ -108,14 +111,38 @@ export class HttpTransport implements Transport {
         }
       } catch (e) {
         if (this.running) {
-          Logger.error("HttpTransport", "Poll error", e as Error);
+          this.consecutiveErrors++;
+          Logger.error("HttpTransport", "Poll error", e as Error, { 
+            consecutiveErrors: this.consecutiveErrors 
+          });
+          
+          // Implement exponential backoff for repeated errors
+          const backoffDelay = Math.min(
+            POLL_INTERVAL_MS * Math.pow(2, Math.min(this.consecutiveErrors - 1, 5)),
+            30000 // Max 30 seconds
+          );
+          
           this.emit({
             type: "status",
             status: "disconnected",
             reason: e instanceof Error ? e.message : "unknown",
           });
+
+          // Stop polling if too many consecutive errors
+          if (this.consecutiveErrors >= this.MAX_CONSECUTIVE_ERRORS) {
+            Logger.error("HttpTransport", "Too many consecutive errors, stopping polling", undefined, {
+              consecutiveErrors: this.consecutiveErrors
+            });
+            this.running = false;
+            return;
+          }
+
+          await new Promise((r) => setTimeout(r, backoffDelay));
+          continue; // Skip normal poll interval after backoff
         }
       }
+      // Reset error counter on successful poll
+      this.consecutiveErrors = 0;
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     }
   }
@@ -124,11 +151,20 @@ export class HttpTransport implements Transport {
     if (output.type === "status") {
       if (output.status === this.lastStatus) return;
       this.lastStatus = output.status;
+      // Reset error counter on successful status change
+      if (output.status === "connected") {
+        this.consecutiveErrors = 0;
+      }
     }
     const resolver = this.resolvers.shift();
     if (resolver) {
       resolver({ value: output, done: false });
     } else {
+      // Prevent unbounded queue growth
+      if (this.outputs.length >= this.MAX_QUEUE_SIZE) {
+        Logger.warn("HttpTransport", "Output queue full, dropping oldest", { queueSize: this.outputs.length });
+        this.outputs.shift();
+      }
       this.outputs.push(output);
     }
   }
