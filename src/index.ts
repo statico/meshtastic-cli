@@ -88,8 +88,9 @@ process.on("SIGHUP", () => {
   process.exit(0);
 });
 
-// Final safety net - flush logs on any exit
+// Final safety net - flush logs and close database on any exit
 process.on("exit", (code) => {
+  db.closeDb();
   Logger.shutdown();
 });
 

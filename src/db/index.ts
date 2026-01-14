@@ -197,12 +197,30 @@ export function clearDb(session: string = "default") {
   // Close db if it's the current session
   if (db && currentSession === session) {
     db.close();
+    db = null as any; // Reset to allow re-initialization
   }
 
   // Delete database files
   if (existsSync(dbPath)) unlinkSync(dbPath);
   if (existsSync(walPath)) unlinkSync(walPath);
   if (existsSync(shmPath)) unlinkSync(shmPath);
+}
+
+/**
+ * Closes the database connection gracefully
+ * Should be called on application exit
+ */
+export function closeDb(): void {
+  if (db) {
+    try {
+      db.close();
+      Logger.info("Database", "Database connection closed");
+    } catch (error) {
+      Logger.error("Database", "Error closing database", error as Error);
+    } finally {
+      db = null as any;
+    }
+  }
 }
 
 export function getSessionName(): string {
