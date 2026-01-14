@@ -231,6 +231,10 @@ const { waitUntilExit } = render(
 );
 
 waitUntilExit().catch((e) => {
-  console.error("Failed:", e.message);
+  const error = e instanceof Error ? e : new Error(String(e));
+  Logger.error("Main", "Application exit error", error);
+  console.error("Failed:", error.message);
+  db.closeDb();
+  Logger.shutdown();
   process.exit(1);
 });
