@@ -22,6 +22,7 @@ import { MeshViewPacketList, MeshViewInspector, MeshViewInspectorTab } from "./c
 import { MeshViewStore, MeshViewPacket, MeshViewApiResponse, extractPublicKeyFromPayload } from "../protocol/meshview";
 import { RebootModal } from "./components/RebootModal";
 import { DeviceNotificationModal } from "./components/DeviceNotificationModal";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import * as db from "../db";
 import { toBinary, create } from "@bufbuild/protobuf";
 import { formatNodeId, getHardwareModelName } from "../utils";
@@ -3052,22 +3053,24 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
             ? Math.floor(contentHeight * 0.8)
             : inspectorHeight;
           return (
-            <Box height={contentHeight} flexDirection="column">
-              <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
-                <PacketList
-                  packets={packets}
-                  selectedIndex={selectedPacketIndex}
-                  nodeStore={nodeStore}
-                  height={listHeight}
-                  isFollowing={selectedPacketIndex === packets.length - 1}
-                  useFahrenheit={useFahrenheit}
-                  meshViewConfirmedIds={meshViewConfirmedIds}
-                />
+            <ErrorBoundary context="Packets Panel">
+              <Box height={contentHeight} flexDirection="column">
+                <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
+                  <PacketList
+                    packets={packets}
+                    selectedIndex={selectedPacketIndex}
+                    nodeStore={nodeStore}
+                    height={listHeight}
+                    isFollowing={selectedPacketIndex === packets.length - 1}
+                    useFahrenheit={useFahrenheit}
+                    meshViewConfirmedIds={meshViewConfirmedIds}
+                  />
+                </Box>
+                <Box height={detailHeight} borderStyle="single" borderColor={theme.border.normal}>
+                  <PacketInspector packet={selectedPacket} activeTab={inspectorTab} height={detailHeight - 2} nodeStore={nodeStore} scrollOffset={inspectorScrollOffset} meshViewUrl={localMeshViewUrl} useFahrenheit={useFahrenheit} />
+                </Box>
               </Box>
-              <Box height={detailHeight} borderStyle="single" borderColor={theme.border.normal}>
-                <PacketInspector packet={selectedPacket} activeTab={inspectorTab} height={detailHeight - 2} nodeStore={nodeStore} scrollOffset={inspectorScrollOffset} meshViewUrl={localMeshViewUrl} useFahrenheit={useFahrenheit} />
-              </Box>
-            </Box>
+            </ErrorBoundary>
           );
         })()}
 
@@ -3079,71 +3082,78 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               )
             : nodes, nodesSortKey, nodesSortAscending);
           return (
-            <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
-              <NodesPanel
-                nodes={filteredNodes}
-                selectedIndex={selectedNodeIndex}
-                height={terminalHeight - 6}
-                filter={nodesFilter}
-                filterInputActive={nodesFilterInput}
-                sortKey={nodesSortKey}
-                sortAscending={nodesSortAscending}
-                terminalWidth={terminalWidth}
-              />
-            </Box>
+            <ErrorBoundary context="Nodes Panel">
+              <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
+                <NodesPanel
+                  nodes={filteredNodes}
+                  selectedIndex={selectedNodeIndex}
+                  height={terminalHeight - 6}
+                  filter={nodesFilter}
+                  filterInputActive={nodesFilterInput}
+                  sortKey={nodesSortKey}
+                  sortAscending={nodesSortAscending}
+                  terminalWidth={terminalWidth}
+                />
+              </Box>
+            </ErrorBoundary>
           );
         })()}
 
         {mode === "chat" && (
-          <Box flexGrow={1} flexDirection="column">
-            <ChatPanel
-              messages={messages}
-              channel={chatChannel}
-              channels={channels}
-              input={chatInput}
-              inputFocused={chatInputFocused}
-              nodeStore={nodeStore}
-              myNodeNum={myNodeNum}
-              height={terminalHeight - 4}
-              width={terminalWidth}
-              selectedMessageIndex={selectedChatMessageIndex}
-              showEmojiSelector={showEmojiSelector}
-              emojiSelectorIndex={emojiSelectorIndex}
-              loraConfig={loraConfig}
-              filter={chatFilter}
-              filterInputActive={chatFilterInput}
-              meshViewConfirmedIds={meshViewConfirmedIds}
-              replyTo={chatReplyTo}
-            />
-          </Box>
+          <ErrorBoundary context="Chat Panel">
+            <Box flexGrow={1} flexDirection="column">
+              <ChatPanel
+                messages={messages}
+                channel={chatChannel}
+                channels={channels}
+                input={chatInput}
+                inputFocused={chatInputFocused}
+                nodeStore={nodeStore}
+                myNodeNum={myNodeNum}
+                height={terminalHeight - 4}
+                width={terminalWidth}
+                selectedMessageIndex={selectedChatMessageIndex}
+                showEmojiSelector={showEmojiSelector}
+                emojiSelectorIndex={emojiSelectorIndex}
+                loraConfig={loraConfig}
+                filter={chatFilter}
+                filterInputActive={chatFilterInput}
+                meshViewConfirmedIds={meshViewConfirmedIds}
+                replyTo={chatReplyTo}
+              />
+            </Box>
+          </ErrorBoundary>
         )}
 
         {mode === "dm" && (() => {
           const contentHeight = terminalHeight - 4;
           return (
-            <Box height={contentHeight} borderStyle="single" borderColor={theme.border.normal}>
-              <DMPanel
-                conversations={dmConversations}
-                messages={dmMessages}
-                selectedConvoIndex={selectedDMConvoIndex}
-                selectedMessageIndex={selectedDMMessageIndex}
-                inputFocused={dmInputFocused}
-                input={dmInput}
-                nodeStore={nodeStore}
-                myNodeNum={myNodeNum}
-                height={contentHeight - 2}
-                width={terminalWidth}
-                deleteConfirm={dmDeleteConfirm}
-                meshViewConfirmedIds={meshViewConfirmedIds}
-                replyTo={dmReplyTo}
-              />
-            </Box>
+            <ErrorBoundary context="DM Panel">
+              <Box height={contentHeight} borderStyle="single" borderColor={theme.border.normal}>
+                <DMPanel
+                  conversations={dmConversations}
+                  messages={dmMessages}
+                  selectedConvoIndex={selectedDMConvoIndex}
+                  selectedMessageIndex={selectedDMMessageIndex}
+                  inputFocused={dmInputFocused}
+                  input={dmInput}
+                  nodeStore={nodeStore}
+                  myNodeNum={myNodeNum}
+                  height={contentHeight - 2}
+                  width={terminalWidth}
+                  deleteConfirm={dmDeleteConfirm}
+                  meshViewConfirmedIds={meshViewConfirmedIds}
+                  replyTo={dmReplyTo}
+                />
+              </Box>
+            </ErrorBoundary>
           );
         })()}
 
         {mode === "config" && (
-          <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
-            <ConfigPanel
+          <ErrorBoundary context="Config Panel">
+            <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
+              <ConfigPanel
               section={configSection}
               selectedMenuIndex={configMenuIndex}
               height={terminalHeight - 6}
@@ -3179,18 +3189,21 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               batchEditMode={batchEditMode}
               batchEditCount={batchEditCount}
             />
-          </Box>
+            </Box>
+          </ErrorBoundary>
         )}
 
         {mode === "log" && (
-          <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
-            <LogPanel
+          <ErrorBoundary context="Log Panel">
+            <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
+              <LogPanel
               responses={logResponses}
               selectedIndex={selectedLogIndex}
               height={terminalHeight - 6}
               nodeStore={nodeStore}
             />
-          </Box>
+            </Box>
+          </ErrorBoundary>
         )}
 
         {mode === "meshview" && (() => {
@@ -3202,27 +3215,29 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
             : meshViewInspectorHeight;
 
           return (
-            <>
-              <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
-                <MeshViewPacketList
-                  packets={meshViewPackets}
-                  selectedIndex={selectedMeshViewIndex}
-                  height={listHeight}
-                  error={meshViewError}
-                  useFahrenheit={useFahrenheit}
-                />
-              </Box>
-              <Box height={detailHeight} borderStyle="single" borderColor={theme.border.normal}>
-                <MeshViewInspector
-                  packet={meshViewPackets[selectedMeshViewIndex]}
-                  activeTab={meshViewInspectorTab}
-                  height={detailHeight - 2}
-                  scrollOffset={meshViewInspectorScrollOffset}
-                  meshViewUrl={localMeshViewUrl}
-                  useFahrenheit={useFahrenheit}
-                />
-              </Box>
-            </>
+            <ErrorBoundary context="MeshView Panel">
+              <>
+                <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
+                  <MeshViewPacketList
+                    packets={meshViewPackets}
+                    selectedIndex={selectedMeshViewIndex}
+                    height={listHeight}
+                    error={meshViewError}
+                    useFahrenheit={useFahrenheit}
+                  />
+                </Box>
+                <Box height={detailHeight} borderStyle="single" borderColor={theme.border.normal}>
+                  <MeshViewInspector
+                    packet={meshViewPackets[selectedMeshViewIndex]}
+                    activeTab={meshViewInspectorTab}
+                    height={detailHeight - 2}
+                    scrollOffset={meshViewInspectorScrollOffset}
+                    meshViewUrl={localMeshViewUrl}
+                    useFahrenheit={useFahrenheit}
+                  />
+                </Box>
+              </>
+            </ErrorBoundary>
           );
         })()}
       </Box>
