@@ -55,8 +55,10 @@ process.on("uncaughtException", (error) => {
   logError("UNCAUGHT EXCEPTION", error);
   Logger.error("Process", "Uncaught exception", error);
   Logger.shutdown();
+  // Use console.error for fatal errors as Logger may not be available
   console.error("Fatal error:", error.message);
   console.error(`Stack trace saved to ${ERROR_LOG_PATH}`);
+  db.closeDb();
   process.exit(1);
 });
 
@@ -66,7 +68,9 @@ process.on("unhandledRejection", (reason) => {
     reason: String(reason)
   });
   Logger.shutdown();
+  // Use console.error for fatal errors as Logger may not be available
   console.error("Unhandled promise rejection:", reason);
+  db.closeDb();
   process.exit(1);
 });
 
