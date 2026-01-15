@@ -74,12 +74,15 @@ export class HttpTransport implements Transport {
     let useTlsFlag = tls;
     
     if (!hasPort) {
-      // If no port in address, use provided port or default to 4403
-      const defaultPort = port || 4403;
-      addressWithPort = `${address}:${defaultPort}`;
+      // If no port in address and port is explicitly provided, use it
+      // Otherwise, don't add a port (use default HTTP/HTTPS port 80/443)
+      if (port !== undefined) {
+        addressWithPort = `${address}:${port}`;
+      }
+      // If no port provided and no port in address, use default HTTP port (no :port in URL)
     }
     // If port is provided via flag but address also has a port, flag takes precedence
-    else if (port) {
+    else if (port !== undefined) {
       // Extract hostname/IP from address
       const hostnameMatch = address.match(/^(.+):\d+$/);
       if (hostnameMatch) {
@@ -99,11 +102,36 @@ export class HttpTransport implements Transport {
 
     Logger.info("HttpTransport", "Attempting connection", { address, tls: useTlsFlag, url });
     
-    // Skip strict connection test - start polling immediately
-    // The polling loop will handle connection errors gracefully
-    // This is more resilient for cases where the server accepts connections
-    // but endpoints may hang or require specific conditions
-    Logger.info("HttpTransport", "Starting transport (connection will be verified during polling)", { url, insecure });
+    // Perform initial connection test with short timeout for immediate feedback
+    // This helps users know if the address/port is wrong before polling starts
+    try {
+      Logger.info("HttpTransport", "Testing initial connection", { url });
+      const testResponse = await fetch(`${url}/api/v1/fromradio?all=false`, getFetchOptions(url, insecure, {
+        method: "GET",
+        headers: { Accept: "application/x-protobuf" },
+        signal: AbortSignal.timeout(3000), // Short timeout for initial test
+      }));
+      if (!testResponse.ok) {
+        Logger.warn("HttpTransport", "Initial connection test returned non-OK status", { 
+          status: testResponse.status, 
+          statusText: testResponse.statusText,
+          url
+        });
+        // Don't throw - continue anyway, polling will handle it
+      } else {
+        Logger.info("HttpTransport", "Initial connection test successful", { url });
+      }
+    } catch (error) {
+      // Log the error with URL for debugging
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      Logger.warn("HttpTransport", "Initial connection test failed (will retry during polling)", error as Error, { 
+        url,
+        error: errorMsg
+      });
+      // Don't throw - start polling anyway to allow retries
+    }
+    
+    Logger.info("HttpTransport", "Starting transport and polling", { url, insecure });
     const transport = new HttpTransport(url, insecure);
     transport.startPolling();
     return transport;
@@ -174,20 +202,23 @@ export class HttpTransport implements Transport {
             30000 // Max 30 seconds
           );
           
-          this.emit({
-            type: "status",
-            status: "disconnected",
-            reason: e instanceof Error ? e.message : "unknown",
-          });
-
           // Stop polling if too many consecutive errors
           if (this.consecutiveErrors >= this.MAX_CONSECUTIVE_ERRORS) {
             Logger.error("HttpTransport", "Too many consecutive errors, stopping polling", undefined, {
               consecutiveErrors: this.consecutiveErrors
             });
+            this.emit({
+              type: "status",
+              status: "disconnected",
+              reason: e instanceof Error ? e.message : "unknown",
+            });
             this.running = false;
             return;
           }
+          
+          // While actively retrying, keep status as "connecting" to show we're still trying
+          // Only emit disconnected when we've given up (handled above)
+          // This provides better UX - user sees "connecting" while we're actively retrying
 
           await new Promise((r) => setTimeout(r, backoffDelay));
           continue; // Skip normal poll interval after backoff

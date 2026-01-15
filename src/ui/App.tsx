@@ -153,7 +153,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   // Connect to device
   useEffect(() => {
     let cancelled = false;
-    Logger.info("App", "Initiating device connection", { address });
+    setConnectError(null); // Clear any previous errors
+    Logger.info("App", "Initiating device connection", { address, useTls, httpPort, insecure });
     (async () => {
       try {
         const t = await HttpTransport.create(address, useTls, httpPort, insecure);
@@ -165,8 +166,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         if (!cancelled) {
           const msg = e instanceof Error ? e.message : String(e);
           Logger.error("App", "Connection failed", e as Error, { address });
-          console.error(`Connection failed: ${msg}`);
-          process.exit(1);
+          setConnectError(msg);
+          // Don't exit immediately - let user see the error and quit manually
         }
       }
     })();
@@ -176,7 +177,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       }
       cancelled = true;
     };
-  }, [address]);
+  }, [address, useTls, httpPort, insecure]);
 
   // Track terminal resize with 500ms debounce
   useEffect(() => {
@@ -961,13 +962,20 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               reason: (output as any).reason,
             });
             setStatus(output.status);
-            if (output.status === "connected" && !configRequested) {
-              Logger.info("App", "Connected - requesting config", { skipConfig, skipNodes });
-              configRequested = true;
-              if (!skipConfig) {
-                requestConfig(skipNodes);
+            // Clear error on successful connection
+            if (output.status === "connected") {
+              setConnectError(null);
+              if (!configRequested) {
+                Logger.info("App", "Connected - requesting config", { skipConfig, skipNodes });
+                configRequested = true;
+                if (!skipConfig) {
+                  requestConfig(skipNodes);
+                }
+                fetchOwnerFallback();
               }
-              fetchOwnerFallback();
+            } else if (output.status === "disconnected" && (output as any).reason) {
+              // Show connection error reason to user
+              setConnectError((output as any).reason);
             }
           } else if (output.type === "packet") {
             Logger.debug("App", "Processing packet from device");
@@ -3403,6 +3411,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       {/* Status bar */}
       <Box height={1} paddingX={1} flexWrap="nowrap" overflow="hidden">
         <Text color={statusColor}>{status.toUpperCase()}</Text>
+        {status === "disconnected" && connectError && (
+          <>
+            <Text color={theme.fg.muted}> | </Text>
+            <Text color={theme.packet.encrypted}>{connectError}</Text>
+          </>
+        )}
         <Text color={theme.fg.muted}> | </Text>
         <Text color={theme.fg.secondary}>{packets.length} pkts</Text>
         <Text color={theme.fg.muted}> | </Text>
