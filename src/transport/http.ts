@@ -6,6 +6,32 @@ import { validateUrl } from "../utils/safe-exec";
 const POLL_INTERVAL_MS = parseInt(process.env.MESHTASTIC_POLL_INTERVAL_MS || "3000", 10);
 const TIMEOUT_MS = parseInt(process.env.MESHTASTIC_TIMEOUT_MS || "5000", 10);
 
+// Helper to check if URL is localhost (for self-signed cert handling)
+function isLocalhost(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname.startsWith("127.") || hostname === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
+// Helper to create fetch options with TLS configuration for self-signed certs
+function getFetchOptions(url: string, insecure: boolean, additionalOptions: RequestInit = {}): RequestInit {
+  const options: RequestInit = { ...additionalOptions };
+  
+  // Accept self-signed certificates if insecure flag is set or if connecting to localhost
+  if (url.startsWith("https://") && (insecure || isLocalhost(url))) {
+    // Bun's fetch supports tls option to configure TLS
+    (options as any).tls = {
+      rejectUnauthorized: false,
+    };
+  }
+  
+  return options;
+}
+
 // Validate timeout values
 if (isNaN(POLL_INTERVAL_MS) || POLL_INTERVAL_MS < 100 || POLL_INTERVAL_MS > 60000) {
   throw new Error(`Invalid POLL_INTERVAL_MS: ${process.env.MESHTASTIC_POLL_INTERVAL_MS}. Must be between 100 and 60000`);
@@ -16,6 +42,7 @@ if (isNaN(TIMEOUT_MS) || TIMEOUT_MS < 1000 || TIMEOUT_MS > 60000) {
 
 export class HttpTransport implements Transport {
   private url: string;
+  private insecure: boolean;
   private running = false;
   private outputs: DeviceOutput[] = [];
   private resolvers: Array<(value: IteratorResult<DeviceOutput>) => void> = [];
@@ -24,11 +51,12 @@ export class HttpTransport implements Transport {
   private consecutiveErrors = 0;
   private readonly MAX_CONSECUTIVE_ERRORS = 10;
 
-  constructor(url: string) {
+  constructor(url: string, insecure = false) {
     this.url = url.replace(/\/$/, "");
+    this.insecure = insecure;
   }
 
-  static async create(address: string, tls = false): Promise<HttpTransport> {
+  static async create(address: string, tls = false, port?: number, insecure = false): Promise<HttpTransport> {
     // Validate address format
     try {
       // Basic validation - address should not contain protocol
@@ -40,7 +68,26 @@ export class HttpTransport implements Transport {
       throw error;
     }
 
-    const url = `${tls ? "https" : "http"}://${address}`;
+    // Check if address already includes a port
+    const hasPort = /:\d+$/.test(address) || /]:\d+$/.test(address);
+    let addressWithPort = address;
+    let useTlsFlag = tls;
+    
+    if (!hasPort) {
+      // If no port in address, use provided port or default to 4403
+      const defaultPort = port || 4403;
+      addressWithPort = `${address}:${defaultPort}`;
+    }
+    // If port is provided via flag but address also has a port, flag takes precedence
+    else if (port) {
+      // Extract hostname/IP from address
+      const hostnameMatch = address.match(/^(.+):\d+$/);
+      if (hostnameMatch) {
+        addressWithPort = `${hostnameMatch[1]}:${port}`;
+      }
+    }
+
+    const url = `${useTlsFlag ? "https" : "http"}://${addressWithPort}`;
     
     // Validate the constructed URL
     try {
@@ -50,20 +97,16 @@ export class HttpTransport implements Transport {
       throw error;
     }
 
-    Logger.info("HttpTransport", "Attempting connection", { address, tls, url });
-    try {
-      await fetch(`${url}/api/v1/fromradio`, {
-        method: "GET",
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-      Logger.info("HttpTransport", "Connection successful", { url });
-      const transport = new HttpTransport(url);
-      transport.startPolling();
-      return transport;
-    } catch (error) {
-      Logger.error("HttpTransport", "Connection failed", error as Error, { url });
-      throw error;
-    }
+    Logger.info("HttpTransport", "Attempting connection", { address, tls: useTlsFlag, url });
+    
+    // Skip strict connection test - start polling immediately
+    // The polling loop will handle connection errors gracefully
+    // This is more resilient for cases where the server accepts connections
+    // but endpoints may hang or require specific conditions
+    Logger.info("HttpTransport", "Starting transport (connection will be verified during polling)", { url, insecure });
+    const transport = new HttpTransport(url, insecure);
+    transport.startPolling();
+    return transport;
   }
 
   private startPolling() {
@@ -87,11 +130,11 @@ export class HttpTransport implements Transport {
         let batchCount = 0;
         while (gotPacket && this.running && batchCount < 50) {
           Logger.debug("HttpTransport", "Polling for packets", { url: `${this.url}/api/v1/fromradio` });
-          const response = await fetch(`${this.url}/api/v1/fromradio?all=false`, {
+          const response = await fetch(`${this.url}/api/v1/fromradio?all=false`, getFetchOptions(this.url, this.insecure, {
             method: "GET",
             headers: { Accept: "application/x-protobuf" },
             signal: AbortSignal.timeout(TIMEOUT_MS),
-          });
+          }));
 
           if (!response.ok) {
             Logger.warn("HttpTransport", "HTTP error response", { status: response.status, statusText: response.statusText });
@@ -197,12 +240,12 @@ export class HttpTransport implements Transport {
   async send(data: Uint8Array): Promise<void> {
     Logger.info("HttpTransport", "Sending packet", { size: data.byteLength, url: `${this.url}/api/v1/toradio` });
     try {
-      const response = await fetch(`${this.url}/api/v1/toradio`, {
+      const response = await fetch(`${this.url}/api/v1/toradio`, getFetchOptions(this.url, this.insecure, {
         method: "PUT",
         headers: { "Content-Type": "application/x-protobuf" },
         body: Buffer.from(data),
         signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
+      }));
       if (!response.ok) {
         Logger.error("HttpTransport", "Send failed", undefined, { status: response.status, statusText: response.statusText });
         throw new Error(`HTTP ${response.status}`);
@@ -229,11 +272,11 @@ export class HttpTransport implements Transport {
     // Try /json/nodes endpoint to find local node (node with hopsAway=0 or smallest num)
     Logger.debug("HttpTransport", "Fetching owner info", { url: `${this.url}/json/nodes` });
     try {
-      const response = await fetch(`${this.url}/json/nodes`, {
+      const response = await fetch(`${this.url}/json/nodes`, getFetchOptions(this.url, this.insecure, {
         method: "GET",
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
+      }));
       if (!response.ok) {
         Logger.warn("HttpTransport", "Failed to fetch owner", { status: response.status });
         return null;

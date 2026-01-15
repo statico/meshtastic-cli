@@ -95,9 +95,12 @@ interface AppProps {
   skipNodes?: boolean;
   meshViewUrl?: string;
   useFahrenheit?: boolean;
+  httpPort?: number;
+  useTls?: boolean;
+  insecure?: boolean;
 }
 
-export function App({ address, packetStore, nodeStore, skipConfig = false, skipNodes = false, meshViewUrl, useFahrenheit = false }: AppProps) {
+export function App({ address, packetStore, nodeStore, skipConfig = false, skipNodes = false, meshViewUrl, useFahrenheit = false, httpPort, useTls = false, insecure = false }: AppProps) {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const [transport, setTransport] = useState<Transport | null>(null);
@@ -153,7 +156,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     Logger.info("App", "Initiating device connection", { address });
     (async () => {
       try {
-        const t = await HttpTransport.create(address);
+        const t = await HttpTransport.create(address, useTls, httpPort, insecure);
         if (!cancelled) {
           Logger.info("App", "Transport created successfully", { address });
           setTransport(t);

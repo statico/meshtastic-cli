@@ -109,6 +109,9 @@ let meshViewUrl: string | undefined;
 let useFahrenheit = false;
 let enableLogging = true;
 let packetLimit = 1000;
+let httpPort: number | undefined;
+let useTls = false;
+let insecure = false;
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
@@ -148,6 +151,22 @@ for (let i = 0; i < args.length; i++) {
       process.exit(1);
     }
     packetLimit = limit;
+  } else if (arg === "--port" || arg === "-P") {
+    const portArg = args[++i];
+    if (!portArg) {
+      console.error("--port requires a port number");
+      process.exit(1);
+    }
+    const port = parseInt(portArg, 10);
+    if (isNaN(port) || port < 1 || port > 65535) {
+      console.error("Port must be between 1 and 65535");
+      process.exit(1);
+    }
+    httpPort = port;
+  } else if (arg === "--tls" || arg === "-T") {
+    useTls = true;
+  } else if (arg === "--insecure" || arg === "-k") {
+    insecure = true;
   } else if (arg === "--help" || arg === "-h") {
     console.log(`
 Meshtastic CLI Viewer
@@ -165,6 +184,9 @@ Options:
   --meshview, -m        MeshView URL for packet/node links (default: from settings or disabled)
   --fahrenheit, -F      Display temperatures in Fahrenheit instead of Celsius
   --packet-limit, -p    Maximum packets to store in database (default: 1000)
+  --port, -P            HTTP port number (default: 4403 if no port in address)
+  --tls, -T             Use HTTPS instead of HTTP
+  --insecure, -k        Accept self-signed SSL certificates
   --enable-logging, -L  Enable verbose logging to ~/.config/meshtastic-cli/log
   --help, -h            Show this help message
 `);
@@ -239,6 +261,9 @@ const { waitUntilExit } = render(
     skipNodes,
     meshViewUrl: resolvedMeshViewUrl,
     useFahrenheit,
+    httpPort,
+    useTls,
+    insecure,
   })
 );
 

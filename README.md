@@ -94,7 +94,34 @@ Options:
   --skip-nodes       Skip downloading node database (faster connect)
   --meshview, -m     MeshView URL for packet/node links
   --fahrenheit, -F   Display temperatures in Fahrenheit
+  --port, -P         HTTP port number (default: 4403 if no port in address)
+  --tls, -T          Use HTTPS instead of HTTP
+  --insecure, -k     Accept self-signed SSL certificates
   --help, -h         Show help
+```
+
+### Examples
+
+Connect to a Meshtastic device (default port 4403):
+```sh
+meshtastic-cli 192.168.0.123
+```
+
+Connect to meshtasticd HTTP API (port 8080 with HTTPS):
+```sh
+meshtastic-cli 127.0.0.1 --port 8080 --tls --insecure
+```
+
+> **Note:** meshtasticd servers need to have the webserver enabled. The webserver typically runs on port 8080 with HTTPS. Check your meshtasticd configuration to ensure the webserver is enabled.
+
+Connect to a device on a custom port:
+```sh
+meshtastic-cli 192.168.1.100 --port 8080
+```
+
+Connect with HTTPS and accept self-signed certificate:
+```sh
+meshtastic-cli example.com --tls --insecure
 ```
 
 ## Message Status Indicators
