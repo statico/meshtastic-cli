@@ -773,16 +773,20 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       // Rate limiting check
       const now = Date.now();
       const timeSinceLastRequest = now - meshViewRequestRef.current.lastRequest;
+      
+      // Reset request count FIRST if a minute has passed (before checking limits)
+      // This ensures the counter resets properly even if we're rate-limited
+      if (timeSinceLastRequest > 60000) {
+        meshViewRequestRef.current.requestCount = 0;
+      }
+
+      // Check minimum time between requests
       if (timeSinceLastRequest < MESHVIEW_RATE_LIMIT_MS) {
         Logger.debug("App", "Rate limiting MeshView request", { timeSinceLastRequest });
         return;
       }
 
-      // Reset request count if a minute has passed
-      if (timeSinceLastRequest > 60000) {
-        meshViewRequestRef.current.requestCount = 0;
-      }
-
+      // Check maximum requests per minute
       if (meshViewRequestRef.current.requestCount >= MESHVIEW_MAX_REQUESTS_PER_MINUTE) {
         Logger.warn("App", "MeshView rate limit exceeded", { 
           requestCount: meshViewRequestRef.current.requestCount 
