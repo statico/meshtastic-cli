@@ -26,7 +26,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import * as db from "../db";
 import { toBinary, create } from "@bufbuild/protobuf";
 import { formatNodeId, getHardwareModelName } from "../utils";
-import { setSetting } from "../settings";
+import { setSetting, loadSettings } from "../settings";
 import packageJson from "../../package.json";
 import { Logger } from "../logger";
 import { safeOpenUrl, validateUrl } from "../utils/safe-exec";
@@ -256,6 +256,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const [configSection, setConfigSection] = useState<ConfigSection>("menu");
   const [configMenuIndex, setConfigMenuIndex] = useState(0);
   const [configLoading, setConfigLoading] = useState(false);
+  const [pendingConfigType, setPendingConfigType] = useState<ConfigSection | null>(null);
+  const [pendingChannels, setPendingChannels] = useState<Set<number>>(new Set());
+  const configTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [deviceConfig, setDeviceConfig] = useState<Config.Config_DeviceConfig>();
   const [positionConfig, setPositionConfig] = useState<Config.Config_PositionConfig>();
   const [powerConfig, setPowerConfig] = useState<Config.Config_PowerConfig>();
@@ -283,7 +286,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const [configEditValue, setConfigEditValue] = useState("");
   const [selectedChannelIndex, setSelectedChannelIndex] = useState(0);
   const [selectedConfigFieldIndex, setSelectedConfigFieldIndex] = useState(0);
-  const [localMeshViewUrl, setLocalMeshViewUrl] = useState<string | undefined>(meshViewUrl);
+  // Initialize localMeshViewUrl from prop or settings
+  const [localMeshViewUrl, setLocalMeshViewUrl] = useState<string | undefined>(() => {
+    if (meshViewUrl) return meshViewUrl;
+    const settings = loadSettings();
+    return settings.meshViewUrl;
+  });
 
   // MeshView firehose state
   const [meshViewPackets, setMeshViewPackets] = useState<MeshViewPacket[]>([]);
@@ -558,82 +566,117 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           from: mp.from,
           variantCase: adminMsg.payloadVariant.case,
         });
-        setConfigLoading(false);
+
+        const clearLoadingIfMatch = (expectedSection: ConfigSection | null) => {
+          if (pendingConfigType === expectedSection) {
+            if (configTimeoutRef.current) {
+              clearTimeout(configTimeoutRef.current);
+              configTimeoutRef.current = null;
+            }
+            setConfigLoading(false);
+            setPendingConfigType(null);
+          }
+        };
 
         switch (adminMsg.payloadVariant.case) {
           case "getConfigResponse": {
             const config = adminMsg.payloadVariant.value;
+            let matchedSection: ConfigSection | null = null;
             switch (config.payloadVariant.case) {
               case "device":
                 setDeviceConfig(config.payloadVariant.value);
+                matchedSection = "device";
                 break;
               case "position":
                 setPositionConfig(config.payloadVariant.value);
+                matchedSection = "position";
                 break;
               case "power":
                 setPowerConfig(config.payloadVariant.value);
+                matchedSection = "power";
                 break;
               case "network":
                 setNetworkConfig(config.payloadVariant.value);
+                matchedSection = "network";
                 break;
               case "display":
                 setDisplayConfig(config.payloadVariant.value);
+                matchedSection = "display";
                 break;
               case "lora":
                 setLoraConfig(config.payloadVariant.value);
+                matchedSection = "lora";
                 break;
               case "bluetooth":
                 setBluetoothConfig(config.payloadVariant.value);
+                matchedSection = "bluetooth";
                 break;
               case "security":
                 setSecurityConfig(config.payloadVariant.value);
+                matchedSection = "security";
                 break;
             }
+            clearLoadingIfMatch(matchedSection);
             break;
           }
           case "getModuleConfigResponse": {
             const moduleConfig = adminMsg.payloadVariant.value;
+            let matchedSection: ConfigSection | null = null;
             switch (moduleConfig.payloadVariant.case) {
               case "mqtt":
                 setMqttConfig(moduleConfig.payloadVariant.value);
+                matchedSection = "mqtt";
                 break;
               case "serial":
                 setSerialConfig(moduleConfig.payloadVariant.value);
+                matchedSection = "serial";
                 break;
               case "externalNotification":
                 setExtNotifConfig(moduleConfig.payloadVariant.value);
+                matchedSection = "extnotif";
                 break;
               case "storeForward":
                 setStoreForwardConfig(moduleConfig.payloadVariant.value);
+                matchedSection = "storeforward";
                 break;
               case "rangeTest":
                 setRangeTestConfig(moduleConfig.payloadVariant.value);
+                matchedSection = "rangetest";
                 break;
               case "telemetry":
                 setTelemetryConfig(moduleConfig.payloadVariant.value);
+                matchedSection = "telemetry";
                 break;
               case "cannedMessage":
                 setCannedMsgConfig(moduleConfig.payloadVariant.value);
+                matchedSection = "cannedmsg";
                 break;
               case "audio":
                 setAudioConfig(moduleConfig.payloadVariant.value);
+                matchedSection = "audio";
                 break;
               case "remoteHardware":
                 setRemoteHwConfig(moduleConfig.payloadVariant.value);
+                matchedSection = "remotehw";
                 break;
               case "neighborInfo":
                 setNeighborInfoConfig(moduleConfig.payloadVariant.value);
+                matchedSection = "neighborinfo";
                 break;
               case "ambientLighting":
                 setAmbientLightConfig(moduleConfig.payloadVariant.value);
+                matchedSection = "ambientlight";
                 break;
               case "detectionSensor":
                 setDetectionSensorConfig(moduleConfig.payloadVariant.value);
+                matchedSection = "detectionsensor";
                 break;
               case "paxcounter":
                 setPaxcounterConfig(moduleConfig.payloadVariant.value);
+                matchedSection = "paxcounter";
                 break;
             }
+            clearLoadingIfMatch(matchedSection);
             break;
           }
           case "getChannelResponse": {
@@ -644,10 +687,29 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               next[idx] = channel;
               return next;
             });
+            // For channels, track which ones we've received
+            if (pendingConfigType === "channels") {
+              setPendingChannels((prev) => {
+                const updated = new Set(prev);
+                updated.add(channel.index);
+                // If we've received all 8 channels (0-7), clear loading
+                if (updated.size >= 8) {
+                  if (configTimeoutRef.current) {
+                    clearTimeout(configTimeoutRef.current);
+                    configTimeoutRef.current = null;
+                  }
+                  setConfigLoading(false);
+                  setPendingConfigType(null);
+                  return new Set();
+                }
+                return updated;
+              });
+            }
             break;
           }
           case "getOwnerResponse": {
             setConfigOwner(adminMsg.payloadVariant.value);
+            clearLoadingIfMatch("user");
             break;
           }
         }
@@ -665,6 +727,16 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
 
   // MeshView cache (5 second TTL)
   const meshViewCacheRef = useRef<{ data: any[]; timestamp: number } | null>(null);
+
+  // Cleanup timeout on unmount or config section change
+  useEffect(() => {
+    return () => {
+      if (configTimeoutRef.current) {
+        clearTimeout(configTimeoutRef.current);
+        configTimeoutRef.current = null;
+      }
+    };
+  }, [configSection]);
 
   useEffect(() => {
     const unsubscribe = packetStore.onPacket((packet) => {
@@ -723,14 +795,17 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         const since = meshViewStoreRef.current.getLatestImportTime();
         // Validate URL before fetching
         validateUrl(localMeshViewUrl);
-        const url = since
-          ? `${localMeshViewUrl}/api/packets?since=${since}&limit=100`
-          : `${localMeshViewUrl}/api/packets?limit=100`;
+        // Use URLSearchParams for all query parameters to ensure proper encoding
+        const url = new URL(`${localMeshViewUrl}/api/packets`);
+        if (since) {
+          url.searchParams.set("since", String(since));
+        }
+        url.searchParams.set("limit", "100");
         
         meshViewRequestRef.current.lastRequest = now;
         meshViewRequestRef.current.requestCount++;
         
-        const response = await fetch(url);
+        const response = await fetch(url.toString());
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data: MeshViewApiResponse = await response.json();
         if (data.packets?.length > 0) {
@@ -777,10 +852,13 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       try {
         // Validate URL before fetching
         validateUrl(localMeshViewUrl);
-        const url = latestTime
-          ? `${localMeshViewUrl}/api/packets?since=${latestTime}&limit=100`
-          : `${localMeshViewUrl}/api/packets?limit=100`;
-        const response = await fetch(url);
+        // Use URLSearchParams for all query parameters to ensure proper encoding
+        const url = new URL(`${localMeshViewUrl}/api/packets`);
+        if (latestTime) {
+          url.searchParams.set("since", String(latestTime));
+        }
+        url.searchParams.set("limit", "100");
+        const response = await fetch(url.toString());
         if (!response.ok) return;
         const data: MeshViewApiResponse = await response.json();
         if (data.packets?.length > 0) {
@@ -1317,7 +1395,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       try {
         // Validate URL before fetching
         validateUrl(localMeshViewUrl);
-        const url = `${localMeshViewUrl}/api/nodes?days_active=30`;
+        // Use URLSearchParams for all query parameters to ensure proper encoding
+        const url = new URL(`${localMeshViewUrl}/api/nodes`);
+        url.searchParams.set("days_active", "30");
         const response = await fetch(url);
         if (!response.ok) {
           showNotification(`MeshView error: ${response.status}`);
@@ -1379,7 +1459,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       try {
         // Validate URL before fetching
         validateUrl(localMeshViewUrl);
-        const url = `${localMeshViewUrl}/api/nodes?days_active=30`;
+        // Use URLSearchParams for all query parameters to ensure proper encoding
+        const url = new URL(`${localMeshViewUrl}/api/nodes`);
+        url.searchParams.set("days_active", "30");
         const response = await fetch(url);
         if (!response.ok) {
           showNotification(`MeshView error: ${response.status}`);
@@ -1437,9 +1519,33 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       showNotification("Waiting for node info...");
       return;
     }
+
+    // Clear any existing timeout
+    if (configTimeoutRef.current) {
+      clearTimeout(configTimeoutRef.current);
+      configTimeoutRef.current = null;
+    }
+
+    // Don't set loading for local settings (they're loaded from disk)
+    if (section === "local") {
+      const settings = loadSettings();
+      setLocalMeshViewUrl(settings.meshViewUrl);
+      return;
+    }
+
     setConfigLoading(true);
+    setPendingConfigType(section);
 
     const opts = { myNodeNum };
+    const CONFIG_TIMEOUT_MS = 10000; // 10 second timeout
+
+    // Set up timeout
+    configTimeoutRef.current = setTimeout(() => {
+      setConfigLoading(false);
+      setPendingConfigType(null);
+      showNotification(`Timeout waiting for ${section} config`);
+      configTimeoutRef.current = null;
+    }, CONFIG_TIMEOUT_MS);
 
     try {
       let binary: Uint8Array | null = null;
@@ -1509,27 +1615,38 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.PAXCOUNTER_CONFIG, opts);
           break;
         case "channels":
-          // Request all 8 channels
+          // Request all 8 channels and track which ones we're waiting for
+          setPendingChannels(new Set([0, 1, 2, 3, 4, 5, 6, 7]));
           for (let i = 0; i < 8; i++) {
             const chBinary = adminHelper.createGetChannelRequest(i, opts);
             await transport.send(chBinary);
           }
-          setConfigLoading(false);
+          // Loading will be cleared when all channels are received
           return;
         case "user":
           binary = adminHelper.createGetOwnerRequest(opts);
           break;
         default:
+          if (configTimeoutRef.current) {
+            clearTimeout(configTimeoutRef.current);
+            configTimeoutRef.current = null;
+          }
           setConfigLoading(false);
+          setPendingConfigType(null);
           return;
       }
 
       if (binary) {
         await transport.send(binary);
       }
-    } catch {
-      showNotification("Failed to request config");
+    } catch (error) {
+      if (configTimeoutRef.current) {
+        clearTimeout(configTimeoutRef.current);
+        configTimeoutRef.current = null;
+      }
       setConfigLoading(false);
+      setPendingConfigType(null);
+      showNotification(`Failed to request ${section} config: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }, [myNodeNum, transport, showNotification]);
 
@@ -2620,7 +2737,13 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
             if (item.key === "channels") {
               setSelectedChannelIndex(0);
             }
-            requestConfigSection(item.key);
+            // Load local settings immediately if entering local section
+            if (item.key === "local") {
+              const settings = loadSettings();
+              setLocalMeshViewUrl(settings.meshViewUrl);
+            } else {
+              requestConfigSection(item.key);
+            }
           }
           return;
         }
