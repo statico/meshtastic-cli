@@ -100,7 +100,7 @@ process.on("exit", (code) => {
 
 // Parse CLI arguments
 const args = process.argv.slice(2);
-let address = "192.168.0.123";
+let address: string | undefined;
 let skipConfig = false;
 let skipNodes = false;
 let session = "default";
@@ -152,10 +152,10 @@ for (let i = 0; i < args.length; i++) {
     console.log(`
 Meshtastic CLI Viewer
 
-Usage: meshtastic-cli [address] [options]
+Usage: meshtastic-cli <address> [options]
 
 Arguments:
-  address            Device address (default: 192.168.0.123)
+  address            Device address (required) - IP address, hostname, or serial port
 
 Options:
   --session, -s         Session name for database (default: default)
@@ -177,6 +177,14 @@ Options:
       process.exit(1);
     }
   }
+}
+
+// Require address to be specified
+if (!address) {
+  console.error("Error: Device address is required");
+  console.error("Usage: meshtastic-cli <address> [options]");
+  console.error("Run with --help for more information");
+  process.exit(1);
 }
 
 // Handle --clear option

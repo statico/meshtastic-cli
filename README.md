@@ -82,10 +82,10 @@ bun run dev 192.168.1.100
 ## Usage
 
 ```
-meshtastic-cli [address] [options]
+meshtastic-cli <address> [options]
 
 Arguments:
-  address            Device address (default: 192.168.0.123)
+  address            Device address (required) - IP address, hostname, or serial port
 
 Options:
   --session, -s      Session name for database (default: default)
