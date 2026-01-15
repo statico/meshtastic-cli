@@ -29,14 +29,23 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    Logger.error(
-      "ErrorBoundary",
-      `Error in ${this.props.context || "component"}`,
-      error,
-      {
-        componentStack: errorInfo.componentStack,
-      }
-    );
+    // Fallback to console if Logger fails (e.g., disk full, permissions)
+    // This prevents errors from being silently lost if logging infrastructure fails
+    try {
+      Logger.error(
+        "ErrorBoundary",
+        `Error in ${this.props.context || "component"}`,
+        error,
+        {
+          componentStack: errorInfo.componentStack,
+        }
+      );
+    } catch (logError) {
+      // Fallback logging if Logger itself fails
+      console.error("ErrorBoundary: Failed to log error via Logger", logError);
+      console.error(`ErrorBoundary: Original error in ${this.props.context || "component"}:`, error);
+      console.error("ErrorBoundary: Component stack:", errorInfo.componentStack);
+    }
   }
 
   render() {
