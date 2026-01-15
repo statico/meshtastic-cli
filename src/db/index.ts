@@ -18,6 +18,7 @@ let db: Database | null = null;
 let currentSession = "default";
 let packetRetentionLimit = DEFAULT_PACKET_RETENTION_LIMIT;
 let pruningInProgress = false;
+let pruningQueue: Promise<void> = Promise.resolve();
 
 /**
  * Ensures the database is initialized
@@ -643,27 +644,35 @@ export function getPackets(limit = 1000): DbPacket[] {
 }
 
 export function prunePackets() {
-  // Prevent concurrent pruning operations
-  if (pruningInProgress) {
-    Logger.debug("Database", "Pruning already in progress, skipping");
-    return;
-  }
-
-  pruningInProgress = true;
-  try {
-    const database = ensureDb();
-    const count = (database.query(`SELECT COUNT(*) as count FROM packets`).get() as DbCountResult).count;
-    if (count > packetRetentionLimit) {
-      const toDelete = count - packetRetentionLimit;
-      Logger.debug("Database", "Pruning packets", { current: count, limit: packetRetentionLimit, toDelete });
-      database.run(`DELETE FROM packets WHERE id IN (SELECT id FROM packets ORDER BY timestamp ASC LIMIT ?)`, [toDelete]);
-      Logger.debug("Database", "Packets pruned", { deleted: toDelete });
+  // Use a promise queue to prevent race conditions in async scenarios
+  // Multiple insertPacket() calls can be queued, but only one pruning operation runs at a time
+  pruningQueue = pruningQueue.then(async () => {
+    // Double-check pattern: skip if already in progress (shouldn't happen with queue, but safety check)
+    if (pruningInProgress) {
+      Logger.debug("Database", "Pruning already in progress, skipping");
+      return;
     }
-  } catch (error) {
-    Logger.error("Database", "Error pruning packets", error as Error);
-  } finally {
+
+    pruningInProgress = true;
+    try {
+      const database = ensureDb();
+      const count = (database.query(`SELECT COUNT(*) as count FROM packets`).get() as DbCountResult).count;
+      if (count > packetRetentionLimit) {
+        const toDelete = count - packetRetentionLimit;
+        Logger.debug("Database", "Pruning packets", { current: count, limit: packetRetentionLimit, toDelete });
+        database.run(`DELETE FROM packets WHERE id IN (SELECT id FROM packets ORDER BY timestamp ASC LIMIT ?)`, [toDelete]);
+        Logger.debug("Database", "Packets pruned", { deleted: toDelete });
+      }
+    } catch (error) {
+      Logger.error("Database", "Error pruning packets", error as Error);
+    } finally {
+      pruningInProgress = false;
+    }
+  }).catch((error) => {
+    // Ensure flag is reset even if promise chain fails
     pruningInProgress = false;
-  }
+    Logger.error("Database", "Unexpected error in pruning queue", error as Error);
+  });
 }
 
 export function getPacketCount(): number {
