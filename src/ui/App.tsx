@@ -2015,6 +2015,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         if (pos.latitudeI && pos.longitudeI) {
           const lat = pos.latitudeI / 1e7;
           const lon = pos.longitudeI / 1e7;
+          // Validate lat/lon are finite numbers before constructing URL
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            showNotification("Invalid position data", theme.status.error);
+            return;
+          }
           try {
             const url = new URL("https://www.google.com/maps");
             url.searchParams.set("q", `${lat},${lon}`);
@@ -2197,9 +2202,14 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       }
       if (input === "m" && selectedNode) {
         if (selectedNode.latitudeI != null && selectedNode.longitudeI != null) {
+          const lat = selectedNode.latitudeI / 1e7;
+          const lon = selectedNode.longitudeI / 1e7;
+          // Validate lat/lon are finite numbers before constructing URL
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            showNotification("Invalid position data", theme.status.error);
+            return;
+          }
           try {
-            const lat = selectedNode.latitudeI / 1e7;
-            const lon = selectedNode.longitudeI / 1e7;
             const url = new URL("https://www.google.com/maps");
             url.searchParams.set("q", `${lat},${lon}`);
             safeOpenUrl(url.toString());
