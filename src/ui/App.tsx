@@ -65,9 +65,27 @@ export interface ChannelInfo {
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-// MeshView rate limiting constants
-const MESHVIEW_RATE_LIMIT_MS = 1000; // Minimum time between requests (1 second)
-const MESHVIEW_MAX_REQUESTS_PER_MINUTE = 60; // Maximum requests per minute
+// MeshView rate limiting constants - configurable via environment variables
+const MESHVIEW_RATE_LIMIT_MS = parseInt(
+  process.env.MESHTASTIC_MESHVIEW_RATE_LIMIT_MS || "1000",
+  10
+);
+const MESHVIEW_MAX_REQUESTS_PER_MINUTE = parseInt(
+  process.env.MESHTASTIC_MESHVIEW_MAX_REQUESTS_PER_MINUTE || "60",
+  10
+);
+
+// Validate rate limit values
+if (isNaN(MESHVIEW_RATE_LIMIT_MS) || MESHVIEW_RATE_LIMIT_MS < 100 || MESHVIEW_RATE_LIMIT_MS > 60000) {
+  throw new Error(
+    `Invalid MESHTASTIC_MESHVIEW_RATE_LIMIT_MS: ${process.env.MESHTASTIC_MESHVIEW_RATE_LIMIT_MS}. Must be between 100 and 60000`
+  );
+}
+if (isNaN(MESHVIEW_MAX_REQUESTS_PER_MINUTE) || MESHVIEW_MAX_REQUESTS_PER_MINUTE < 1 || MESHVIEW_MAX_REQUESTS_PER_MINUTE > 1000) {
+  throw new Error(
+    `Invalid MESHTASTIC_MESHVIEW_MAX_REQUESTS_PER_MINUTE: ${process.env.MESHTASTIC_MESHVIEW_MAX_REQUESTS_PER_MINUTE}. Must be between 1 and 1000`
+  );
+}
 
 interface AppProps {
   address: string;
