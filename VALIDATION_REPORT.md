@@ -48,13 +48,14 @@ The action plan in `ANALYSIS_REPORT.md` was created based on an analysis that id
 **Plan Issue:** The plan recommends this fix, but it's already implemented.
 
 ### 4. Race Condition in Packet Pruning
-**Status:** ✅ **FIXED**
+**Status:** ✅ **FIXED (Enhanced)**
 
-- **Current Implementation:** `pruningInProgress` flag exists (line 20 in `src/db/index.ts`)
-- **Implementation:** Prevents concurrent pruning operations (lines 585-603)
-- **Protection:** Uses try/finally to ensure flag is reset
+- **Current Implementation:** Promise queue-based locking (line 21 in `src/db/index.ts`)
+- **Implementation:** Uses promise queue to prevent TOCTOU race conditions in async scenarios
+- **Protection:** Multiple async `insertPacket()` calls safely queue pruning operations
+- **Enhancement:** Replaced boolean flag with promise queue for better async safety
 
-**Plan Issue:** The plan recommends this fix, but it's already implemented.
+**Note:** Original boolean flag approach had a race condition in async scenarios. Now fixed with promise queue.
 
 ### 5. JSON Parsing Error Handling
 **Status:** ✅ **FIXED**
