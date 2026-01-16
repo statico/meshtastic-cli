@@ -1,0 +1,21 @@
+Lora:
+  Module: sx1262
+  CS: 18
+  IRQ: 20
+  Busy: 16
+  Reset: 12
+  TXen: 17
+  RXen: 4
+  DIO3_TCXO_VOLTAGE: true
+  SX126X_MAX_POWER: 8
+  spiSpeed: 1000000
+
+Logging:
+  JSONFile: /var/lib/meshtasticd/all_packets.json
+
+General:
+  MACAddress: a8:27:eb:3a:89:ce
+  MaxNodes: 3000
+  MaxMessageQueue: 1000
+  ConfigDirectory: /etc/meshtasticd/config.d/
+  AvailableDirectory: /etc/meshtasticd/available.d/

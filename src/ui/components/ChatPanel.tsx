@@ -30,7 +30,7 @@ export const FIRMWARE_EMOJIS = [
   { emoji: "💤", name: "zzz" },
 ];
 
-function AnimatedDots() {
+const AnimatedDots = React.memo(() => {
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
@@ -50,7 +50,7 @@ function AnimatedDots() {
       <Text color={theme.fg.muted}>]</Text>
     </Text>
   );
-}
+});
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -83,7 +83,7 @@ interface ChatPanelProps {
 // Prefix width: [HH:MM:SS] (10) + space (1) + name (10) + space (1) = 22 chars
 const PREFIX_WIDTH = 22;
 
-export function ChatPanel({
+function ChatPanelComponent({
   messages,
   channel,
   channels,
@@ -350,6 +350,26 @@ export function ChatPanel({
   );
 }
 
+export const ChatPanel = React.memo(ChatPanelComponent, (prevProps, nextProps) => {
+  // Only re-render if relevant props changed
+  return (
+    prevProps.messages.length === nextProps.messages.length &&
+    prevProps.channel === nextProps.channel &&
+    prevProps.input === nextProps.input &&
+    prevProps.inputFocused === nextProps.inputFocused &&
+    prevProps.height === nextProps.height &&
+    prevProps.width === nextProps.width &&
+    prevProps.selectedMessageIndex === nextProps.selectedMessageIndex &&
+    prevProps.showEmojiSelector === nextProps.showEmojiSelector &&
+    prevProps.emojiSelectorIndex === nextProps.emojiSelectorIndex &&
+    prevProps.filter === nextProps.filter &&
+    prevProps.filterInputActive === nextProps.filterInputActive &&
+    prevProps.replyTo === nextProps.replyTo &&
+    prevProps.channels === nextProps.channels &&
+    prevProps.meshViewConfirmedIds === nextProps.meshViewConfirmedIds
+  );
+});
+
 interface MessageRowProps {
   message: DbMessage;
   nodeStore: NodeStore;
@@ -360,7 +380,7 @@ interface MessageRowProps {
   allMessages: DbMessage[];
 }
 
-function MessageRow({ message, nodeStore, isOwn, isSelected, width, meshViewConfirmedIds, allMessages }: MessageRowProps) {
+const MessageRow = React.memo(function MessageRow({ message, nodeStore, isOwn, isSelected, width, meshViewConfirmedIds, allMessages }: MessageRowProps) {
   const fromName = nodeStore.getNodeName(message.fromNode);
   const time = new Date(message.timestamp * 1000).toLocaleTimeString(undefined, { hour12: false });
   const nameColor = isOwn ? theme.fg.accent : theme.packet.position;
@@ -533,4 +553,16 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, width, meshViewConf
       )}
     </Box>
   );
-}
+}, (prevProps, nextProps) => {
+  // Only re-render if relevant props changed
+  return (
+    prevProps.message.id === nextProps.message.id &&
+    prevProps.message.status === nextProps.message.status &&
+    prevProps.message.text === nextProps.message.text &&
+    prevProps.message.timestamp === nextProps.message.timestamp &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.width === nextProps.width &&
+    prevProps.isOwn === nextProps.isOwn &&
+    prevProps.meshViewConfirmedIds === nextProps.meshViewConfirmedIds
+  );
+});

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Box, Text, useInput, useApp, useStdout } from "ink";
 import { theme } from "./theme";
 import type { DecodedPacket } from "../protocol/decoder";
@@ -130,6 +130,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const [connectError, setConnectError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const packetUpdateQueueRef = useRef<DecodedPacket[]>([]);
+  const packetUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Reboot modal state
   const [showRebootModal, setShowRebootModal] = useState(false);
@@ -770,18 +772,36 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           hasFromRadio: !!packet.fromRadio,
         });
       }
-      setPackets((prev) => {
-        const next = [...prev, packet].slice(-5000);
-        // Auto-scroll only if exactly at the last packet (not just near it)
-        const lastIndex = prev.length - 1;
-        const wasAtEnd = prev.length > 0 && selectedPacketIndexRef.current === lastIndex;
-        if (wasAtEnd) {
-          setSelectedPacketIndex(next.length - 1);
-        }
-        return next;
-      });
+      
+      // Batch packet updates to reduce flickering
+      packetUpdateQueueRef.current.push(packet);
+      
+      if (!packetUpdateTimeoutRef.current) {
+        packetUpdateTimeoutRef.current = setTimeout(() => {
+          const batch = [...packetUpdateQueueRef.current];
+          packetUpdateQueueRef.current = [];
+          packetUpdateTimeoutRef.current = null;
+          
+          setPackets((prev) => {
+            const next = [...prev, ...batch].slice(-5000);
+            // Auto-scroll only if exactly at the last packet (not just near it)
+            const lastIndex = prev.length - 1;
+            const wasAtEnd = prev.length > 0 && selectedPacketIndexRef.current === lastIndex;
+            if (wasAtEnd) {
+              setSelectedPacketIndex(next.length - 1);
+            }
+            return next;
+          });
+        }, 100); // Batch updates every 100ms
+      }
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (packetUpdateTimeoutRef.current) {
+        clearTimeout(packetUpdateTimeoutRef.current);
+        packetUpdateTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   // MeshView firehose polling - poll every second when on meshview tab

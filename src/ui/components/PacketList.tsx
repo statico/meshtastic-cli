@@ -7,7 +7,7 @@ import { Mesh, Portnums, Telemetry, StoreForward, Channel, Config } from "@mesht
 import { formatNodeId, getHardwareModelName } from "../../utils";
 import { fitVisual } from "../../utils/string-width";
 
-function LiveIndicator() {
+const LiveIndicator = React.memo(() => {
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ function LiveIndicator() {
       <Text color={dimGreen}>{frames[pattern[frame]]}</Text>
     </Text>
   );
-}
+});
 
 interface PacketListProps {
   packets: DecodedPacket[];
@@ -66,7 +66,7 @@ function PacketListHeader() {
   );
 }
 
-export function PacketList({ packets, selectedIndex, nodeStore, height = 20, isFollowing, useFahrenheit = false, meshViewConfirmedIds }: PacketListProps) {
+function PacketListComponent({ packets, selectedIndex, nodeStore, height = 20, isFollowing, useFahrenheit = false, meshViewConfirmedIds }: PacketListProps) {
   // Account for LIVE indicator and header taking rows
   const visibleCount = Math.max(1, height - 3 - (isFollowing ? 1 : 0));
 
@@ -376,7 +376,7 @@ interface PacketRowProps {
   meshViewConfirmedIds?: Set<number>;
 }
 
-function PacketRow({ packet, nodeStore, isSelected, useFahrenheit, meshViewConfirmedIds }: PacketRowProps) {
+const PacketRow = React.memo(function PacketRow({ packet, nodeStore, isSelected, useFahrenheit, meshViewConfirmedIds }: PacketRowProps) {
   const time = packet.timestamp.toLocaleTimeString(undefined, { hour12: false });
   const bgColor = isSelected ? theme.bg.selected : undefined;
   const isConfirmedByMeshView = packet.meshPacket?.id && meshViewConfirmedIds?.has(packet.meshPacket.id);
@@ -682,4 +682,24 @@ function PacketRow({ packet, nodeStore, isSelected, useFahrenheit, meshViewConfi
       </Text>
     </Box>
   );
-}
+}, (prevProps, nextProps) => {
+  // Only re-render if relevant props changed
+  return (
+    prevProps.packet.id === nextProps.packet.id &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.useFahrenheit === nextProps.useFahrenheit &&
+    prevProps.meshViewConfirmedIds === nextProps.meshViewConfirmedIds
+  );
+});
+
+export const PacketList = React.memo(PacketListComponent, (prevProps, nextProps) => {
+  // Only re-render if relevant props changed
+  return (
+    prevProps.packets.length === nextProps.packets.length &&
+    prevProps.selectedIndex === nextProps.selectedIndex &&
+    prevProps.height === nextProps.height &&
+    prevProps.isFollowing === nextProps.isFollowing &&
+    prevProps.useFahrenheit === nextProps.useFahrenheit &&
+    prevProps.meshViewConfirmedIds === nextProps.meshViewConfirmedIds
+  );
+});
