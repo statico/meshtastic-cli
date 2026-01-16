@@ -8,7 +8,7 @@ import { fitVisual } from "../../utils/string-width";
 
 const MESSAGE_TIMEOUT_MS = 30000;
 
-function AnimatedDots() {
+const AnimatedDots = React.memo(() => {
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ function AnimatedDots() {
       <Text color={theme.fg.muted}>]</Text>
     </Text>
   );
-}
+});
 
 interface DMPanelProps {
   conversations: DMConversation[];
@@ -49,7 +49,7 @@ interface DMPanelProps {
 // Left panel width: star(1) + space(1) + name(6) + space(1) + id(9) = 18
 const LEFT_PANEL_WIDTH = 20;
 
-export function DMPanel({
+function DMPanelComponent({
   conversations,
   messages,
   selectedConvoIndex,
@@ -218,6 +218,23 @@ export function DMPanel({
   );
 }
 
+export const DMPanel = React.memo(DMPanelComponent, (prevProps, nextProps) => {
+  // Only re-render if relevant props changed
+  return (
+    prevProps.conversations.length === nextProps.conversations.length &&
+    prevProps.messages.length === nextProps.messages.length &&
+    prevProps.selectedConvoIndex === nextProps.selectedConvoIndex &&
+    prevProps.selectedMessageIndex === nextProps.selectedMessageIndex &&
+    prevProps.inputFocused === nextProps.inputFocused &&
+    prevProps.input === nextProps.input &&
+    prevProps.height === nextProps.height &&
+    prevProps.width === nextProps.width &&
+    prevProps.deleteConfirm === nextProps.deleteConfirm &&
+    prevProps.replyTo === nextProps.replyTo &&
+    prevProps.meshViewConfirmedIds === nextProps.meshViewConfirmedIds
+  );
+});
+
 interface MessageRowProps {
   message: DbMessage;
   nodeStore: NodeStore;
@@ -228,7 +245,7 @@ interface MessageRowProps {
   allMessages: DbMessage[];
 }
 
-function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth, meshViewConfirmedIds, allMessages }: MessageRowProps) {
+const MessageRow = React.memo(function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth, meshViewConfirmedIds, allMessages }: MessageRowProps) {
   const fromName = nodeStore.getNodeName(message.fromNode);
   const time = new Date(message.timestamp * 1000).toLocaleTimeString(undefined, { hour12: false });
   const nameColor = isOwn ? theme.fg.accent : theme.packet.position;
@@ -345,7 +362,19 @@ function MessageRow({ message, nodeStore, isOwn, isSelected, textWidth, meshView
       </Text>
     </Box>
   );
-}
+}, (prevProps, nextProps) => {
+  // Only re-render if relevant props changed
+  return (
+    prevProps.message.id === nextProps.message.id &&
+    prevProps.message.status === nextProps.message.status &&
+    prevProps.message.text === nextProps.message.text &&
+    prevProps.message.timestamp === nextProps.message.timestamp &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.textWidth === nextProps.textWidth &&
+    prevProps.isOwn === nextProps.isOwn &&
+    prevProps.meshViewConfirmedIds === nextProps.meshViewConfirmedIds
+  );
+});
 
 // Role name mappings
 const ROLE_NAMES: Record<number, string> = {
