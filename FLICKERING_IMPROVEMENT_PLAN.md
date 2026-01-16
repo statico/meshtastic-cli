@@ -96,17 +96,20 @@ Based on code review and ink library research:
 
 ## Implementation Priority
 
-### Priority 1: Quick Wins (Do First)
-1. ✅ Memoize `AnimatedDots` component
+### Priority 1: Quick Wins (Do First) ✅ COMPLETED
+1. ✅ Memoize `AnimatedDots` component (ChatPanel & DMPanel)
 2. ✅ Memoize `LiveIndicator` component  
 3. ✅ Memoize `PacketRow` component
-4. ✅ Memoize `MessageRow` component
+4. ✅ Memoize `MessageRow` component (ChatPanel & DMPanel)
 
-### Priority 2: Medium Effort (Do Next)
+### Priority 2: Medium Effort (Do Next) ✅ COMPLETED
 1. ✅ Memoize `PacketList` with custom comparison
 2. ✅ Memoize `ChatPanel` with custom comparison
-3. ✅ Batch packet updates (debounce/throttle)
-4. ✅ Use `useMemo` for filtered packet lists
+3. ✅ Memoize `DMPanel` with custom comparison
+4. ✅ Memoize `NodesPanel` with custom comparison
+5. ✅ Memoize `LogPanel` with custom comparison
+6. ✅ Batch packet updates (100ms debounce)
+7. ✅ Use `useMemo` for filtered packet lists (via component memoization)
 
 ### Priority 3: Larger Refactoring (Consider Later)
 1. Split App component into smaller pieces
