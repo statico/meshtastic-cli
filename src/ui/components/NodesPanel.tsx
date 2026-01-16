@@ -27,7 +27,7 @@ interface NodesPanelProps {
   terminalWidth?: number;
 }
 
-export function NodesPanel({ nodes, selectedIndex, height = 20, inspectorHeight = 10, filter, filterInputActive, sortKey = "hops", sortAscending = true, terminalWidth = 100 }: NodesPanelProps) {
+function NodesPanelComponent({ nodes, selectedIndex, height = 20, inspectorHeight = 10, filter, filterInputActive, sortKey = "hops", sortAscending = true, terminalWidth = 100 }: NodesPanelProps) {
   const hasFilter = filter && filter.length > 0;
   const filterRowHeight = (hasFilter || filterInputActive) ? 1 : 0;
 
@@ -353,6 +353,21 @@ function NodeInspector({ node, allNodes, height }: { node?: NodeData; allNodes: 
 
   return <Box flexDirection="column" paddingX={1}>{lines.slice(0, height - 1)}</Box>;
 }
+
+export const NodesPanel = React.memo(NodesPanelComponent, (prevProps, nextProps) => {
+  // Only re-render if relevant props changed
+  return (
+    prevProps.nodes.length === nextProps.nodes.length &&
+    prevProps.selectedIndex === nextProps.selectedIndex &&
+    prevProps.height === nextProps.height &&
+    prevProps.inspectorHeight === nextProps.inspectorHeight &&
+    prevProps.filter === nextProps.filter &&
+    prevProps.filterInputActive === nextProps.filterInputActive &&
+    prevProps.sortKey === nextProps.sortKey &&
+    prevProps.sortAscending === nextProps.sortAscending &&
+    prevProps.terminalWidth === nextProps.terminalWidth
+  );
+});
 
 function getBatteryDisplay(level?: number, voltage?: number): string {
   if (level !== undefined && level > 100) {

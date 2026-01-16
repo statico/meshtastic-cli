@@ -13,7 +13,7 @@ interface LogPanelProps {
   nodeStore: NodeStore;
 }
 
-export function LogPanel({ responses, selectedIndex, height, nodeStore }: LogPanelProps) {
+function LogPanelComponent({ responses, selectedIndex, height, nodeStore }: LogPanelProps) {
   // Left panel width for list
   const LEFT_PANEL_WIDTH = 30;
 
@@ -65,6 +65,15 @@ export function LogPanel({ responses, selectedIndex, height, nodeStore }: LogPan
     </Box>
   );
 }
+
+export const LogPanel = React.memo(LogPanelComponent, (prevProps, nextProps) => {
+  // Only re-render if relevant props changed
+  return (
+    prevProps.responses.length === nextProps.responses.length &&
+    prevProps.selectedIndex === nextProps.selectedIndex &&
+    prevProps.height === nextProps.height
+  );
+});
 
 function LogList({ responses, selectedIndex, height, nodeStore }: {
   responses: LogResponse[];
