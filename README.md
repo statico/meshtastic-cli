@@ -137,6 +137,23 @@ In Chat and DM views, messages show delivery status:
 
 The `[M]` indicator also appears in the Packets view when a MeshView URL is configured. This confirms the packet was received by the MeshView aggregation server, which is useful for verifying mesh propagation.
 
+## Direct Ping (Shift+D)
+
+Direct ping sends a traceroute request with `hopLimit: 0`, which means only nodes in direct radio range will receive and respond to the packet. This is useful for testing immediate connectivity to neighbors.
+
+**How it works:**
+- The request is sent with 0 hops, so only direct recipients can receive it
+- No retransmissions occur (more lightweight than regular traceroute)
+- Only nodes that can directly hear your transmission will respond
+
+**Caveats:**
+- The response may still be relayed through intermediate nodes (firmware limitation)
+- You cannot definitively confirm bidirectional direct connectivity - you only know they heard YOU directly
+- Less reliable than regular traceroute (single transmission, no retries)
+- No response could mean: (a) not in direct range, or (b) packet was lost to interference
+
+For full bidirectional direct-link testing with RSSI measurements, firmware changes would be needed. See [meshtastic/firmware#8905](https://github.com/meshtastic/firmware/discussions/8905) for ongoing discussion.
+
 ## Terminal Compatibility
 
 For proper emoji and Unicode character display, ensure your terminal uses Unicode-compliant width calculations:

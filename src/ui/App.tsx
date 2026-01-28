@@ -1263,7 +1263,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     const meshPacket = create(Mesh.MeshPacketSchema, {
       from: myNodeNum,
       to: destNode,
-      wantAck: true,
+      wantAck: hopLimit === 0 ? false : true,
       hopLimit: hopLimit ?? 7,
       payloadVariant: { case: "decoded", value: data },
     });
