@@ -16,7 +16,7 @@ export function RebootModal({ reason, elapsed, timeout = 60 }: RebootModalProps)
   useEffect(() => {
     const interval = setInterval(() => {
       setSpinnerFrame((f) => (f + 1) % SPINNER_FRAMES.length);
-    }, 80);
+    }, 120);
     return () => clearInterval(interval);
   }, []);
 

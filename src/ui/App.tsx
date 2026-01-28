@@ -150,7 +150,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     if (status === "connecting") {
       const interval = setInterval(() => {
         setSpinnerFrame((f) => (f + 1) % SPINNER_FRAMES.length);
-      }, 80);
+      }, 120);
       return () => clearInterval(interval);
     }
   }, [status]);
@@ -250,10 +250,9 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     return () => clearInterval(interval);
   }, [showRebootModal]);
 
-  // Trigger full redraw when switching tabs/modes
-  useEffect(() => {
-    setRefreshKey(k => k + 1);
-  }, [mode]);
+  // Removed auto-refresh on mode change to reduce flickering
+  // React's natural reconciliation handles mode switching efficiently
+  // Users can still manually refresh with Ctrl+L if needed
 
   // Auto-dismiss reboot modal when connection is restored
   useEffect(() => {

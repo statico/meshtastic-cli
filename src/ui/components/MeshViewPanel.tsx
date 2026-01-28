@@ -12,7 +12,7 @@ function LiveIndicator({ error }: { error?: string | null }) {
   useEffect(() => {
     const interval = setInterval(() => {
       setFrame((f) => (f + 1) % 4);
-    }, 800);
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
 

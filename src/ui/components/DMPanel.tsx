@@ -14,7 +14,7 @@ const AnimatedDots = React.memo(() => {
   useEffect(() => {
     const interval = setInterval(() => {
       setFrame((f) => (f + 1) % 3);
-    }, 200);
+    }, 500);
     return () => clearInterval(interval);
   }, []);
 

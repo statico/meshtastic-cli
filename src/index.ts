@@ -287,7 +287,11 @@ const { waitUntilExit } = render(
     useTls,
     insecure,
     pcapFile,
-  })
+  }),
+  {
+    incrementalRendering: true,  // Only update changed lines (Ink 6.5.0+)
+    maxFps: 30,                  // Limit to 30 FPS to reduce flicker (Ink 6.3.0+)
+  }
 );
 
 waitUntilExit().catch((e) => {

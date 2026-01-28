@@ -14,7 +14,7 @@ export function DeviceNotificationModal({ message, level, remaining }: DeviceNot
   useEffect(() => {
     const interval = setInterval(() => {
       setFrame((f) => (f + 1) % 4);
-    }, 250);
+    }, 500);
     return () => clearInterval(interval);
   }, []);
 

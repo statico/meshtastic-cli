@@ -13,7 +13,7 @@ const LiveIndicator = React.memo(() => {
   useEffect(() => {
     const interval = setInterval(() => {
       setFrame((f) => (f + 1) % 4);
-    }, 800);
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
 
