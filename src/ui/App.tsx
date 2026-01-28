@@ -30,6 +30,7 @@ import { setSetting, loadSettings } from "../settings";
 import packageJson from "../../package.json";
 import { Logger } from "../logger";
 import { safeOpenUrl, validateUrl } from "../utils/safe-exec";
+import { PcapWriter } from "../pcap";
 
 const BROADCAST_ADDR = 0xFFFFFFFF;
 
@@ -98,9 +99,10 @@ interface AppProps {
   httpPort?: number;
   useTls?: boolean;
   insecure?: boolean;
+  pcapFile?: string;
 }
 
-export function App({ address, packetStore, nodeStore, skipConfig = false, skipNodes = false, meshViewUrl, useFahrenheit = false, httpPort, useTls = false, insecure = false }: AppProps) {
+export function App({ address, packetStore, nodeStore, skipConfig = false, skipNodes = false, meshViewUrl, useFahrenheit = false, httpPort, useTls = false, insecure = false, pcapFile }: AppProps) {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const [transport, setTransport] = useState<Transport | null>(null);
@@ -132,6 +134,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const packetUpdateQueueRef = useRef<DecodedPacket[]>([]);
   const packetUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pcapWriterRef = useRef<PcapWriter | null>(null);
 
   // Reboot modal state
   const [showRebootModal, setShowRebootModal] = useState(false);
@@ -151,6 +154,29 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       return () => clearInterval(interval);
     }
   }, [status]);
+
+  // Setup pcap writer if enabled
+  useEffect(() => {
+    if (!pcapFile) return;
+
+    try {
+      pcapWriterRef.current = new PcapWriter(pcapFile);
+      Logger.info("App", "PCAP writer initialized", { path: pcapFile });
+
+      const unsubscribe = packetStore.onPacket((packet) => {
+        if (pcapWriterRef.current && packet.raw) {
+          pcapWriterRef.current.writePacket(packet.raw, packet.timestamp);
+        }
+      });
+
+      return () => {
+        unsubscribe();
+        pcapWriterRef.current = null;
+      };
+    } catch (error) {
+      Logger.error("App", "Failed to initialize PCAP writer", error as Error, { path: pcapFile });
+    }
+  }, [pcapFile, packetStore]);
 
   // Connect to device
   useEffect(() => {

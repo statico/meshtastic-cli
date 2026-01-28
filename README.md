@@ -97,6 +97,7 @@ Options:
   --port, -P         HTTP port number (default: 4403 if no port in address)
   --tls, -T          Use HTTPS instead of HTTP
   --insecure, -k     Accept self-signed SSL certificates
+  --pcap <file>      Write packets to pcap file for analysis
   --help, -h         Show help
 ```
 
@@ -123,6 +124,13 @@ Connect with HTTPS and accept self-signed certificate:
 ```sh
 meshtastic-cli example.com --tls --insecure
 ```
+
+Capture packets to pcap file for analysis:
+```sh
+meshtastic-cli 192.168.0.123 --pcap traffic.pcap
+```
+
+The pcap file can be analyzed with tools like Wireshark or tcpdump. Packets are written in pcap format with LINKTYPE_USER0 (147) containing the raw Meshtastic protobuf frames.
 
 ## Message Status Indicators
 

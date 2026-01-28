@@ -112,6 +112,7 @@ let packetLimit = 1000;
 let httpPort: number | undefined;
 let useTls = false;
 let insecure = false;
+let pcapFile: string | undefined;
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
@@ -177,6 +178,12 @@ for (let i = 0; i < args.length; i++) {
     useTls = true;
   } else if (arg === "--insecure" || arg === "-k") {
     insecure = true;
+  } else if (arg === "--pcap") {
+    if (i + 1 >= args.length) {
+      console.error("--pcap requires a file path");
+      process.exit(1);
+    }
+    pcapFile = args[++i];
   } else if (arg === "--help" || arg === "-h") {
     console.log(`
 Meshtastic CLI Viewer
@@ -197,6 +204,7 @@ Options:
   --port, -P            HTTP port number (default: 4403 if no port in address)
   --tls, -T             Use HTTPS instead of HTTP
   --insecure, -k        Accept self-signed SSL certificates
+  --pcap <file>         Write packets to pcap file for analysis
   --enable-logging, -L  Enable verbose logging to ~/.config/meshtastic-cli/log
   --help, -h            Show this help message
 `);
@@ -278,6 +286,7 @@ const { waitUntilExit } = render(
     httpPort,
     useTls,
     insecure,
+    pcapFile,
   })
 );
 
