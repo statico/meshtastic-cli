@@ -5,6 +5,8 @@
 2. Commit and tag: `git add package.json && git commit -m "vX.Y.Z" && git tag vX.Y.Z`
 3. Push: `git push && git push origin vX.Y.Z`
 4. Add release notes: `gh release edit vX.Y.Z --notes "..."` (summarize changes since last version)
+   - **Credit issue authors**: If you fixed bugs that reference GitHub issues, credit the original issue author in the release notes
+   - Example: "Fixed argument parsing issues (thanks @davmonk for reporting #1, #2, #4, #5, #6)"
 
 ## Code Style
 - Keep code brief and concise
