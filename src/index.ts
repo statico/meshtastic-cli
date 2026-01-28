@@ -18,17 +18,17 @@ const MAX_LOG_SIZE = 1024 * 1024; // 1 MB - extracted to constant
 // Truncate log file if it exceeds max size
 function truncateLogIfNeeded() {
   try {
-    if (!existsSync(ERROR_LOG_PATH)) return;
     const stats = statSync(ERROR_LOG_PATH);
     if (stats.size > MAX_LOG_SIZE) {
-      const content = readFileSync(ERROR_LOG_PATH, "utf-8");
-      const truncated = content.slice(-MAX_LOG_SIZE);
+      const buf = readFileSync(ERROR_LOG_PATH);
+      const truncated = buf.slice(-MAX_LOG_SIZE);
+      const content = truncated.toString("utf-8");
       // Find first complete entry (starts with newline + timestamp)
-      const firstEntry = truncated.indexOf("\n[");
-      writeFileSync(ERROR_LOG_PATH, firstEntry > 0 ? truncated.slice(firstEntry) : truncated);
+      const firstEntry = content.indexOf("\n[");
+      writeFileSync(ERROR_LOG_PATH, firstEntry > 0 ? content.slice(firstEntry) : content);
     }
-  } catch {
-    // Ignore truncation errors
+  } catch (e) {
+    console.error("Failed to truncate log file:", e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -43,8 +43,8 @@ function logError(type: string, error: Error | unknown) {
       : String(error);
     const entry = `\n[${timestamp}] ${type}\n${message}\n${"─".repeat(60)}\n`;
     appendFileSync(ERROR_LOG_PATH, entry);
-  } catch {
-    // Ignore logging errors
+  } catch (e) {
+    console.error("Failed to write error log:", e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -120,7 +120,11 @@ for (let i = 0; i < args.length; i++) {
   } else if (arg === "--skip-nodes" || arg === "-N") {
     skipNodes = true;
   } else if (arg === "--session" || arg === "-s") {
-    const sessionArg = args[++i] || "default";
+    if (i + 1 >= args.length) {
+      console.error("--session requires a session name");
+      process.exit(1);
+    }
+    const sessionArg = args[++i];
     try {
       session = validateSessionName(sessionArg);
     } catch (error) {
@@ -130,21 +134,27 @@ for (let i = 0; i < args.length; i++) {
   } else if (arg === "--clear") {
     clearSession = true;
   } else if (arg === "--meshview" || arg === "-m") {
+    if (i + 1 >= args.length) {
+      console.error("--meshview requires a URL");
+      process.exit(1);
+    }
     const urlArg = args[++i];
-    if (urlArg) {
-      try {
-        validateUrl(urlArg); // Validate URL format and protocol
-        meshViewUrl = urlArg;
-      } catch (error) {
-        console.error(`Invalid MeshView URL: ${error instanceof Error ? error.message : String(error)}`);
-        process.exit(1);
-      }
+    try {
+      validateUrl(urlArg); // Validate URL format and protocol
+      meshViewUrl = urlArg;
+    } catch (error) {
+      console.error(`Invalid MeshView URL: ${error instanceof Error ? error.message : String(error)}`);
+      process.exit(1);
     }
   } else if (arg === "--fahrenheit" || arg === "-F") {
     useFahrenheit = true;
   } else if (arg === "--enable-logging" || arg === "-L") {
     enableLogging = true;
   } else if (arg === "--packet-limit" || arg === "-p") {
+    if (i + 1 >= args.length) {
+      console.error("--packet-limit requires a number");
+      process.exit(1);
+    }
     const limit = parseInt(args[++i], 10);
     if (isNaN(limit) || limit < 1 || limit > 1000000) {
       console.error("Packet limit must be between 1 and 1,000,000");
@@ -152,11 +162,11 @@ for (let i = 0; i < args.length; i++) {
     }
     packetLimit = limit;
   } else if (arg === "--port" || arg === "-P") {
-    const portArg = args[++i];
-    if (!portArg) {
+    if (i + 1 >= args.length) {
       console.error("--port requires a port number");
       process.exit(1);
     }
+    const portArg = args[++i];
     const port = parseInt(portArg, 10);
     if (isNaN(port) || port < 1 || port > 65535) {
       console.error("Port must be between 1 and 65535");
@@ -192,6 +202,10 @@ Options:
 `);
     process.exit(0);
   } else if (!arg.startsWith("-")) {
+    if (address) {
+      console.error("Error: Multiple addresses specified. Only one address is allowed.");
+      process.exit(1);
+    }
     try {
       address = validateAddress(arg);
     } catch (error) {
