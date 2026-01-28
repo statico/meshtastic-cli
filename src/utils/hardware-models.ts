@@ -131,7 +131,7 @@ export function getHardwareModelName(hwModel: number | undefined): string {
   if (hwModel === undefined || hwModel === 0) return "Unknown";
   // Try protobuf enum first (may have additional models)
   const protoName = Mesh.HardwareModel[hwModel];
-  if (protoName) return protoName;
+  if (protoName && protoName !== "null") return protoName;
   // Fall back to our extended map
   return EXTENDED_HARDWARE_MODELS[hwModel] || `HW_${hwModel}`;
 }

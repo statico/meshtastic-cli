@@ -162,9 +162,8 @@ function NodeRow({ node, isSelected, terminalWidth = 100 }: NodeRowProps) {
   const displayName = truncateVisual(name, isCompact ? 4 : 6);
 
   const favStar = node.isFavorite ? "★" : " ";
-  const hwModel = node.hwModel !== undefined
-    ? getHardwareModelName(node.hwModel).replace(/_/g, " ")
-    : "";
+  const hwModelName = node.hwModel !== undefined ? getHardwareModelName(node.hwModel) : "";
+  const hwModel = hwModelName && hwModelName !== "Unknown" ? hwModelName.replace(/_/g, " ") : "";
   const role = formatRoleChar(node.role);
 
   const hopsPadding = isCompact ? 2 : 4;
@@ -226,7 +225,7 @@ function NodeInspector({ node, allNodes, height }: { node?: NodeData; allNodes: 
           <Text color={getRoleColor(node.role)}>{formatRole(node.role)}</Text>
         </>
       )}
-      {node.hwModel !== undefined && (
+      {node.hwModel !== undefined && getHardwareModelName(node.hwModel) !== "Unknown" && (
         <>
           <Text color={theme.fg.muted}>  Hardware: </Text>
           <Text color={theme.data.hardware}>{getHardwareModelName(node.hwModel)}</Text>
