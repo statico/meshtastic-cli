@@ -1956,6 +1956,17 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     }
   }, [nodes, nodesSortKey, nodesSortAscending, getSortedNodes, showNotification]);
 
+  // Memoize filtered and sorted nodes to prevent recalculation on every render
+  const filteredNodes = useMemo(() => {
+    const filtered = nodesFilter
+      ? nodes.filter(n =>
+          (n.shortName?.toLowerCase().includes(nodesFilter.toLowerCase())) ||
+          (n.longName?.toLowerCase().includes(nodesFilter.toLowerCase()))
+        )
+      : nodes;
+    return getSortedNodes(filtered, nodesSortKey, nodesSortAscending);
+  }, [nodes, nodesFilter, nodesSortKey, nodesSortAscending, getSortedNodes]);
+
   // Key input handling
   useInput((input, key) => {
     // If quit dialog is showing, it handles its own input
@@ -3248,17 +3259,6 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const nodeName = myShortName || (myNodeNum ? nodeStore.getNodeName(myNodeNum) : "???");
   const maxNodeNameLength = terminalWidth < 65 ? 10 : 20;
   const truncatedNodeName = nodeName.length > maxNodeNameLength ? nodeName.slice(0, maxNodeNameLength - 1) + "…" : nodeName;
-
-  // Memoize filtered and sorted nodes to prevent recalculation on every render
-  const filteredNodes = useMemo(() => {
-    const filtered = nodesFilter
-      ? nodes.filter(n =>
-          (n.shortName?.toLowerCase().includes(nodesFilter.toLowerCase())) ||
-          (n.longName?.toLowerCase().includes(nodesFilter.toLowerCase()))
-        )
-      : nodes;
-    return getSortedNodes(filtered, nodesSortKey, nodesSortAscending);
-  }, [nodes, nodesFilter, nodesSortKey, nodesSortAscending, getSortedNodes]);
 
   return (
     <Box flexDirection="column" width="100%" height={terminalHeight - 1}>
