@@ -127,8 +127,8 @@ const EXTENDED_HARDWARE_MODELS: Record<number, string> = {
   255: "PRIVATE_HW",
 };
 
-export function getHardwareModelName(hwModel: number | undefined): string {
-  if (hwModel === undefined || hwModel === 0) return "Unknown";
+export function getHardwareModelName(hwModel: number | undefined | null): string {
+  if (hwModel === undefined || hwModel === null || hwModel === 0) return "Unknown";
   // Try protobuf enum first (may have additional models)
   const protoName = Mesh.HardwareModel[hwModel];
   if (protoName && protoName !== "null") return protoName;
