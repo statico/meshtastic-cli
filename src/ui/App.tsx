@@ -134,6 +134,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const packetUpdateQueueRef = useRef<DecodedPacket[]>([]);
   const packetUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const nodeUpdateQueueRef = useRef<NodeData[]>([]);
+  const nodeUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pcapWriterRef = useRef<PcapWriter | null>(null);
 
   // Reboot modal state
@@ -390,9 +392,24 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       setSelectedLogIndex(initialLogs.length - 1);
     }
 
+    // Batch node updates to reduce flickering (similar to packet batching)
     nodeStore.onUpdate((updatedNodes) => {
-      setNodes(updatedNodes);
+      nodeUpdateQueueRef.current = updatedNodes;
+
+      if (!nodeUpdateTimeoutRef.current) {
+        nodeUpdateTimeoutRef.current = setTimeout(() => {
+          setNodes(nodeUpdateQueueRef.current);
+          nodeUpdateTimeoutRef.current = null;
+        }, 100); // 100ms debounce
+      }
     });
+
+    return () => {
+      if (nodeUpdateTimeoutRef.current) {
+        clearTimeout(nodeUpdateTimeoutRef.current);
+        nodeUpdateTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   // Load DM conversations when myNodeNum is known
@@ -3232,8 +3249,19 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const maxNodeNameLength = terminalWidth < 65 ? 10 : 20;
   const truncatedNodeName = nodeName.length > maxNodeNameLength ? nodeName.slice(0, maxNodeNameLength - 1) + "…" : nodeName;
 
+  // Memoize filtered and sorted nodes to prevent recalculation on every render
+  const filteredNodes = useMemo(() => {
+    const filtered = nodesFilter
+      ? nodes.filter(n =>
+          (n.shortName?.toLowerCase().includes(nodesFilter.toLowerCase())) ||
+          (n.longName?.toLowerCase().includes(nodesFilter.toLowerCase()))
+        )
+      : nodes;
+    return getSortedNodes(filtered, nodesSortKey, nodesSortAscending);
+  }, [nodes, nodesFilter, nodesSortKey, nodesSortAscending, getSortedNodes]);
+
   return (
-    <Box flexDirection="column" width="100%" height="100%">
+    <Box flexDirection="column" width="100%" height={terminalHeight - 1}>
       {/* Header */}
       <Box
         height={3}
@@ -3285,30 +3313,22 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           );
         })()}
 
-        {mode === "nodes" && (() => {
-          const filteredNodes = getSortedNodes(nodesFilter
-            ? nodes.filter(n =>
-                (n.shortName?.toLowerCase().includes(nodesFilter.toLowerCase())) ||
-                (n.longName?.toLowerCase().includes(nodesFilter.toLowerCase()))
-              )
-            : nodes, nodesSortKey, nodesSortAscending);
-          return (
-            <ErrorBoundary context="Nodes Panel">
-              <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
-                <NodesPanel
-                  nodes={filteredNodes}
-                  selectedIndex={selectedNodeIndex}
-                  height={terminalHeight - 6}
-                  filter={nodesFilter}
-                  filterInputActive={nodesFilterInput}
-                  sortKey={nodesSortKey}
-                  sortAscending={nodesSortAscending}
-                  terminalWidth={terminalWidth}
-                />
-              </Box>
-            </ErrorBoundary>
-          );
-        })()}
+        {mode === "nodes" && (
+          <ErrorBoundary context="Nodes Panel">
+            <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
+              <NodesPanel
+                nodes={filteredNodes}
+                selectedIndex={selectedNodeIndex}
+                height={terminalHeight - 6}
+                filter={nodesFilter}
+                filterInputActive={nodesFilterInput}
+                sortKey={nodesSortKey}
+                sortAscending={nodesSortAscending}
+                terminalWidth={terminalWidth}
+              />
+            </Box>
+          </ErrorBoundary>
+        )}
 
         {mode === "chat" && (
           <ErrorBoundary context="Chat Panel">

@@ -352,22 +352,26 @@ function ChatPanelComponent({
 
 export const ChatPanel = React.memo(ChatPanelComponent, (prevProps, nextProps) => {
   // Only re-render if relevant props changed
-  return (
-    prevProps.messages.length === nextProps.messages.length &&
-    prevProps.channel === nextProps.channel &&
-    prevProps.input === nextProps.input &&
-    prevProps.inputFocused === nextProps.inputFocused &&
-    prevProps.height === nextProps.height &&
-    prevProps.width === nextProps.width &&
-    prevProps.selectedMessageIndex === nextProps.selectedMessageIndex &&
-    prevProps.showEmojiSelector === nextProps.showEmojiSelector &&
-    prevProps.emojiSelectorIndex === nextProps.emojiSelectorIndex &&
-    prevProps.filter === nextProps.filter &&
-    prevProps.filterInputActive === nextProps.filterInputActive &&
-    prevProps.replyTo === nextProps.replyTo &&
-    prevProps.channels === nextProps.channels &&
-    prevProps.meshViewConfirmedIds === nextProps.meshViewConfirmedIds
-  );
+  // Note: Return true to skip re-render, false to re-render
+  if (
+    prevProps.messages !== nextProps.messages ||
+    prevProps.channel !== nextProps.channel ||
+    prevProps.input !== nextProps.input ||
+    prevProps.inputFocused !== nextProps.inputFocused ||
+    prevProps.height !== nextProps.height ||
+    prevProps.width !== nextProps.width ||
+    prevProps.selectedMessageIndex !== nextProps.selectedMessageIndex ||
+    prevProps.showEmojiSelector !== nextProps.showEmojiSelector ||
+    prevProps.emojiSelectorIndex !== nextProps.emojiSelectorIndex ||
+    prevProps.filter !== nextProps.filter ||
+    prevProps.filterInputActive !== nextProps.filterInputActive ||
+    prevProps.replyTo !== nextProps.replyTo ||
+    prevProps.channels !== nextProps.channels ||
+    prevProps.meshViewConfirmedIds !== nextProps.meshViewConfirmedIds
+  ) {
+    return false; // Props changed, re-render
+  }
+  return true; // Props unchanged, skip re-render
 });
 
 interface MessageRowProps {
@@ -555,14 +559,18 @@ const MessageRow = React.memo(function MessageRow({ message, nodeStore, isOwn, i
   );
 }, (prevProps, nextProps) => {
   // Only re-render if relevant props changed
-  return (
-    prevProps.message.id === nextProps.message.id &&
-    prevProps.message.status === nextProps.message.status &&
-    prevProps.message.text === nextProps.message.text &&
-    prevProps.message.timestamp === nextProps.message.timestamp &&
-    prevProps.isSelected === nextProps.isSelected &&
-    prevProps.width === nextProps.width &&
-    prevProps.isOwn === nextProps.isOwn &&
-    prevProps.meshViewConfirmedIds === nextProps.meshViewConfirmedIds
-  );
+  // Note: Return true to skip re-render, false to re-render
+  if (
+    prevProps.message.id !== nextProps.message.id ||
+    prevProps.message.status !== nextProps.message.status ||
+    prevProps.message.text !== nextProps.message.text ||
+    prevProps.message.timestamp !== nextProps.message.timestamp ||
+    prevProps.isSelected !== nextProps.isSelected ||
+    prevProps.width !== nextProps.width ||
+    prevProps.isOwn !== nextProps.isOwn ||
+    prevProps.meshViewConfirmedIds !== nextProps.meshViewConfirmedIds
+  ) {
+    return false; // Props changed, re-render
+  }
+  return true; // Props unchanged, skip re-render
 });

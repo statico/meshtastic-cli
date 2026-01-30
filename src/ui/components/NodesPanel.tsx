@@ -355,17 +355,21 @@ function NodeInspector({ node, allNodes, height }: { node?: NodeData; allNodes: 
 
 export const NodesPanel = React.memo(NodesPanelComponent, (prevProps, nextProps) => {
   // Only re-render if relevant props changed
-  return (
-    prevProps.nodes.length === nextProps.nodes.length &&
-    prevProps.selectedIndex === nextProps.selectedIndex &&
-    prevProps.height === nextProps.height &&
-    prevProps.inspectorHeight === nextProps.inspectorHeight &&
-    prevProps.filter === nextProps.filter &&
-    prevProps.filterInputActive === nextProps.filterInputActive &&
-    prevProps.sortKey === nextProps.sortKey &&
-    prevProps.sortAscending === nextProps.sortAscending &&
-    prevProps.terminalWidth === nextProps.terminalWidth
-  );
+  // Note: Return true to skip re-render, false to re-render
+  if (
+    prevProps.nodes !== nextProps.nodes ||
+    prevProps.selectedIndex !== nextProps.selectedIndex ||
+    prevProps.height !== nextProps.height ||
+    prevProps.inspectorHeight !== nextProps.inspectorHeight ||
+    prevProps.filter !== nextProps.filter ||
+    prevProps.filterInputActive !== nextProps.filterInputActive ||
+    prevProps.sortKey !== nextProps.sortKey ||
+    prevProps.sortAscending !== nextProps.sortAscending ||
+    prevProps.terminalWidth !== nextProps.terminalWidth
+  ) {
+    return false; // Props changed, re-render
+  }
+  return true; // Props unchanged, skip re-render
 });
 
 function getBatteryDisplay(level?: number, voltage?: number): string {
