@@ -1013,15 +1013,32 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
 
     let running = true;
     let configRequested = false;
+    let packetCount = 0;
+    let statusCount = 0;
+    const loopStartTime = Date.now();
+
+    Logger.info("App", "Transport loop starting", {
+      address: (transport as any).address || "unknown",
+      timestamp: new Date().toISOString()
+    });
 
     (async () => {
       try {
         for await (const output of transport.fromDevice) {
-          if (!running) break;
+          if (!running) {
+            Logger.info("App", "Transport loop breaking due to running=false", {
+              packetsProcessed: packetCount,
+              statusUpdates: statusCount,
+              duration: Date.now() - loopStartTime
+            });
+            break;
+          }
           if (output.type === "status") {
+            statusCount++;
             Logger.info("App", "Status changed", {
               status: output.status,
               reason: (output as any).reason,
+              statusUpdateNumber: statusCount
             });
             setStatus(output.status);
             // Clear error on successful connection
@@ -1038,33 +1055,62 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
             } else if (output.status === "disconnected" && (output as any).reason) {
               // Show connection error reason to user
               setConnectError((output as any).reason);
+              Logger.warn("App", "Disconnected with reason", {
+                reason: (output as any).reason,
+                packetsProcessed: packetCount
+              });
             }
           } else if (output.type === "packet") {
-            Logger.debug("App", "Processing packet from device");
+            packetCount++;
+            Logger.debug("App", "Processing packet from device", { packetNumber: packetCount });
             try {
               const { decodeFromRadio } = await import("../protocol/decoder");
               const decoded = decodeFromRadio(output.data);
               packetStore.add(decoded);
             } catch (error) {
-              Logger.error("App", "Error decoding/storing packet", error as Error);
+              Logger.error("App", "Error decoding/storing packet", error as Error, { packetNumber: packetCount });
             }
           }
         }
         // Log when transport loop exits normally
-        Logger.warn("App", "Transport loop exited", { running });
+        const duration = Date.now() - loopStartTime;
+        Logger.warn("App", "Transport loop exited", {
+          running,
+          packetsProcessed: packetCount,
+          statusUpdates: statusCount,
+          durationMs: duration,
+          durationReadable: `${Math.floor(duration / 60000)}m ${Math.floor((duration % 60000) / 1000)}s`
+        });
         if (running) {
-          console.error("CRITICAL: Transport iterator completed unexpectedly while running=true");
-          Logger.error("App", "TRANSPORT_LOOP_EXIT: Transport loop exited while running=true", new Error("Transport loop exited"));
+          const criticalMsg = `CRITICAL: Transport iterator completed unexpectedly while running=true (processed ${packetCount} packets, ${statusCount} status updates, ran for ${Math.floor(duration / 1000)}s)`;
+          console.error(criticalMsg);
+          Logger.error("App", "TRANSPORT_LOOP_EXIT: Transport loop exited while running=true", new Error("Transport loop exited"), {
+            packetsProcessed: packetCount,
+            statusUpdates: statusCount,
+            duration
+          });
         }
       } catch (error) {
-        Logger.error("App", "Transport reading loop error", error as Error);
+        const duration = Date.now() - loopStartTime;
+        Logger.error("App", "Transport reading loop error", error as Error, {
+          packetsProcessed: packetCount,
+          statusUpdates: statusCount,
+          duration
+        });
         if (running) {
           console.error("Transport error:", error);
+          console.error(`Stats: ${packetCount} packets, ${statusCount} status updates, ${Math.floor(duration / 1000)}s runtime`);
         }
       }
     })();
 
     return () => {
+      const duration = Date.now() - loopStartTime;
+      Logger.info("App", "Transport effect cleanup", {
+        packetsProcessed: packetCount,
+        statusUpdates: statusCount,
+        duration
+      });
       running = false;
     };
   }, [transport]);
@@ -1979,10 +2025,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
 
     // Quit - show confirmation dialog (but not when input is focused)
     if ((input === "q" || input === "Q") && !isInputFocused) {
+      Logger.info("App", "Quit key pressed (q) - showing confirmation dialog");
       setShowQuitDialog(true);
       return;
     }
     if (key.ctrl && input === "c") {
+      Logger.info("App", "Quit key pressed (Ctrl+C) - showing confirmation dialog");
       setShowQuitDialog(true);
       return;
     }
@@ -3520,11 +3568,24 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         >
           <QuitDialog
             onConfirm={() => {
+              Logger.info("App", "User confirmed quit - initiating shutdown");
+
+              // Call Ink's exit to trigger cleanup
               exit();
-              process.stdout.write('\x1bc'); // Clear screen on quit
-              process.exit(0);
+
+              // Give Ink a moment to cleanup before forcing exit
+              // This prevents the race condition where process.exit() fires before Ink cleanup
+              setTimeout(() => {
+                Logger.info("App", "Shutdown complete - clearing screen and exiting");
+                Logger.shutdown(); // Force flush logs before exit
+                process.stdout.write('\x1bc'); // Clear screen on quit
+                process.exit(0);
+              }, 100);
             }}
-            onCancel={() => setShowQuitDialog(false)}
+            onCancel={() => {
+              Logger.info("App", "User cancelled quit");
+              setShowQuitDialog(false);
+            }}
           />
         </Box>
       )}

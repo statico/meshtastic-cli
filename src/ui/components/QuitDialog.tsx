@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text, useInput } from "ink";
 import { theme } from "../theme";
+import { Logger } from "../../logger";
 
 interface QuitDialogProps {
   onConfirm: () => void;
@@ -10,8 +11,10 @@ interface QuitDialogProps {
 export function QuitDialog({ onConfirm, onCancel }: QuitDialogProps) {
   useInput((input, key) => {
     if (key.return || input === "y" || input === "Y") {
+      Logger.info("QuitDialog", "User confirmed quit", { key: key.return ? "return" : input });
       onConfirm();
     } else if (key.escape || input === "n" || input === "N") {
+      Logger.info("QuitDialog", "User cancelled quit", { key: key.escape ? "escape" : input });
       onCancel();
     }
   });

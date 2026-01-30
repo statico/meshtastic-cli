@@ -145,13 +145,23 @@ export class HttpTransport implements Transport {
   }
 
   private async poll() {
+    Logger.info("HttpTransport", "Poll loop starting", {
+      url: this.url,
+      running: this.running,
+      timestamp: new Date().toISOString()
+    });
+
     let iterationCount = 0;
     while (this.running) {
       try {
         iterationCount++;
         // Heartbeat every 60 iterations (~3 minutes at 3s per iteration)
         if (iterationCount % 60 === 0) {
-          Logger.info("HttpTransport", `Poll heartbeat: ${iterationCount} iterations`);
+          Logger.info("HttpTransport", `Poll heartbeat: ${iterationCount} iterations`, {
+            consecutiveErrors: this.consecutiveErrors,
+            pendingResolvers: this.resolvers.length,
+            queuedOutputs: this.outputs.length
+          });
         }
         // Drain available packets with a small delay between each
         let gotPacket = true;
@@ -228,6 +238,28 @@ export class HttpTransport implements Transport {
       this.consecutiveErrors = 0;
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     }
+
+    // Log when poll loop exits
+    Logger.warn("HttpTransport", "Poll loop exited", {
+      running: this.running,
+      iterationCount,
+      pendingResolvers: this.resolvers.length,
+      outputsInQueue: this.outputs.length
+    });
+
+    // If running is still true, something unexpected happened
+    if (this.running) {
+      Logger.error("HttpTransport", "CRITICAL: Poll loop exited while running=true", new Error("Poll loop exited unexpectedly"), {
+        iterationCount,
+        consecutiveErrors: this.consecutiveErrors
+      });
+      // Set running to false and close the iterator
+      this.running = false;
+      for (const resolver of this.resolvers) {
+        resolver({ value: undefined as any, done: true });
+      }
+      this.resolvers = [];
+    }
   }
 
   private emit(output: DeviceOutput) {
@@ -241,6 +273,11 @@ export class HttpTransport implements Transport {
     }
     const resolver = this.resolvers.shift();
     if (resolver) {
+      Logger.debug("HttpTransport", "Emit: resolving pending promise", {
+        outputType: output.type,
+        remainingResolvers: this.resolvers.length,
+        queuedOutputs: this.outputs.length
+      });
       resolver({ value: output, done: false });
     } else {
       // Prevent unbounded queue growth
@@ -248,6 +285,10 @@ export class HttpTransport implements Transport {
         Logger.warn("HttpTransport", "Output queue full, dropping oldest", { queueSize: this.outputs.length });
         this.outputs.shift();
       }
+      Logger.debug("HttpTransport", "Emit: queueing output (no pending promises)", {
+        outputType: output.type,
+        queueSize: this.outputs.length + 1
+      });
       this.outputs.push(output);
     }
   }
@@ -256,11 +297,30 @@ export class HttpTransport implements Transport {
     const self = this;
     return {
       [Symbol.asyncIterator]() {
+        let iterationCount = 0;
         return {
           next(): Promise<IteratorResult<DeviceOutput>> {
+            iterationCount++;
             const queued = self.outputs.shift();
-            if (queued) return Promise.resolve({ value: queued, done: false });
-            if (!self.running) return Promise.resolve({ value: undefined as any, done: true });
+            if (queued) {
+              Logger.debug("HttpTransport", "Iterator: returning queued output", {
+                iteration: iterationCount,
+                outputType: queued.type,
+                queueLength: self.outputs.length
+              });
+              return Promise.resolve({ value: queued, done: false });
+            }
+            if (!self.running) {
+              Logger.warn("HttpTransport", "Iterator: returning done (running=false)", {
+                iteration: iterationCount,
+                pendingResolvers: self.resolvers.length
+              });
+              return Promise.resolve({ value: undefined as any, done: true });
+            }
+            Logger.debug("HttpTransport", "Iterator: creating pending promise", {
+              iteration: iterationCount,
+              pendingResolvers: self.resolvers.length + 1
+            });
             return new Promise((resolve) => self.resolvers.push(resolve));
           },
         };
@@ -289,14 +349,26 @@ export class HttpTransport implements Transport {
   }
 
   async disconnect(): Promise<void> {
-    Logger.info("HttpTransport", "Disconnecting", { url: this.url });
+    Logger.info("HttpTransport", "Disconnecting", {
+      url: this.url,
+      hadResolvers: this.resolvers.length > 0,
+      pendingResolvers: this.resolvers.length,
+      outputsInQueue: this.outputs.length
+    });
     this.running = false;
     this.emit({ type: "status", status: "disconnected", reason: "user" });
+
+    // Resolve all pending promises to unblock for-await loops
+    const resolverCount = this.resolvers.length;
     for (const resolver of this.resolvers) {
       resolver({ value: undefined as any, done: true });
     }
     this.resolvers = [];
-    Logger.info("HttpTransport", "Disconnected");
+
+    Logger.info("HttpTransport", "Disconnected", {
+      resolvedPromises: resolverCount,
+      clearedOutputs: this.outputs.length
+    });
   }
 
   async fetchOwner(): Promise<{ id: string; longName: string; shortName: string; hwModel: string; myNodeNum: number } | null> {
