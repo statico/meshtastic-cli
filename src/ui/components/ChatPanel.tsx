@@ -153,59 +153,64 @@ function ChatPanelComponent({
     return lineCount || 1; // Ensure at least 1 line
   };
 
+  // Clamp selection to valid range
+  const clampedSelection = selectedMessageIndex >= 0
+    ? Math.min(selectedMessageIndex, filteredMessages.length - 1)
+    : -1;
+
   // Calculate visible messages based on actual line heights
   const visibleMessages: DbMessage[] = [];
   let scrollOffset = 0;
-  let totalLines = 0;
 
-  if (selectedMessageIndex < 0) {
-    // No selection - show most recent messages that fit
-    let linesUsed = 0;
-    for (let i = filteredMessages.length - 1; i >= 0; i--) {
-      const msgHeight = getMessageHeight(filteredMessages[i]);
-      if (linesUsed + msgHeight <= messageAreaHeight) {
-        visibleMessages.unshift(filteredMessages[i]);
-        linesUsed += msgHeight;
-        scrollOffset = i;
+  // Compute bottom-anchored view (what's visible when showing most recent messages)
+  let bottomLinesUsed = 0;
+  let bottomViewStart = filteredMessages.length;
+  for (let i = filteredMessages.length - 1; i >= 0; i--) {
+    const h = getMessageHeight(filteredMessages[i]);
+    if (bottomLinesUsed + h <= messageAreaHeight) {
+      bottomLinesUsed += h;
+      bottomViewStart = i;
+    } else {
+      break;
+    }
+  }
+
+  if (clampedSelection < 0 || clampedSelection >= bottomViewStart) {
+    // No selection, or selection is within the bottom view — show bottom-anchored view
+    for (let i = bottomViewStart; i < filteredMessages.length; i++) {
+      visibleMessages.push(filteredMessages[i]);
+    }
+    scrollOffset = bottomViewStart;
+  } else {
+    // Selection is above the bottom view — scroll up to keep it visible
+    // Show selected message near the bottom third with context above
+    visibleMessages.push(filteredMessages[clampedSelection]);
+    let linesUsed = getMessageHeight(filteredMessages[clampedSelection]);
+    scrollOffset = clampedSelection;
+
+    // Fill below (newer messages for context, up to ~1/3 of viewport)
+    const maxBelowLines = Math.floor(messageAreaHeight / 3);
+    let belowLines = 0;
+    for (let i = clampedSelection + 1; i < filteredMessages.length; i++) {
+      const h = getMessageHeight(filteredMessages[i]);
+      if (belowLines + h <= maxBelowLines && linesUsed + h <= messageAreaHeight) {
+        visibleMessages.push(filteredMessages[i]);
+        belowLines += h;
+        linesUsed += h;
       } else {
         break;
       }
     }
-  } else {
-    // Try to center the selected message
-    scrollOffset = Math.max(0, selectedMessageIndex);
-    let linesUsed = 0;
 
-    // Add selected message first
-    if (scrollOffset < filteredMessages.length) {
-      visibleMessages.push(filteredMessages[scrollOffset]);
-      linesUsed += getMessageHeight(filteredMessages[scrollOffset]);
-    }
-
-    // Add messages before and after alternately to center
-    let before = scrollOffset - 1;
-    let after = scrollOffset + 1;
-    while ((before >= 0 || after < filteredMessages.length) && linesUsed < messageAreaHeight) {
-      if (after < filteredMessages.length) {
-        const msgHeight = getMessageHeight(filteredMessages[after]);
-        if (linesUsed + msgHeight <= messageAreaHeight) {
-          visibleMessages.push(filteredMessages[after]);
-          linesUsed += msgHeight;
-          after++;
-        } else {
-          break;
-        }
-      }
-      if (before >= 0) {
-        const msgHeight = getMessageHeight(filteredMessages[before]);
-        if (linesUsed + msgHeight <= messageAreaHeight) {
-          visibleMessages.unshift(filteredMessages[before]);
-          linesUsed += msgHeight;
-          scrollOffset = before;
-          before--;
-        } else if (after >= filteredMessages.length) {
-          break;
-        }
+    // Fill above with remaining space
+    for (let i = clampedSelection - 1; i >= 0; i--) {
+      const h = getMessageHeight(filteredMessages[i]);
+      if (linesUsed + h <= messageAreaHeight) {
+        visibleMessages.unshift(filteredMessages[i]);
+        linesUsed += h;
+        scrollOffset = i;
+      } else {
+        break;
       }
     }
   }
@@ -304,7 +309,7 @@ function ChatPanelComponent({
                 message={msg}
                 nodeStore={nodeStore}
                 isOwn={msg.fromNode === myNodeNum}
-                isSelected={actualIndex === selectedMessageIndex && !inputFocused}
+                isSelected={actualIndex === clampedSelection && !inputFocused}
                 width={width}
                 meshViewConfirmedIds={meshViewConfirmedIds}
                 allMessages={messages}

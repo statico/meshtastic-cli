@@ -1843,7 +1843,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           cmp = (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0);
           break;
       }
-      return sortAscending ? cmp : -cmp;
+      const primary = sortAscending ? cmp : -cmp;
+      return primary !== 0 ? primary : a.num - b.num;
     });
   }, []);
 
@@ -1860,6 +1861,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     if (nodeIndex >= 0) {
       setMode("nodes");
       setSelectedNodeIndex(nodeIndex);
+      // Set ref directly so the selection preservation effect targets the right node
+      selectedNodeNumRef.current = nodeNum;
     } else {
       showNotification("Node not found in list", theme.status.offline);
     }
@@ -1889,8 +1892,14 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       if (newIndex >= 0) {
         setSelectedNodeIndex(newIndex);
       } else {
-        // Node disappeared (filtered out) — clamp to valid range
-        setSelectedNodeIndex(i => Math.min(i, filteredNodes.length - 1));
+        // Node disappeared (filtered out) — clamp to valid range and update ref
+        setSelectedNodeIndex(i => {
+          const clamped = Math.min(i, filteredNodes.length - 1);
+          if (filteredNodes[clamped]) {
+            selectedNodeNumRef.current = filteredNodes[clamped].num;
+          }
+          return clamped;
+        });
       }
     }
   }, [filteredNodes]);
@@ -3043,7 +3052,6 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   });
 
   const selectedPacket = packets[selectedPacketIndex];
-  const selectedNode = nodes[selectedNodeIndex];
 
   const getModeLabel = () => {
     const p = mode === "packets";
