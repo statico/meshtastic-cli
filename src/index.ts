@@ -289,6 +289,7 @@ let httpPort: number | undefined;
 let useTls = false;
 let insecure = false;
 let pcapFile: string | undefined;
+let bot = false;
 
 for (let i = 0; i < args.length; i++) {
   const arg = args[i];
@@ -370,6 +371,8 @@ for (let i = 0; i < args.length; i++) {
     useTls = true;
   } else if (arg === "--insecure" || arg === "-k") {
     insecure = true;
+  } else if (arg === "--bot" || arg === "-b") {
+    bot = true;
   } else if (arg === "--pcap") {
     if (i + 1 >= args.length) {
       console.error("--pcap requires a file path");
@@ -398,6 +401,7 @@ Options:
   --port, -P            HTTP port number (default: 4403 if no port in address)
   --tls, -T             Use HTTPS instead of HTTP
   --insecure, -k        Accept self-signed SSL certificates
+  --bot, -b             Auto-reply to "ping" and "test" messages
   --pcap <file>         Write packets to pcap file for analysis
   --enable-logging, -L  Enable verbose logging to ~/.config/meshtastic-cli/log
   --help, -h            Show this help message
@@ -491,6 +495,7 @@ const { waitUntilExit } = render(
     useTls,
     insecure,
     pcapFile,
+    bot,
   }),
   {
     incrementalRendering: true,  // Only update changed lines (Ink 6.5.0+)

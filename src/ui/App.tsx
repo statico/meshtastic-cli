@@ -108,9 +108,10 @@ interface AppProps {
   useTls?: boolean;
   insecure?: boolean;
   pcapFile?: string;
+  bot?: boolean;
 }
 
-export function App({ address, packetStore, nodeStore, skipConfig = false, skipNodes = false, meshViewUrl, useFahrenheit = false, httpPort, useTls = false, insecure = false, pcapFile }: AppProps) {
+export function App({ address, packetStore, nodeStore, skipConfig = false, skipNodes = false, meshViewUrl, useFahrenheit = false, httpPort, useTls = false, insecure = false, pcapFile, bot = false }: AppProps) {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const [transport, setTransport] = useState<Transport | null>(null);
@@ -145,6 +146,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const nodeUpdateQueueRef = useRef<NodeData[]>([]);
   const nodeUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pcapWriterRef = useRef<PcapWriter | null>(null);
+  const transportRef = useRef<Transport | null>(null);
+  transportRef.current = transport;
 
   // Reboot modal state
   const [showRebootModal, setShowRebootModal] = useState(false);
@@ -581,6 +584,57 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           const selectedConvo = dmConversations[selectedDMConvoIndex];
           if (selectedConvo && mp.from === selectedConvo.nodeNum) {
             setDmMessages(db.getDMMessages(myNodeNum, selectedConvo.nodeNum));
+          }
+        }
+
+        // Bot auto-reply to "ping" and "test"
+        if (bot && mp.from !== myNodeNum && transportRef.current) {
+          const trimmed = (packet.payload as string).trim().toLowerCase();
+          if (trimmed === "ping" || trimmed === "test") {
+            const parts = [trimmed === "ping" ? "pong" : "ack"];
+            if (mp.rxSnr != null) parts.push(`SNR:${mp.rxSnr}dB`);
+            if (mp.rxRssi != null && mp.rxRssi !== 0) parts.push(`RSSI:${mp.rxRssi}dBm`);
+            if (mp.hopStart) parts.push(`hops:${mp.hopStart - (mp.hopLimit ?? 0)}/${mp.hopStart}`);
+            const reply = parts.join(" | ");
+            const isDM = mp.to !== BROADCAST_ADDR;
+
+            const packetId = Math.floor(Math.random() * 0xffffffff);
+            const data = create(Mesh.DataSchema, {
+              portnum: Portnums.PortNum.TEXT_MESSAGE_APP,
+              payload: new TextEncoder().encode(reply),
+            });
+            const meshPacket = create(Mesh.MeshPacketSchema, {
+              id: packetId,
+              from: myNodeNum,
+              to: isDM ? mp.from : BROADCAST_ADDR,
+              channel: isDM ? 0 : mp.channel,
+              wantAck: true,
+              payloadVariant: { case: "decoded", value: data },
+            });
+            const toRadio = create(Mesh.ToRadioSchema, {
+              payloadVariant: { case: "packet", value: meshPacket },
+            });
+
+            const t = transportRef.current;
+            const binary = toBinary(Mesh.ToRadioSchema, toRadio);
+            t.send(binary).then(() => {
+              const botMsg: db.DbMessage = {
+                packetId,
+                fromNode: myNodeNum,
+                toNode: isDM ? mp.from : BROADCAST_ADDR,
+                channel: isDM ? 0 : mp.channel,
+                text: reply,
+                timestamp: Math.floor(Date.now() / 1000),
+                status: "pending",
+              };
+              db.insertMessage(botMsg);
+              if (!isDM) {
+                setMessages(prev => [...prev, botMsg].slice(-100));
+              }
+              Logger.info("Bot", `Auto-replied "${reply}" to ${formatNodeId(mp.from)}`, { isDM });
+            }).catch(() => {
+              Logger.warn("Bot", `Failed to auto-reply to ${formatNodeId(mp.from)}`);
+            });
           }
         }
       }
