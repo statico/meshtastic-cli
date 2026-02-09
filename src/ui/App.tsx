@@ -1876,6 +1876,25 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     return getSortedNodes(filtered, nodesSortKey, nodesSortAscending);
   }, [nodes, nodesFilter, nodesSortKey, nodesSortAscending, getSortedNodes]);
 
+  // Preserve node selection across list updates by tracking selected node number
+  const selectedNodeNumRef = useRef<number | null>(null);
+  // Keep ref in sync with current selection
+  if (filteredNodes[selectedNodeIndex]) {
+    selectedNodeNumRef.current = filteredNodes[selectedNodeIndex].num;
+  }
+  useEffect(() => {
+    const prev = selectedNodeNumRef.current;
+    if (prev != null && filteredNodes.length > 0) {
+      const newIndex = filteredNodes.findIndex(n => n.num === prev);
+      if (newIndex >= 0) {
+        setSelectedNodeIndex(newIndex);
+      } else {
+        // Node disappeared (filtered out) — clamp to valid range
+        setSelectedNodeIndex(i => Math.min(i, filteredNodes.length - 1));
+      }
+    }
+  }, [filteredNodes]);
+
   // Build flat config rows
   const flatConfigRows = useMemo(() =>
     buildFlatRows(configStore, configChannels, configOwner, localMeshViewUrl, configFilter || undefined),
@@ -2308,7 +2327,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         }
       }
     } else if (mode === "chat") {
-      const channelMessages = messages.filter((m) => m.channel === chatChannel);
+      const channelMessages = messages.filter((m) => m.channel === chatChannel && m.toNode === 0xffffffff);
       const emojiCount = 17; // FIRMWARE_EMOJIS.length
 
       // Emoji selector mode
