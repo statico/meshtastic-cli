@@ -12,8 +12,16 @@ import { PacketInspector, InspectorTab } from "./components/PacketInspector";
 import { NodesPanel } from "./components/NodesPanel";
 import { ChatPanel } from "./components/ChatPanel";
 import { DMPanel } from "./components/DMPanel";
-import { ConfigPanel, ConfigSection, getMenuItemByIndex, getMenuItemCount, CONFIG_FIELD_COUNTS } from "./components/ConfigPanel";
+import { ConfigPanel } from "./components/ConfigPanel";
 import * as adminHelper from "../protocol/admin";
+import {
+  ALL_FIELDS, buildFlatRows, formatValue, getRawEditValue,
+  SECTION_TO_CONFIG_TYPE, SECTION_TO_MODULE_TYPE,
+  CONFIG_CASE_TO_SECTION, MODULE_CASE_TO_SECTION,
+  SECTION_TO_CONFIG_CASE, SECTION_TO_MODULE_CASE,
+  TOTAL_CONFIG_SECTIONS,
+  type ConfigStore, type FlatConfigRow,
+} from "./config-fields";
 import { HelpDialog } from "./components/HelpDialog";
 import { QuitDialog } from "./components/QuitDialog";
 import { ResponseModal } from "./components/ResponseModal";
@@ -303,40 +311,19 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const [dmDeleteConfirm, setDmDeleteConfirm] = useState(false);
   const [dmReplyTo, setDmReplyTo] = useState<db.DbMessage | null>(null);
 
-  // Config state
-  const [configSection, setConfigSection] = useState<ConfigSection>("menu");
-  const [configMenuIndex, setConfigMenuIndex] = useState(0);
+  // Config state - unified store replaces 20+ individual useState hooks
+  const [configStore, setConfigStore] = useState<ConfigStore>(new Map());
   const [configLoading, setConfigLoading] = useState(false);
-  const [pendingConfigType, setPendingConfigType] = useState<ConfigSection | null>(null);
+  const [configLoadedSections, setConfigLoadedSections] = useState(0);
   const [pendingChannels, setPendingChannels] = useState<Set<number>>(new Set());
   const configTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [deviceConfig, setDeviceConfig] = useState<Config.Config_DeviceConfig>();
-  const [positionConfig, setPositionConfig] = useState<Config.Config_PositionConfig>();
-  const [powerConfig, setPowerConfig] = useState<Config.Config_PowerConfig>();
-  const [networkConfig, setNetworkConfig] = useState<Config.Config_NetworkConfig>();
-  const [displayConfig, setDisplayConfig] = useState<Config.Config_DisplayConfig>();
-  const [loraConfig, setLoraConfig] = useState<Config.Config_LoRaConfig>();
-  const [bluetoothConfig, setBluetoothConfig] = useState<Config.Config_BluetoothConfig>();
-  const [securityConfig, setSecurityConfig] = useState<Config.Config_SecurityConfig>();
-  const [mqttConfig, setMqttConfig] = useState<ModuleConfig.ModuleConfig_MQTTConfig>();
-  const [serialConfig, setSerialConfig] = useState<ModuleConfig.ModuleConfig_SerialConfig>();
-  const [extNotifConfig, setExtNotifConfig] = useState<ModuleConfig.ModuleConfig_ExternalNotificationConfig>();
-  const [storeForwardConfig, setStoreForwardConfig] = useState<ModuleConfig.ModuleConfig_StoreForwardConfig>();
-  const [rangeTestConfig, setRangeTestConfig] = useState<ModuleConfig.ModuleConfig_RangeTestConfig>();
-  const [telemetryConfig, setTelemetryConfig] = useState<ModuleConfig.ModuleConfig_TelemetryConfig>();
-  const [cannedMsgConfig, setCannedMsgConfig] = useState<ModuleConfig.ModuleConfig_CannedMessageConfig>();
-  const [audioConfig, setAudioConfig] = useState<ModuleConfig.ModuleConfig_AudioConfig>();
-  const [remoteHwConfig, setRemoteHwConfig] = useState<ModuleConfig.ModuleConfig_RemoteHardwareConfig>();
-  const [neighborInfoConfig, setNeighborInfoConfig] = useState<ModuleConfig.ModuleConfig_NeighborInfoConfig>();
-  const [ambientLightConfig, setAmbientLightConfig] = useState<ModuleConfig.ModuleConfig_AmbientLightingConfig>();
-  const [detectionSensorConfig, setDetectionSensorConfig] = useState<ModuleConfig.ModuleConfig_DetectionSensorConfig>();
-  const [paxcounterConfig, setPaxcounterConfig] = useState<ModuleConfig.ModuleConfig_PaxcounterConfig>();
   const [configChannels, setConfigChannels] = useState<Mesh.Channel[]>([]);
   const [configOwner, setConfigOwner] = useState<Mesh.User>();
   const [configEditing, setConfigEditing] = useState<string | null>(null);
   const [configEditValue, setConfigEditValue] = useState("");
-  const [selectedChannelIndex, setSelectedChannelIndex] = useState(0);
-  const [selectedConfigFieldIndex, setSelectedConfigFieldIndex] = useState(0);
+  const [selectedConfigIndex, setSelectedConfigIndex] = useState(0);
+  const [configFilter, setConfigFilter] = useState("");
+  const [configFilterInput, setConfigFilterInput] = useState(false);
   // Initialize localMeshViewUrl from prop or settings
   const [localMeshViewUrl, setLocalMeshViewUrl] = useState<string | undefined>(() => {
     if (meshViewUrl) return meshViewUrl;
@@ -362,7 +349,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const [meshViewConfirmedIds, setMeshViewConfirmedIds] = useState<Set<number>>(new Set());
 
   const [batchEditMode, setBatchEditMode] = useState(false);
-  const [batchEditCount, setBatchEditCount] = useState(0);
+  const batchSnapshotRef = useRef<Map<string, string>>(new Map());
 
   // Filter state
   const [nodesFilter, setNodesFilter] = useState("");
@@ -633,149 +620,54 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           variantCase: adminMsg.payloadVariant.case,
         });
 
-        const clearLoadingIfMatch = (expectedSection: ConfigSection | null) => {
-          if (pendingConfigType === expectedSection) {
-            if (configTimeoutRef.current) {
-              clearTimeout(configTimeoutRef.current);
-              configTimeoutRef.current = null;
-            }
-            setConfigLoading(false);
-            setPendingConfigType(null);
-          }
-        };
-
         switch (adminMsg.payloadVariant.case) {
           case "getConfigResponse": {
             const config = adminMsg.payloadVariant.value;
-            let matchedSection: ConfigSection | null = null;
-            switch (config.payloadVariant.case) {
-              case "device":
-                setDeviceConfig(config.payloadVariant.value);
-                matchedSection = "device";
-                break;
-              case "position":
-                setPositionConfig(config.payloadVariant.value);
-                matchedSection = "position";
-                break;
-              case "power":
-                setPowerConfig(config.payloadVariant.value);
-                matchedSection = "power";
-                break;
-              case "network":
-                setNetworkConfig(config.payloadVariant.value);
-                matchedSection = "network";
-                break;
-              case "display":
-                setDisplayConfig(config.payloadVariant.value);
-                matchedSection = "display";
-                break;
-              case "lora":
-                setLoraConfig(config.payloadVariant.value);
-                matchedSection = "lora";
-                break;
-              case "bluetooth":
-                setBluetoothConfig(config.payloadVariant.value);
-                matchedSection = "bluetooth";
-                break;
-              case "security":
-                setSecurityConfig(config.payloadVariant.value);
-                matchedSection = "security";
-                break;
+            const section = CONFIG_CASE_TO_SECTION[config.payloadVariant.case as string];
+            if (section) {
+              setConfigStore(prev => {
+                const next = new Map(prev);
+                next.set(section, config.payloadVariant.value as Record<string, unknown>);
+                return next;
+              });
+              setConfigLoadedSections(n => n + 1);
             }
-            clearLoadingIfMatch(matchedSection);
             break;
           }
           case "getModuleConfigResponse": {
-            const moduleConfig = adminMsg.payloadVariant.value;
-            let matchedSection: ConfigSection | null = null;
-            switch (moduleConfig.payloadVariant.case) {
-              case "mqtt":
-                setMqttConfig(moduleConfig.payloadVariant.value);
-                matchedSection = "mqtt";
-                break;
-              case "serial":
-                setSerialConfig(moduleConfig.payloadVariant.value);
-                matchedSection = "serial";
-                break;
-              case "externalNotification":
-                setExtNotifConfig(moduleConfig.payloadVariant.value);
-                matchedSection = "extnotif";
-                break;
-              case "storeForward":
-                setStoreForwardConfig(moduleConfig.payloadVariant.value);
-                matchedSection = "storeforward";
-                break;
-              case "rangeTest":
-                setRangeTestConfig(moduleConfig.payloadVariant.value);
-                matchedSection = "rangetest";
-                break;
-              case "telemetry":
-                setTelemetryConfig(moduleConfig.payloadVariant.value);
-                matchedSection = "telemetry";
-                break;
-              case "cannedMessage":
-                setCannedMsgConfig(moduleConfig.payloadVariant.value);
-                matchedSection = "cannedmsg";
-                break;
-              case "audio":
-                setAudioConfig(moduleConfig.payloadVariant.value);
-                matchedSection = "audio";
-                break;
-              case "remoteHardware":
-                setRemoteHwConfig(moduleConfig.payloadVariant.value);
-                matchedSection = "remotehw";
-                break;
-              case "neighborInfo":
-                setNeighborInfoConfig(moduleConfig.payloadVariant.value);
-                matchedSection = "neighborinfo";
-                break;
-              case "ambientLighting":
-                setAmbientLightConfig(moduleConfig.payloadVariant.value);
-                matchedSection = "ambientlight";
-                break;
-              case "detectionSensor":
-                setDetectionSensorConfig(moduleConfig.payloadVariant.value);
-                matchedSection = "detectionsensor";
-                break;
-              case "paxcounter":
-                setPaxcounterConfig(moduleConfig.payloadVariant.value);
-                matchedSection = "paxcounter";
-                break;
+            const mc = adminMsg.payloadVariant.value;
+            const section = MODULE_CASE_TO_SECTION[mc.payloadVariant.case as string];
+            if (section) {
+              setConfigStore(prev => {
+                const next = new Map(prev);
+                next.set(section, mc.payloadVariant.value as Record<string, unknown>);
+                return next;
+              });
+              setConfigLoadedSections(n => n + 1);
             }
-            clearLoadingIfMatch(matchedSection);
             break;
           }
           case "getChannelResponse": {
             const channel = adminMsg.payloadVariant.value;
             setConfigChannels((prev) => {
               const next = [...prev];
-              const idx = channel.index;
-              next[idx] = channel;
+              next[channel.index] = channel;
               return next;
             });
-            // For channels, track which ones we've received
-            if (pendingConfigType === "channels") {
-              setPendingChannels((prev) => {
-                const updated = new Set(prev);
-                updated.add(channel.index);
-                // If we've received all 8 channels (0-7), clear loading
-                if (updated.size >= 8) {
-                  if (configTimeoutRef.current) {
-                    clearTimeout(configTimeoutRef.current);
-                    configTimeoutRef.current = null;
-                  }
-                  setConfigLoading(false);
-                  setPendingConfigType(null);
-                  return new Set();
-                }
-                return updated;
-              });
-            }
+            setPendingChannels((prev) => {
+              const updated = new Set(prev);
+              updated.add(channel.index);
+              if (updated.size >= 8) {
+                setConfigLoadedSections(n => n + 1);
+                return new Set();
+              }
+              return updated;
+            });
             break;
           }
           case "getOwnerResponse": {
             setConfigOwner(adminMsg.payloadVariant.value);
-            clearLoadingIfMatch("user");
+            setConfigLoadedSections(n => n + 1);
             break;
           }
         }
@@ -794,7 +686,18 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   // MeshView cache (5 second TTL)
   const meshViewCacheRef = useRef<{ data: any[]; timestamp: number } | null>(null);
 
-  // Cleanup timeout on unmount or config section change
+  // Clear loading when all sections arrive
+  useEffect(() => {
+    if (configLoadedSections >= TOTAL_CONFIG_SECTIONS && configLoading) {
+      setConfigLoading(false);
+      if (configTimeoutRef.current) {
+        clearTimeout(configTimeoutRef.current);
+        configTimeoutRef.current = null;
+      }
+    }
+  }, [configLoadedSections, configLoading]);
+
+  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (configTimeoutRef.current) {
@@ -802,7 +705,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         configTimeoutRef.current = null;
       }
     };
-  }, [configSection]);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = packetStore.onPacket((packet) => {
@@ -1651,7 +1554,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     showNotification(`Updated ${updated} of ${unknownNodes.length} unknown nodes`);
   }, [localMeshViewUrl, nodes, nodeStore, showNotification]);
 
-  const requestConfigSection = useCallback(async (section: ConfigSection) => {
+  const requestAllConfigs = useCallback(async () => {
     if (!transport) {
       showNotification("Not connected");
       return;
@@ -1661,133 +1564,44 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       return;
     }
 
-    // Clear any existing timeout
-    if (configTimeoutRef.current) {
-      clearTimeout(configTimeoutRef.current);
-      configTimeoutRef.current = null;
-    }
-
-    // Don't set loading for local settings (they're loaded from disk)
-    if (section === "local") {
-      const settings = loadSettings();
-      setLocalMeshViewUrl(settings.meshViewUrl);
-      return;
-    }
-
     setConfigLoading(true);
-    setPendingConfigType(section);
+    setConfigLoadedSections(0);
 
     const opts = { myNodeNum };
-    const CONFIG_TIMEOUT_MS = 10000; // 10 second timeout
 
     // Set up timeout
+    if (configTimeoutRef.current) clearTimeout(configTimeoutRef.current);
     configTimeoutRef.current = setTimeout(() => {
       setConfigLoading(false);
-      setPendingConfigType(null);
-      showNotification(`Timeout waiting for ${section} config`);
+      showNotification("Timeout loading some configs");
       configTimeoutRef.current = null;
-    }, CONFIG_TIMEOUT_MS);
+    }, 30000);
 
     try {
-      let binary: Uint8Array | null = null;
-
-      switch (section) {
-        case "device":
-          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.DEVICE_CONFIG, opts);
-          break;
-        case "position":
-          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.POSITION_CONFIG, opts);
-          break;
-        case "power":
-          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.POWER_CONFIG, opts);
-          break;
-        case "network":
-          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.NETWORK_CONFIG, opts);
-          break;
-        case "display":
-          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.DISPLAY_CONFIG, opts);
-          break;
-        case "lora":
-          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.LORA_CONFIG, opts);
-          break;
-        case "bluetooth":
-          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.BLUETOOTH_CONFIG, opts);
-          break;
-        case "security":
-          binary = adminHelper.createGetConfigRequest(adminHelper.ConfigType.SECURITY_CONFIG, opts);
-          break;
-        case "mqtt":
-          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.MQTT_CONFIG, opts);
-          break;
-        case "serial":
-          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.SERIAL_CONFIG, opts);
-          break;
-        case "extnotif":
-          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.EXTNOTIF_CONFIG, opts);
-          break;
-        case "storeforward":
-          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.STOREFORWARD_CONFIG, opts);
-          break;
-        case "rangetest":
-          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.RANGETEST_CONFIG, opts);
-          break;
-        case "telemetry":
-          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.TELEMETRY_CONFIG, opts);
-          break;
-        case "cannedmsg":
-          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.CANNEDMSG_CONFIG, opts);
-          break;
-        case "audio":
-          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.AUDIO_CONFIG, opts);
-          break;
-        case "remotehw":
-          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.REMOTEHARDWARE_CONFIG, opts);
-          break;
-        case "neighborinfo":
-          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.NEIGHBORINFO_CONFIG, opts);
-          break;
-        case "ambientlight":
-          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.AMBIENTLIGHTING_CONFIG, opts);
-          break;
-        case "detectionsensor":
-          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.DETECTIONSENSOR_CONFIG, opts);
-          break;
-        case "paxcounter":
-          binary = adminHelper.createGetModuleConfigRequest(adminHelper.ModuleConfigType.PAXCOUNTER_CONFIG, opts);
-          break;
-        case "channels":
-          // Request all 8 channels and track which ones we're waiting for
-          setPendingChannels(new Set([0, 1, 2, 3, 4, 5, 6, 7]));
-          for (let i = 0; i < 8; i++) {
-            const chBinary = adminHelper.createGetChannelRequest(i, opts);
-            await transport.send(chBinary);
-          }
-          // Loading will be cleared when all channels are received
-          return;
-        case "user":
-          binary = adminHelper.createGetOwnerRequest(opts);
-          break;
-        default:
-          if (configTimeoutRef.current) {
-            clearTimeout(configTimeoutRef.current);
-            configTimeoutRef.current = null;
-          }
-          setConfigLoading(false);
-          setPendingConfigType(null);
-          return;
-      }
-
-      if (binary) {
+      // Request all radio configs
+      for (const [, configType] of Object.entries(SECTION_TO_CONFIG_TYPE)) {
+        const binary = adminHelper.createGetConfigRequest(configType, opts);
         await transport.send(binary);
       }
-    } catch (error) {
-      if (configTimeoutRef.current) {
-        clearTimeout(configTimeoutRef.current);
-        configTimeoutRef.current = null;
+      // Request all module configs
+      for (const [, moduleType] of Object.entries(SECTION_TO_MODULE_TYPE)) {
+        const binary = adminHelper.createGetModuleConfigRequest(moduleType, opts);
+        await transport.send(binary);
       }
-      setConfigLoading(false);
-      setPendingConfigType(null);
-      showNotification(`Failed to request ${section} config: ${error instanceof Error ? error.message : "Unknown error"}`);
+      // Request all 8 channels
+      setPendingChannels(new Set([0, 1, 2, 3, 4, 5, 6, 7]));
+      for (let i = 0; i < 8; i++) {
+        const chBinary = adminHelper.createGetChannelRequest(i, opts);
+        await transport.send(chBinary);
+      }
+      // Request owner
+      const ownerBinary = adminHelper.createGetOwnerRequest(opts);
+      await transport.send(ownerBinary);
+      // Load local settings
+      const settings = loadSettings();
+      setLocalMeshViewUrl(settings.meshViewUrl);
+    } catch (error) {
+      showNotification(`Failed to request configs: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   }, [myNodeNum, transport, showNotification]);
 
@@ -1814,16 +1628,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       const binary = adminHelper.createSetOwnerRequest(updatedOwner, { myNodeNum });
       await transport.send(binary);
       setConfigOwner(updatedOwner);
-      if (batchEditMode) {
-        setBatchEditCount(c => c + 1);
-        showNotification(`Queued ${field} change (${batchEditCount + 1} pending)`);
-      } else {
-        showNotification(`Saved ${field}. Device may reboot.`);
-      }
+      showNotification(batchEditMode ? `Queued ${field}` : `Saved ${field}. Device may reboot.`);
     } catch {
       showNotification("Failed to save owner config");
     }
-  }, [myNodeNum, transport, configOwner, showNotification, batchEditMode, batchEditCount]);
+  }, [myNodeNum, transport, configOwner, showNotification, batchEditMode]);
 
   const saveChannel = useCallback(async (channelIndex: number, updates: { name?: string; role?: number; psk?: Uint8Array; uplinkEnabled?: boolean; downlinkEnabled?: boolean }) => {
     if (!transport || !myNodeNum) {
@@ -1856,91 +1665,91 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         c.index === channelIndex ? updatedChannel : c
       ));
 
-      if (batchEditMode) {
-        setBatchEditCount(c => c + 1);
-        showNotification(`Queued channel ${channelIndex} change`);
-      } else {
-        showNotification(`Saved channel ${channelIndex}. Device may reboot.`);
-      }
+      showNotification(batchEditMode ? `Queued channel ${channelIndex} change` : `Saved channel ${channelIndex}. Device may reboot.`);
     } catch {
       showNotification("Failed to save channel config");
     }
   }, [myNodeNum, transport, configChannels, showNotification, batchEditMode]);
 
-  // Save radio config (device, position, power, network, display, lora, bluetooth, security)
-  type RadioConfigCase = "device" | "position" | "power" | "network" | "display" | "lora" | "bluetooth" | "security";
-  const saveRadioConfig = useCallback(async <T extends object>(
-    configCase: RadioConfigCase,
-    configValue: T,
-    setter: React.Dispatch<React.SetStateAction<T | undefined>>,
-    label: string
-  ) => {
+  // Unified save for any config field
+  const saveConfigField = useCallback(async (section: string, fieldKey: string, newValue: unknown) => {
     if (!transport || !myNodeNum) return;
-    try {
-      const config = create(Config.ConfigSchema, {
-        payloadVariant: { case: configCase, value: configValue } as Config.Config["payloadVariant"],
-      });
-      const binary = adminHelper.createSetConfigRequest(config, { myNodeNum });
-      await transport.send(binary);
-      setter(configValue);
-      if (batchEditMode) {
-        setBatchEditCount(c => c + 1);
-        showNotification(`Queued ${label} change`);
-      } else {
-        showNotification(`Saved ${label}. Device may reboot.`);
-      }
-    } catch {
-      showNotification(`Failed to save ${label}`);
-    }
-  }, [myNodeNum, transport, showNotification, batchEditMode]);
 
-  // Save module config
-  type ModuleConfigCase = "mqtt" | "serial" | "externalNotification" | "storeForward" | "rangeTest" | "telemetry" | "cannedMessage" | "audio" | "remoteHardware" | "neighborInfo" | "ambientLighting" | "detectionSensor" | "paxcounter";
-  const saveModuleConfig = useCallback(async <T extends object>(
-    configCase: ModuleConfigCase,
-    configValue: T,
-    setter: React.Dispatch<React.SetStateAction<T | undefined>>,
-    label: string
-  ) => {
-    if (!transport || !myNodeNum) return;
-    try {
-      const config = create(ModuleConfig.ModuleConfigSchema, {
-        payloadVariant: { case: configCase, value: configValue } as ModuleConfig.ModuleConfig["payloadVariant"],
-      });
-      const binary = adminHelper.createSetModuleConfigRequest(config, { myNodeNum });
-      await transport.send(binary);
-      setter(configValue);
-      if (batchEditMode) {
-        setBatchEditCount(c => c + 1);
-        showNotification(`Queued ${label} change`);
-      } else {
-        showNotification(`Saved ${label}. Device may reboot.`);
-      }
-    } catch {
-      showNotification(`Failed to save ${label}`);
+    const label = `${section}.${fieldKey}`;
+
+    // Radio config
+    const radioCase = SECTION_TO_CONFIG_CASE[section];
+    if (radioCase) {
+      const currentData = configStore.get(section) as Record<string, unknown> | undefined;
+      if (!currentData) { showNotification(`No ${section} config loaded`); return; }
+      const updated = { ...currentData, [fieldKey]: newValue };
+      try {
+        const config = create(Config.ConfigSchema, {
+          payloadVariant: { case: radioCase, value: updated } as Config.Config["payloadVariant"],
+        });
+        const binary = adminHelper.createSetConfigRequest(config, { myNodeNum });
+        await transport.send(binary);
+        setConfigStore(prev => { const next = new Map(prev); next.set(section, updated); return next; });
+        showNotification(batchEditMode ? `Queued ${label}` : `Saved ${label}. Device may reboot.`);
+      } catch { showNotification(`Failed to save ${label}`); }
+      return;
     }
-  }, [myNodeNum, transport, showNotification, batchEditMode]);
+
+    // Module config
+    const moduleCase = SECTION_TO_MODULE_CASE[section];
+    if (moduleCase) {
+      const currentData = configStore.get(section) as Record<string, unknown> | undefined;
+      if (!currentData) { showNotification(`No ${section} config loaded`); return; }
+      const updated = { ...currentData, [fieldKey]: newValue };
+      try {
+        const config = create(ModuleConfig.ModuleConfigSchema, {
+          payloadVariant: { case: moduleCase, value: updated } as ModuleConfig.ModuleConfig["payloadVariant"],
+        });
+        const binary = adminHelper.createSetModuleConfigRequest(config, { myNodeNum });
+        await transport.send(binary);
+        setConfigStore(prev => { const next = new Map(prev); next.set(section, updated); return next; });
+        showNotification(batchEditMode ? `Queued ${label}` : `Saved ${label}. Device may reboot.`);
+      } catch { showNotification(`Failed to save ${label}`); }
+      return;
+    }
+  }, [myNodeNum, transport, configStore, showNotification, batchEditMode]);
 
   const startBatchEdit = useCallback(async () => {
     if (!transport || !myNodeNum) return;
     try {
       const binary = adminHelper.createBeginEditSettingsRequest({ myNodeNum });
       await transport.send(binary);
+      // Snapshot current field values for diff tracking
+      const snapshot = new Map<string, string>();
+      for (const row of buildFlatRows(configStore, configChannels, configOwner, localMeshViewUrl)) {
+        if (row.isSectionHeader || !row.field) continue;
+        snapshot.set(`${row.field.section}_${row.field.key}`, JSON.stringify(row.value));
+      }
+      batchSnapshotRef.current = snapshot;
       setBatchEditMode(true);
-      setBatchEditCount(0);
     } catch {
       // Silently fail - batch mode is best-effort
     }
-  }, [myNodeNum, transport]);
+  }, [myNodeNum, transport, configStore, configChannels, configOwner, localMeshViewUrl]);
 
   const commitBatchEdit = useCallback(async () => {
     if (!transport || !myNodeNum) return;
     try {
       const binary = adminHelper.createCommitEditSettingsRequest({ myNodeNum });
       await transport.send(binary);
+      // Count diffs inline since batchEditCount useMemo is defined later
+      const snapshot = batchSnapshotRef.current;
+      let count = 0;
+      if (snapshot.size > 0) {
+        for (const row of buildFlatRows(configStore, configChannels, configOwner, localMeshViewUrl)) {
+          if (row.isSectionHeader || !row.field) continue;
+          const key = `${row.field.section}_${row.field.key}`;
+          const snapshotVal = snapshot.get(key);
+          if (snapshotVal !== undefined && snapshotVal !== JSON.stringify(row.value)) count++;
+        }
+      }
       setBatchEditMode(false);
-      const count = batchEditCount;
-      setBatchEditCount(0);
+      batchSnapshotRef.current = new Map();
       setRebootReason(`Committing ${count} config changes`);
       setRebootElapsed(0);
       setShowRebootModal(true);
@@ -1948,11 +1757,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     } catch {
       showNotification("Failed to commit batch edit");
     }
-  }, [myNodeNum, transport, batchEditCount, showNotification]);
+  }, [myNodeNum, transport, configStore, configChannels, configOwner, localMeshViewUrl, showNotification]);
 
   const cancelBatchEdit = useCallback(() => {
     setBatchEditMode(false);
-    setBatchEditCount(0);
+    batchSnapshotRef.current = new Map();
     showNotification("Batch edit cancelled. Changes discarded.");
   }, [showNotification]);
 
@@ -2013,6 +1822,33 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     return getSortedNodes(filtered, nodesSortKey, nodesSortAscending);
   }, [nodes, nodesFilter, nodesSortKey, nodesSortAscending, getSortedNodes]);
 
+  // Build flat config rows
+  const flatConfigRows = useMemo(() =>
+    buildFlatRows(configStore, configChannels, configOwner, localMeshViewUrl, configFilter || undefined),
+    [configStore, configChannels, configOwner, localMeshViewUrl, configFilter]
+  );
+
+  // Build unfiltered rows for diffing (snapshot comparison ignores current filter)
+  const allConfigRows = useMemo(() =>
+    buildFlatRows(configStore, configChannels, configOwner, localMeshViewUrl),
+    [configStore, configChannels, configOwner, localMeshViewUrl]
+  );
+
+  // Derive batch edit count by diffing current values against snapshot
+  const batchEditCount = useMemo(() => {
+    if (!batchEditMode) return 0;
+    const snapshot = batchSnapshotRef.current;
+    if (snapshot.size === 0) return 0;
+    let count = 0;
+    for (const row of allConfigRows) {
+      if (row.isSectionHeader || !row.field) continue;
+      const key = `${row.field.section}_${row.field.key}`;
+      const snapshotVal = snapshot.get(key);
+      if (snapshotVal !== undefined && snapshotVal !== JSON.stringify(row.value)) count++;
+    }
+    return count;
+  }, [batchEditMode, allConfigRows]);
+
   // Key input handling
   useInput((input, key) => {
     // If quit dialog is showing, it handles its own input
@@ -2021,7 +1857,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     }
 
     // Check if any text input is focused (for suppressing global shortcuts)
-    const isInputFocused = chatInputFocused || dmInputFocused || nodesFilterInput || chatFilterInput || configEditing !== null;
+    const isInputFocused = chatInputFocused || dmInputFocused || nodesFilterInput || chatFilterInput || configFilterInput || configEditing !== null;
 
     // Quit - show confirmation dialog (but not when input is focused)
     if ((input === "q" || input === "Q") && !isInputFocused) {
@@ -2074,7 +1910,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       if (input === "4") { setMode("dm"); return; }
       if (input === "5") { setMode("log"); setChatInputFocused(false); setDmInputFocused(false); return; }
       if (input === "6" && localMeshViewUrl) { setMode("meshview"); setChatInputFocused(false); setDmInputFocused(false); return; }
-      if (input === (localMeshViewUrl ? "7" : "6")) { setMode("config"); setChatInputFocused(false); setDmInputFocused(false); if (!batchEditMode) startBatchEdit(); return; }
+      if (input === (localMeshViewUrl ? "7" : "6")) { setMode("config"); setChatInputFocused(false); setDmInputFocused(false); if (!batchEditMode) startBatchEdit(); requestAllConfigs(); return; }
       // Bracket keys for tab switching
       const modes: AppMode[] = localMeshViewUrl
         ? ["packets", "nodes", "chat", "dm", "log", "meshview", "config"]
@@ -2085,7 +1921,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         setMode(newMode);
         setChatInputFocused(false);
         setDmInputFocused(false);
-        if (newMode === "config" && !batchEditMode) startBatchEdit();
+        if (newMode === "config") { if (!batchEditMode) startBatchEdit(); requestAllConfigs(); }
         return;
       }
       if (input === "]") {
@@ -2094,7 +1930,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         setMode(newMode);
         setChatInputFocused(false);
         setDmInputFocused(false);
-        if (newMode === "config" && !batchEditMode) startBatchEdit();
+        if (newMode === "config") { if (!batchEditMode) startBatchEdit(); requestAllConfigs(); }
         return;
       }
     }
@@ -2835,310 +2671,207 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         return;
       }
     } else if (mode === "config") {
-      const menuCount = getMenuItemCount();
-
-      if (configSection === "menu") {
-        // Menu navigation
-        if (input === "j" || key.downArrow) {
-          setConfigMenuIndex((i) => Math.min(i + 1, menuCount - 1));
+      // Filter input mode
+      if (configFilterInput) {
+        if (key.escape) {
+          setConfigFilterInput(false);
+          setConfigFilter("");
           return;
         }
-        if (input === "k" || key.upArrow) {
-          setConfigMenuIndex((i) => Math.max(i - 1, 0));
-          return;
-        }
-        // Column navigation with h/l or left/right arrows
-        // Columns: radio (0-7), module (8-20), other (21-22), local (23)
-        const columnStarts = [0, 8, 21, 23];
-        const columnEnds = [7, 20, 22, 23];
-        const getColumn = (idx: number) => {
-          for (let c = 0; c < columnStarts.length; c++) {
-            if (idx >= columnStarts[c] && idx <= columnEnds[c]) return c;
-          }
-          return 0;
-        };
-        const getRowInColumn = (idx: number, col: number) => idx - columnStarts[col];
-        if (input === "h" || key.leftArrow) {
-          const col = getColumn(configMenuIndex);
-          if (col > 0) {
-            const row = getRowInColumn(configMenuIndex, col);
-            const newCol = col - 1;
-            const maxRow = columnEnds[newCol] - columnStarts[newCol];
-            const newRow = Math.min(row, maxRow);
-            setConfigMenuIndex(columnStarts[newCol] + newRow);
-          }
-          return;
-        }
-        if (input === "l" || key.rightArrow) {
-          const col = getColumn(configMenuIndex);
-          if (col < columnStarts.length - 1) {
-            const row = getRowInColumn(configMenuIndex, col);
-            const newCol = col + 1;
-            const maxRow = columnEnds[newCol] - columnStarts[newCol];
-            const newRow = Math.min(row, maxRow);
-            setConfigMenuIndex(columnStarts[newCol] + newRow);
-          }
-          return;
-        }
-        // Home/End
-        const isConfigHome = input === "g" || input === "\x1b[H" || input === "\x1b[1~" || input === "\x1bOH";
-        const isConfigEnd = input === "G" || input === "\x1b[F" || input === "\x1b[4~" || input === "\x1bOF";
-        if (isConfigHome) {
-          setConfigMenuIndex(0);
-          return;
-        }
-        if (isConfigEnd) {
-          setConfigMenuIndex(menuCount - 1);
-          return;
-        }
-        // Enter to select section
         if (key.return) {
-          const item = getMenuItemByIndex(configMenuIndex);
-          if (item) {
-            setConfigSection(item.key);
-            // Reset indices when entering sections
-            setSelectedConfigFieldIndex(0);
-            if (item.key === "channels") {
-              setSelectedChannelIndex(0);
-            }
-            // Load local settings immediately if entering local section
-            if (item.key === "local") {
-              const settings = loadSettings();
-              setLocalMeshViewUrl(settings.meshViewUrl);
-            } else {
-              requestConfigSection(item.key);
-            }
-          }
+          setConfigFilterInput(false);
           return;
         }
-        // 'r' for reboot
-        if (input === "r") {
-          sendRebootRequest(2);
+        if (key.backspace || key.delete) {
+          setConfigFilter(s => s.slice(0, -1));
           return;
         }
-        // 'b' to toggle batch edit mode
-        if (input === "b") {
-          if (batchEditMode) {
-            showNotification(`Batch mode active (${batchEditCount} pending). Press 'c' to commit or 'C' to cancel.`);
-          } else {
-            startBatchEdit();
-          }
+        if (input && !key.ctrl && !key.meta) {
+          setConfigFilter(s => s + input);
           return;
         }
-        // 'c' to commit batch edits
-        if (input === "c" && batchEditMode) {
-          commitBatchEdit();
+        return;
+      }
+
+      // Text editing mode
+      if (configEditing) {
+        if (key.escape) {
+          setConfigEditing(null);
+          setConfigEditValue("");
           return;
         }
-        // 'C' to cancel batch edits
-        if (input === "C" && batchEditMode) {
-          cancelBatchEdit();
-          return;
-        }
-      } else {
-        // Handle config editing mode
-        if (configEditing) {
-          if (key.escape) {
-            setConfigEditing(null);
-            setConfigEditValue("");
-            return;
-          }
-          if (key.return) {
-            // Save the edit - show notification to confirm we reached here
-            showNotification(`Saving ${configEditing}...`);
-            if (configSection === "user" && configOwner) {
-              saveOwner(configEditing, configEditValue);
-            } else if (configSection === "local" && configEditing === "meshViewUrl") {
-              // Save local settings
+        if (key.return) {
+          // Find the row being edited to determine category
+          const editRow = flatConfigRows.find(r => r.field && `${r.field.section}_${r.field.key}` === configEditing);
+          const field = editRow?.field;
+          if (field) {
+            if (field.category === "user") {
+              saveOwner(field.key, configEditValue);
+            } else if (field.category === "local" && field.key === "meshViewUrl") {
               const newUrl = configEditValue.trim() || undefined;
               setSetting("meshViewUrl", newUrl);
               setLocalMeshViewUrl(newUrl);
               showNotification(newUrl ? `MeshView URL set to ${newUrl}` : "MeshView URL cleared");
-            } else if (configSection === "channels" && configEditing?.startsWith("channel")) {
-              // Save channel settings - parse channel index from field key like "channel0_name" or "channel0_psk"
-              const nameMatch = configEditing.match(/^channel(\d+)_name$/);
-              const pskMatch = configEditing.match(/^channel(\d+)_psk$/);
+            } else if (field.category === "channel") {
+              const nameMatch = field.key.match(/^channel(\d+)_name$/);
+              const pskMatch = field.key.match(/^channel(\d+)_psk$/);
               if (nameMatch) {
-                const channelIndex = parseInt(nameMatch[1], 10);
-                saveChannel(channelIndex, { name: configEditValue });
+                saveChannel(parseInt(nameMatch[1], 10), { name: configEditValue });
               } else if (pskMatch) {
-                const channelIndex = parseInt(pskMatch[1], 10);
-                // Parse base64 PSK
                 try {
                   const trimmed = configEditValue.trim();
                   if (trimmed === "" || trimmed === "0") {
-                    // Empty or "0" means unencrypted
-                    saveChannel(channelIndex, { psk: new Uint8Array([0]) });
+                    saveChannel(parseInt(pskMatch[1], 10), { psk: new Uint8Array([0]) });
                   } else if (trimmed === "1" || trimmed.toLowerCase() === "default") {
-                    // "1" or "default" means default key
-                    saveChannel(channelIndex, { psk: new Uint8Array([1]) });
+                    saveChannel(parseInt(pskMatch[1], 10), { psk: new Uint8Array([1]) });
                   } else {
-                    // Try to decode as base64
                     const decoded = atob(trimmed);
                     const psk = new Uint8Array(decoded.length);
-                    for (let i = 0; i < decoded.length; i++) {
-                      psk[i] = decoded.charCodeAt(i);
-                    }
-                    saveChannel(channelIndex, { psk });
+                    for (let i = 0; i < decoded.length; i++) psk[i] = decoded.charCodeAt(i);
+                    saveChannel(parseInt(pskMatch[1], 10), { psk });
                   }
                 } catch {
                   showNotification("Invalid base64 key");
                 }
               }
-            }
-            setConfigEditing(null);
-            setConfigEditValue("");
-            return;
-          }
-          if (key.backspace || key.delete) {
-            setConfigEditValue(s => s.slice(0, -1));
-            return;
-          }
-          // Emacs keybindings
-          if (key.ctrl && input === "w") {
-            setConfigEditValue(s => s.replace(/\s*\S*$/, ""));
-            return;
-          }
-          if (key.ctrl && (input === "k" || input === "u")) {
-            setConfigEditValue("");
-            return;
-          }
-          if (input && !key.ctrl && !key.meta) {
-            setConfigEditValue(s => s + input);
-            return;
-          }
-          return;
-        }
-
-        // In a config section - Escape to go back to menu
-        if (key.escape) {
-          setConfigSection("menu");
-          return;
-        }
-        // Enter to refresh the config
-        if (key.return) {
-          requestConfigSection(configSection);
-          return;
-        }
-        // 'e' to enter edit mode for user config
-        if (input === "e" && configSection === "user" && configOwner) {
-          // Start editing long name
-          setConfigEditing("longName");
-          setConfigEditValue(configOwner.longName || "");
-          return;
-        }
-        // 'E' (shift+e) for short name
-        if (input === "E" && configSection === "user" && configOwner) {
-          setConfigEditing("shortName");
-          setConfigEditValue(configOwner.shortName || "");
-          return;
-        }
-        // 'e' to edit local settings
-        if (input === "e" && configSection === "local") {
-          setConfigEditing("meshViewUrl");
-          setConfigEditValue(localMeshViewUrl || "");
-          return;
-        }
-        // Generic config field navigation and editing for radio/module configs
-        const isEditableConfigSection = [
-          "device", "position", "power", "network", "display", "lora", "bluetooth", "security",
-          "mqtt", "serial", "extnotif", "storeforward", "rangetest", "telemetry", "cannedmsg",
-          "audio", "remotehw", "neighborinfo", "ambientlight", "detectionsensor", "paxcounter"
-        ].includes(configSection);
-
-        if (isEditableConfigSection) {
-          const fieldCount = CONFIG_FIELD_COUNTS[configSection] || 0;
-
-          // j/k to navigate fields
-          if (input === "j" || key.downArrow) {
-            setSelectedConfigFieldIndex(i => Math.min(i + 1, fieldCount - 1));
-            return;
-          }
-          if (input === "k" || key.upArrow) {
-            setSelectedConfigFieldIndex(i => Math.max(i - 1, 0));
-            return;
-          }
-          // g/G for first/last field
-          if (input === "g") {
-            setSelectedConfigFieldIndex(0);
-            return;
-          }
-          if (input === "G") {
-            setSelectedConfigFieldIndex(fieldCount - 1);
-            return;
-          }
-        }
-
-        // Channel navigation and editing
-        const validChannels = configChannels.filter(ch => ch != null).sort((a, b) => a.index - b.index);
-        if (configSection === "channels" && validChannels.length > 0) {
-          // j/k to navigate channels
-          if (input === "j" || key.downArrow) {
-            setSelectedChannelIndex(i => Math.min(i + 1, validChannels.length - 1));
-            return;
-          }
-          if (input === "k" || key.upArrow) {
-            setSelectedChannelIndex(i => Math.max(i - 1, 0));
-            return;
-          }
-          // 'e' to edit channel name
-          if (input === "e") {
-            const channel = validChannels[selectedChannelIndex];
-            if (channel) {
-              setConfigEditing(`channel${channel.index}_name`);
-              setConfigEditValue(channel.settings?.name || "");
-            }
-            return;
-          }
-          // 'r' to cycle channel role
-          if (input === "r") {
-            const channel = validChannels[selectedChannelIndex];
-            if (channel) {
-              // Cycle: DISABLED(0) -> PRIMARY(1) -> SECONDARY(2) -> DISABLED(0)
-              const nextRole = (channel.role + 1) % 3;
-              saveChannel(channel.index, { role: nextRole });
-            }
-            return;
-          }
-          // 'p' to edit PSK
-          if (input === "p") {
-            const channel = validChannels[selectedChannelIndex];
-            if (channel) {
-              setConfigEditing(`channel${channel.index}_psk`);
-              // Show current PSK as base64
-              const psk = channel.settings?.psk;
-              if (psk && psk.length > 0 && !(psk.length === 1 && psk[0] === 0)) {
-                const binary = String.fromCharCode(...psk);
-                try {
-                  setConfigEditValue(btoa(binary));
-                } catch {
-                  setConfigEditValue("");
-                }
+            } else if (field.category === "radio" || field.category === "module") {
+              const parsed = field.type === "number" ? Number(configEditValue) : configEditValue;
+              if (field.type === "number" && isNaN(parsed as number)) {
+                showNotification("Invalid number");
               } else {
-                setConfigEditValue("");
+                saveConfigField(field.section, field.key, parsed);
               }
             }
-            return;
           }
-          // 'u' to toggle uplink
-          if (input === "u") {
-            const channel = validChannels[selectedChannelIndex];
-            if (channel) {
-              const newValue = !channel.settings?.uplinkEnabled;
-              saveChannel(channel.index, { uplinkEnabled: newValue });
+          setConfigEditing(null);
+          setConfigEditValue("");
+          return;
+        }
+        if (key.backspace || key.delete) {
+          setConfigEditValue(s => s.slice(0, -1));
+          return;
+        }
+        if (key.ctrl && input === "w") {
+          setConfigEditValue(s => s.replace(/\s*\S*$/, ""));
+          return;
+        }
+        if (key.ctrl && (input === "k" || input === "u")) {
+          setConfigEditValue("");
+          return;
+        }
+        if (input && !key.ctrl && !key.meta) {
+          setConfigEditValue(s => s + input);
+          return;
+        }
+        return;
+      }
+
+      // Helper to find next/prev selectable row (skip section headers)
+      const findNextSelectable = (from: number, dir: 1 | -1): number => {
+        let idx = from + dir;
+        while (idx >= 0 && idx < flatConfigRows.length) {
+          if (!flatConfigRows[idx].isSectionHeader) return idx;
+          idx += dir;
+        }
+        return from;
+      };
+
+      // Escape to go back to packets
+      if (key.escape) {
+        if (configFilter) {
+          setConfigFilter("");
+          return;
+        }
+        setMode("packets");
+        return;
+      }
+
+      // j/k navigation (skip section headers)
+      if (input === "j" || key.downArrow) {
+        setSelectedConfigIndex(i => findNextSelectable(i, 1));
+        return;
+      }
+      if (input === "k" || key.upArrow) {
+        setSelectedConfigIndex(i => findNextSelectable(i, -1));
+        return;
+      }
+
+      // g/G for first/last selectable row
+      if (input === "g") {
+        const first = flatConfigRows.findIndex(r => !r.isSectionHeader);
+        if (first >= 0) setSelectedConfigIndex(first);
+        return;
+      }
+      if (input === "G") {
+        for (let i = flatConfigRows.length - 1; i >= 0; i--) {
+          if (!flatConfigRows[i].isSectionHeader) { setSelectedConfigIndex(i); break; }
+        }
+        return;
+      }
+
+      // Enter/Space to edit the selected field
+      const selectedRow = flatConfigRows[selectedConfigIndex];
+      if (selectedRow && !selectedRow.isSectionHeader && selectedRow.field) {
+        const field = selectedRow.field;
+
+        if (key.return || input === " ") {
+          if (field.type === "readonly") return;
+
+          if (field.type === "boolean") {
+            const newVal = !selectedRow.value;
+            if (field.category === "channel") {
+              const match = field.key.match(/^channel(\d+)_(uplinkEnabled|downlinkEnabled)$/);
+              if (match) saveChannel(parseInt(match[1], 10), { [match[2]]: newVal });
+            } else if (field.category === "radio" || field.category === "module") {
+              saveConfigField(field.section, field.key, newVal);
             }
             return;
           }
-          // 'D' to toggle downlink (capital to avoid conflict with DM shortcut)
-          if (input === "D") {
-            const channel = validChannels[selectedChannelIndex];
-            if (channel) {
-              const newValue = !channel.settings?.downlinkEnabled;
-              saveChannel(channel.index, { downlinkEnabled: newValue });
+
+          if (field.type === "enum") {
+            if (field.category === "channel") {
+              const match = field.key.match(/^channel(\d+)_role$/);
+              if (match) {
+                const nextRole = ((selectedRow.value as number) + 1) % 3;
+                saveChannel(parseInt(match[1], 10), { role: nextRole });
+              }
+            } else if (field.enumMap && (field.category === "radio" || field.category === "module")) {
+              const keys = Object.keys(field.enumMap).map(Number).sort((a, b) => a - b);
+              const currentIdx = keys.indexOf(selectedRow.value as number);
+              const nextIdx = (currentIdx + 1) % keys.length;
+              saveConfigField(field.section, field.key, keys[nextIdx]);
             }
+            return;
+          }
+
+          if (field.type === "text" || field.type === "number") {
+            setConfigEditing(`${field.section}_${field.key}`);
+            setConfigEditValue(getRawEditValue(field, selectedRow.value));
             return;
           }
         }
+      }
+
+      // '/' to enter filter mode
+      if (input === "/") {
+        setConfigFilterInput(true);
+        return;
+      }
+
+      // 'c' to commit batch edits
+      if (input === "c" && batchEditMode) {
+        commitBatchEdit();
+        return;
+      }
+      // 'C' to discard batch edits
+      if (input === "C" && batchEditMode) {
+        cancelBatchEdit();
+        return;
+      }
+      // 'r' for reboot
+      if (input === "r") {
+        sendRebootRequest(2);
+        return;
       }
     } else if (mode === "meshview") {
       const pageSize = Math.max(1, terminalHeight - meshViewInspectorHeight - 10);
@@ -3373,6 +3106,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
                 sortKey={nodesSortKey}
                 sortAscending={nodesSortAscending}
                 terminalWidth={terminalWidth}
+                meshViewUrl={localMeshViewUrl}
               />
             </Box>
           </ErrorBoundary>
@@ -3394,7 +3128,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
                 selectedMessageIndex={selectedChatMessageIndex}
                 showEmojiSelector={showEmojiSelector}
                 emojiSelectorIndex={emojiSelectorIndex}
-                loraConfig={loraConfig}
+                loraConfig={configStore.get("lora") as Config.Config_LoRaConfig | undefined}
                 filter={chatFilter}
                 filterInputActive={chatFilterInput}
                 meshViewConfirmedIds={meshViewConfirmedIds}
@@ -3433,41 +3167,18 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           <ErrorBoundary context="Config Panel">
             <Box flexGrow={1} borderStyle="single" borderColor={theme.border.normal}>
               <ConfigPanel
-              section={configSection}
-              selectedMenuIndex={configMenuIndex}
-              height={terminalHeight - 6}
-              loading={configLoading}
-              deviceConfig={deviceConfig}
-              positionConfig={positionConfig}
-              powerConfig={powerConfig}
-              networkConfig={networkConfig}
-              displayConfig={displayConfig}
-              loraConfig={loraConfig}
-              bluetoothConfig={bluetoothConfig}
-              securityConfig={securityConfig}
-              mqttConfig={mqttConfig}
-              serialConfig={serialConfig}
-              extNotifConfig={extNotifConfig}
-              storeForwardConfig={storeForwardConfig}
-              rangeTestConfig={rangeTestConfig}
-              telemetryConfig={telemetryConfig}
-              cannedMsgConfig={cannedMsgConfig}
-              audioConfig={audioConfig}
-              remoteHwConfig={remoteHwConfig}
-              neighborInfoConfig={neighborInfoConfig}
-              ambientLightConfig={ambientLightConfig}
-              detectionSensorConfig={detectionSensorConfig}
-              paxcounterConfig={paxcounterConfig}
-              channels={configChannels}
-              owner={configOwner}
-              meshViewUrl={localMeshViewUrl}
-              editingField={configEditing}
-              editValue={configEditValue}
-              selectedFieldIndex={selectedConfigFieldIndex}
-              selectedChannelIndex={selectedChannelIndex}
-              batchEditMode={batchEditMode}
-              batchEditCount={batchEditCount}
-            />
+                rows={flatConfigRows}
+                selectedIndex={selectedConfigIndex}
+                height={terminalHeight - 6}
+                loading={configLoading}
+                editingField={configEditing}
+                editValue={configEditValue}
+                batchEditCount={batchEditCount}
+                filter={configFilter}
+                filterInputActive={configFilterInput}
+                loadedSections={configLoadedSections}
+                totalSections={TOTAL_CONFIG_SECTIONS}
+              />
             </Box>
           </ErrorBoundary>
         )}

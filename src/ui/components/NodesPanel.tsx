@@ -25,9 +25,10 @@ interface NodesPanelProps {
   sortKey?: NodeSortKey;
   sortAscending?: boolean;
   terminalWidth?: number;
+  meshViewUrl?: string;
 }
 
-function NodesPanelComponent({ nodes, selectedIndex, height = 20, inspectorHeight = 10, filter, filterInputActive, sortKey = "hops", sortAscending = true, terminalWidth = 100 }: NodesPanelProps) {
+function NodesPanelComponent({ nodes, selectedIndex, height = 20, inspectorHeight = 10, filter, filterInputActive, sortKey = "hops", sortAscending = true, terminalWidth = 100, meshViewUrl }: NodesPanelProps) {
   const hasFilter = filter && filter.length > 0;
   const filterRowHeight = (hasFilter || filterInputActive) ? 1 : 0;
 
@@ -127,7 +128,7 @@ function NodesPanelComponent({ nodes, selectedIndex, height = 20, inspectorHeigh
 
       {/* Node inspector */}
       <Box height={inspectorHeight} flexDirection="column">
-        <NodeInspector node={selectedNode} allNodes={nodes} height={inspectorHeight} />
+        <NodeInspector node={selectedNode} allNodes={nodes} height={inspectorHeight} meshViewUrl={meshViewUrl} />
       </Box>
     </Box>
   );
@@ -189,7 +190,7 @@ function NodeRow({ node, isSelected, terminalWidth = 100 }: NodeRowProps) {
   );
 }
 
-function NodeInspector({ node, allNodes, height }: { node?: NodeData; allNodes: NodeData[]; height: number }) {
+function NodeInspector({ node, allNodes, height, meshViewUrl }: { node?: NodeData; allNodes: NodeData[]; height: number; meshViewUrl?: string }) {
   if (!node) {
     return (
       <Box paddingX={1}>
@@ -353,6 +354,17 @@ function NodeInspector({ node, allNodes, height }: { node?: NodeData; allNodes: 
     );
   }
 
+  // MeshView URL
+  if (meshViewUrl) {
+    const nodeIdHex = node.num.toString(16).padStart(8, "0");
+    lines.push(
+      <Box key="meshview">
+        <Text color={theme.fg.muted}>MeshView: </Text>
+        <Text color={theme.data.hardware}>{meshViewUrl}/node/{nodeIdHex}</Text>
+      </Box>
+    );
+  }
+
   return <Box flexDirection="column" paddingX={1}>{lines.slice(0, height - 1)}</Box>;
 }
 
@@ -368,7 +380,8 @@ export const NodesPanel = React.memo(NodesPanelComponent, (prevProps, nextProps)
     prevProps.filterInputActive !== nextProps.filterInputActive ||
     prevProps.sortKey !== nextProps.sortKey ||
     prevProps.sortAscending !== nextProps.sortAscending ||
-    prevProps.terminalWidth !== nextProps.terminalWidth
+    prevProps.terminalWidth !== nextProps.terminalWidth ||
+    prevProps.meshViewUrl !== nextProps.meshViewUrl
   ) {
     return false; // Props changed, re-render
   }
