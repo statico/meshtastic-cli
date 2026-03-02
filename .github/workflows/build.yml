@@ -18,6 +18,9 @@ jobs:
             target: bun-linux-x64
             artifact: meshtastic-cli-linux-x64
           - os: ubuntu-latest
+            target: bun-linux-x64-baseline
+            artifact: meshtastic-cli-linux-x64-baseline
+          - os: ubuntu-latest
             target: bun-linux-arm64
             artifact: meshtastic-cli-linux-arm64
           - os: macos-latest
