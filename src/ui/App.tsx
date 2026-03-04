@@ -1435,6 +1435,27 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     }
   }, [myNodeNum, transport, nodeStore, showNotification]);
 
+  const removeAllUnknownNodes = useCallback(async () => {
+    if (!transport || !myNodeNum) return;
+    const unknownNodes = nodes.filter(n => n.num !== myNodeNum && (!n.shortName || n.shortName === "???"));
+    if (unknownNodes.length === 0) {
+      showNotification("No unknown nodes to remove");
+      return;
+    }
+    let removed = 0;
+    for (const node of unknownNodes) {
+      try {
+        const binary = adminHelper.createRemoveNodeRequest(node.num, { myNodeNum });
+        await transport.send(binary);
+        nodeStore.removeNode(node.num);
+        removed++;
+      } catch { /* continue removing others */ }
+    }
+    setNodes((prev) => prev.filter((n) => n.num === myNodeNum || (n.shortName && n.shortName !== "???")));
+    setSelectedNodeIndex(0);
+    showNotification(`Removed ${removed} unknown node${removed !== 1 ? "s" : ""}`);
+  }, [myNodeNum, transport, nodes, nodeStore, showNotification]);
+
   const toggleFavoriteNode = useCallback(async (nodeNum: number) => {
     if (!transport || !myNodeNum) return;
     const node = nodes.find((n) => n.num === nodeNum);
@@ -2290,6 +2311,10 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       // Node management shortcuts
       if (input === "x" && selectedNode && selectedNode.num !== myNodeNum) {
         removeNode(selectedNode.num);
+      }
+      // 'X' (shift+x) to remove all unknown nodes
+      if (input === "X") {
+        removeAllUnknownNodes();
       }
       if (input === "f" && selectedNode) {
         toggleFavoriteNode(selectedNode.num);

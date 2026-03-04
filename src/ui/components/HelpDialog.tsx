@@ -54,6 +54,7 @@ const nodeKeys = [
   { key: "f", desc: "Toggle favorite" },
   { key: "I", desc: "Toggle ignored" },
   { key: "x", desc: "Remove node from DB" },
+  { key: "X", desc: "Remove all unknown nodes" },
 ];
 
 const chatKeys = [
