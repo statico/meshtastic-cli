@@ -858,10 +858,10 @@ export function getLogResponses(limit = 100): LogResponse[] {
   const positions = getPositionResponses(limit);
   const traceroutes = getTracerouteResponses(limit);
   const nodeinfos = getNodeInfoResponses(limit);
-  // Merge and sort by timestamp
+  // Merge and sort by timestamp (newest first)
   const all = [...positions, ...traceroutes, ...nodeinfos];
-  all.sort((a, b) => a.timestamp - b.timestamp);
-  return all.slice(-limit);
+  all.sort((a, b) => b.timestamp - a.timestamp);
+  return all.slice(0, limit);
 }
 
 // DM (Direct Message) queries

@@ -378,9 +378,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
 
     const initialLogs = db.getLogResponses(100);
     setLogResponses(initialLogs);
-    if (initialLogs.length > 0) {
-      setSelectedLogIndex(initialLogs.length - 1);
-    }
+    setSelectedLogIndex(0);
 
     // Batch node updates to reduce flickering (similar to packet batching)
     nodeStore.onUpdate((updatedNodes) => {
@@ -507,7 +505,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           timestamp: Math.floor(Date.now() / 1000),
         };
         db.insertPositionResponse(posResponse);
-        setLogResponses(prev => [...prev, posResponse].slice(-100));
+        setLogResponses(prev => [posResponse, ...prev].slice(0, 100));
         setResponseModalData({ type: "position", fromNode: mp.from, data: pos });
         setShowResponseModal(true);
       }
@@ -526,7 +524,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           timestamp: Math.floor(Date.now() / 1000),
         };
         db.insertTracerouteResponse(trResponse);
-        setLogResponses(prev => [...prev, trResponse].slice(-100));
+        setLogResponses(prev => [trResponse, ...prev].slice(0, 100));
         setResponseModalData({ type: "traceroute", fromNode: mp.from, data: route });
         setShowResponseModal(true);
       }
@@ -544,7 +542,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           timestamp: Math.floor(Date.now() / 1000),
         };
         db.insertNodeInfoResponse(niResponse);
-        setLogResponses(prev => [...prev, niResponse].slice(-100));
+        setLogResponses(prev => [niResponse, ...prev].slice(0, 100));
         setResponseModalData({ type: "nodeinfo", fromNode: mp.from, data: user });
         setShowResponseModal(true);
       }

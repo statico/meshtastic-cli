@@ -81,7 +81,7 @@ function LogList({ responses, selectedIndex, height, nodeStore }: {
   height: number;
   nodeStore: NodeStore;
 }) {
-  const visibleCount = Math.max(1, height - 1);
+  const visibleCount = Math.max(1, height - 2); // Account for header
 
   let startIndex = 0;
   if (responses.length > visibleCount) {
@@ -97,8 +97,9 @@ function LogList({ responses, selectedIndex, height, nodeStore }: {
   return (
     <>
       <Box paddingX={1}>
-        <Text color={theme.fg.accent} bold>Log</Text>
-        <Text color={theme.fg.muted}> ({responses.length})</Text>
+        <Text color={theme.fg.muted}>{"TYPE".padEnd(4)}</Text>
+        <Text color={theme.fg.muted}>{"NAME".padEnd(12)}</Text>
+        <Text color={theme.fg.muted}>{"TIME"}</Text>
       </Box>
       {visibleResponses.map((response, i) => (
         <LogRow
@@ -130,7 +131,8 @@ function LogRow({ response, isSelected, nodeStore }: {
   const type = isPosition ? "POS" : isNodeInfo ? "NI" : "TR";
   const typeColor = isPosition ? theme.packet.position : isNodeInfo ? theme.packet.nodeinfo : theme.packet.traceroute;
   const fromName = nodeStore.getNodeName(response.fromNode);
-  const time = new Date(response.timestamp * 1000).toLocaleTimeString(undefined, { hour12: false });
+  const d = new Date(response.timestamp * 1000);
+  const time = `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")} ${d.toLocaleTimeString(undefined, { hour12: false })}`;
   const bgColor = isSelected ? theme.bg.selected : undefined;
 
   return (
