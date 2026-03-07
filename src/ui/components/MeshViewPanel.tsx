@@ -93,8 +93,8 @@ function renderPayloadSummary(payload: string, portnum: number, useFahrenheit: b
 
     // Position data - convert latitudeI/longitudeI to real coordinates
     if (parsed.latitudeI !== undefined && parsed.longitudeI !== undefined) {
-      const lat = (parsed.latitudeI / 1e7).toFixed(5);
-      const lon = (parsed.longitudeI / 1e7).toFixed(5);
+      const lat = (parsed.latitudeI / 1e7).toFixed(6);
+      const lon = (parsed.longitudeI / 1e7).toFixed(6);
       return (
         <>
           <Text color={theme.data.coords}> {lat}</Text>

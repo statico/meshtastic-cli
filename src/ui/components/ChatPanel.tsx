@@ -139,7 +139,7 @@ function ChatPanelComponent({
         let remaining = line;
         while (remaining.length > textWidth) {
           let breakPoint = remaining.lastIndexOf(" ", textWidth);
-          if (breakPoint <= 0) breakPoint = textWidth;
+          if (breakPoint < 1) breakPoint = textWidth;
           lineCount++;
           remaining = remaining.slice(breakPoint).trimStart();
         }
@@ -337,7 +337,7 @@ function ChatPanelComponent({
         <Box paddingX={1}>
           <Text color={theme.fg.muted}>replying to </Text>
           <Text color={theme.fg.accent}>{nodeStore.getNodeName(replyTo.fromNode)}</Text>
-          <Text color={theme.fg.muted}>: "{replyTo.text.length > 30 ? replyTo.text.slice(0, 30) + "..." : replyTo.text}"</Text>
+          <Text color={theme.fg.muted}>: "{(replyTo.text || "").length > 30 ? (replyTo.text || "").slice(0, 30) + "..." : replyTo.text || ""}"</Text>
         </Box>
       )}
 

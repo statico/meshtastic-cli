@@ -122,7 +122,7 @@ function TracerouteDetails({ data, nodeStore }: { data: unknown; nodeStore: Node
         const name = nodeStore.getNodeName(nodeNum);
         const snr = route.snrTowards?.[i];
         return (
-          <Box key={nodeNum}>
+          <Box key={`${nodeNum}-${i}`}>
             <Text color={theme.fg.muted}>  {i + 1}. </Text>
             <Text color={theme.fg.accent}>{name}</Text>
             <Text color={theme.fg.muted}> ({formatNodeId(nodeNum)})</Text>

@@ -71,7 +71,8 @@ export const LogPanel = React.memo(LogPanelComponent, (prevProps, nextProps) => 
   return (
     prevProps.responses.length === nextProps.responses.length &&
     prevProps.selectedIndex === nextProps.selectedIndex &&
-    prevProps.height === nextProps.height
+    prevProps.height === nextProps.height &&
+    prevProps.nodeStore === nextProps.nodeStore
   );
 });
 

@@ -1101,9 +1101,16 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     }
   }, [transport]);
 
+  const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const showNotification = useCallback((msg: string, color?: string) => {
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+    }
     setNotification({ message: msg, color });
-    setTimeout(() => setNotification(null), 2000);
+    notificationTimeoutRef.current = setTimeout(() => {
+      setNotification(null);
+      notificationTimeoutRef.current = null;
+    }, 2000);
   }, []);
 
   const sendMessage = useCallback(async (text: string, replyId?: number) => {
@@ -2937,7 +2944,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
             if (field.category === "channel") {
               const match = field.key.match(/^channel(\d+)_role$/);
               if (match) {
-                const nextRole = ((selectedRow.value as number) + 1) % 3;
+                const roleCount = Object.keys(Channel.Channel_Role).filter(k => isNaN(Number(k))).length;
+                const nextRole = ((selectedRow.value as number) + 1) % roleCount;
                 saveChannel(parseInt(match[1], 10), { role: nextRole });
               }
             } else if (field.enumMap && (field.category === "radio" || field.category === "module")) {
