@@ -93,8 +93,19 @@ export function ConfigPanel({
 
           if (row.isSectionHeader) {
             return (
-              <Box key={`hdr-${row.sectionHeader}-${i}`}>
+              <Box key={`hdr-${row.sectionHeader}-${i}`} backgroundColor={isSelected ? theme.bg.selected : undefined}>
+                <Text color={isSelected ? theme.fg.accent : theme.fg.muted}>
+                  {isSelected ? "> " : "  "}
+                </Text>
                 <Text color={theme.fg.muted}>── {row.sectionHeader} ──</Text>
+                {row.sectionKey && !row.isLoaded && (
+                  <Text color={isSelected ? theme.fg.accent : theme.fg.muted}>
+                    {isSelected ? " [Enter] load" : " (not loaded)"}
+                  </Text>
+                )}
+                {row.isLoaded && (
+                  <Text color={theme.fg.muted}> ✓</Text>
+                )}
               </Box>
             );
           }
@@ -141,9 +152,9 @@ export function ConfigPanel({
       {/* Footer */}
       <Box paddingX={1}>
         {(batchEditCount ?? 0) > 0 ? (
-          <Text color={theme.fg.muted}>j/k nav | Enter edit | / filter | c commit | C discard | r reboot</Text>
+          <Text color={theme.fg.muted}>j/k nav | Enter edit/load | L load all | / filter | c commit | C discard | r reboot</Text>
         ) : (
-          <Text color={theme.fg.muted}>j/k nav | Enter edit | / filter | r reboot</Text>
+          <Text color={theme.fg.muted}>j/k nav | Enter edit/load | L load all | / filter | r reboot</Text>
         )}
       </Box>
     </Box>

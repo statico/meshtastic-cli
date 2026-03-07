@@ -1685,6 +1685,54 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     }
   }, [myNodeNum, transport, showNotification]);
 
+  const requestSectionConfig = useCallback(async (sectionKey: string) => {
+    if (!transport || !myNodeNum) {
+      showNotification("Not connected");
+      return;
+    }
+
+    const opts = { myNodeNum };
+
+    try {
+      if (sectionKey === "channels") {
+        setPendingChannels(new Set([0, 1, 2, 3, 4, 5, 6, 7]));
+        for (let i = 0; i < 8; i++) {
+          const chBinary = adminHelper.createGetChannelRequest(i, opts);
+          await transport.send(chBinary);
+        }
+        showNotification("Loading channels...");
+        return;
+      }
+
+      if (sectionKey === "user") {
+        const ownerBinary = adminHelper.createGetOwnerRequest(opts);
+        await transport.send(ownerBinary);
+        showNotification("Loading user info...");
+        return;
+      }
+
+      // Radio config section
+      const configType = SECTION_TO_CONFIG_TYPE[sectionKey];
+      if (configType !== undefined) {
+        const binary = adminHelper.createGetConfigRequest(configType, opts);
+        await transport.send(binary);
+        showNotification(`Loading ${sectionKey}...`);
+        return;
+      }
+
+      // Module config section
+      const moduleType = SECTION_TO_MODULE_TYPE[sectionKey];
+      if (moduleType !== undefined) {
+        const binary = adminHelper.createGetModuleConfigRequest(moduleType, opts);
+        await transport.send(binary);
+        showNotification(`Loading ${sectionKey}...`);
+        return;
+      }
+    } catch {
+      showNotification(`Failed to load ${sectionKey}`);
+    }
+  }, [myNodeNum, transport, showNotification]);
+
   const sendRebootRequest = useCallback(async (seconds: number = 2, reason: string = "Manual reboot") => {
     if (!transport || !myNodeNum) return;
     try {
@@ -2018,7 +2066,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       if (input === "4") { setMode("dm"); return; }
       if (input === "5") { setMode("log"); setChatInputFocused(false); setDmInputFocused(false); return; }
       if (input === "6" && localMeshViewUrl) { setMode("meshview"); setChatInputFocused(false); setDmInputFocused(false); return; }
-      if (input === (localMeshViewUrl ? "7" : "6")) { setMode("config"); setChatInputFocused(false); setDmInputFocused(false); if (!batchEditMode) startBatchEdit(); requestAllConfigs(); return; }
+      if (input === (localMeshViewUrl ? "7" : "6")) { setMode("config"); setChatInputFocused(false); setDmInputFocused(false); if (!batchEditMode) startBatchEdit(); return; }
       // Bracket keys for tab switching
       const modes: AppMode[] = localMeshViewUrl
         ? ["packets", "nodes", "chat", "dm", "log", "meshview", "config"]
@@ -2029,7 +2077,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         setMode(newMode);
         setChatInputFocused(false);
         setDmInputFocused(false);
-        if (newMode === "config") { if (!batchEditMode) startBatchEdit(); requestAllConfigs(); }
+        if (newMode === "config") { if (!batchEditMode) startBatchEdit(); }
         return;
       }
       if (input === "]") {
@@ -2038,7 +2086,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         setMode(newMode);
         setChatInputFocused(false);
         setDmInputFocused(false);
-        if (newMode === "config") { if (!batchEditMode) startBatchEdit(); requestAllConfigs(); }
+        if (newMode === "config") { if (!batchEditMode) startBatchEdit(); }
         return;
       }
     }
@@ -2878,13 +2926,10 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         return;
       }
 
-      // Helper to find next/prev selectable row (skip section headers)
+      // Helper to find next/prev selectable row (section headers are selectable for lazy loading)
       const findNextSelectable = (from: number, dir: 1 | -1): number => {
-        let idx = from + dir;
-        while (idx >= 0 && idx < flatConfigRows.length) {
-          if (!flatConfigRows[idx].isSectionHeader) return idx;
-          idx += dir;
-        }
+        const idx = from + dir;
+        if (idx >= 0 && idx < flatConfigRows.length) return idx;
         return from;
       };
 
@@ -2908,21 +2953,32 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         return;
       }
 
-      // g/G for first/last selectable row
+      // g/G for first/last row
       if (input === "g") {
-        const first = flatConfigRows.findIndex(r => !r.isSectionHeader);
-        if (first >= 0) setSelectedConfigIndex(first);
+        if (flatConfigRows.length > 0) setSelectedConfigIndex(0);
         return;
       }
       if (input === "G") {
-        for (let i = flatConfigRows.length - 1; i >= 0; i--) {
-          if (!flatConfigRows[i].isSectionHeader) { setSelectedConfigIndex(i); break; }
+        if (flatConfigRows.length > 0) setSelectedConfigIndex(flatConfigRows.length - 1);
+        return;
+      }
+
+      // Enter/Space on section header to load that section
+      const selectedRow = flatConfigRows[selectedConfigIndex];
+      if (selectedRow && selectedRow.isSectionHeader && selectedRow.sectionKey && !selectedRow.isLoaded) {
+        if (key.return || input === " ") {
+          requestSectionConfig(selectedRow.sectionKey);
+          return;
         }
+      }
+
+      // 'L' to load all config sections at once
+      if (input === "L") {
+        requestAllConfigs();
         return;
       }
 
       // Enter/Space to edit the selected field
-      const selectedRow = flatConfigRows[selectedConfigIndex];
       if (selectedRow && !selectedRow.isSectionHeader && selectedRow.field) {
         const field = selectedRow.field;
 

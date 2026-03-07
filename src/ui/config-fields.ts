@@ -19,9 +19,11 @@ export interface FieldDef {
 export interface FlatConfigRow {
   field: FieldDef | null; // null for section headers
   sectionHeader?: string;
+  sectionKey?: string;
   value: unknown;
   displayValue: string;
   isSectionHeader: boolean;
+  isLoaded?: boolean;
 }
 
 export type ConfigStore = Map<string, Record<string, unknown>>;
@@ -419,37 +421,45 @@ export function buildFlatRows(
 
     if (matchedFields.length === 0) continue;
 
-    // Section header
+    // Section header - show load status
+    const isLoaded = configData !== undefined;
     rows.push({
       field: null,
       sectionHeader: sectionInfo.label,
+      sectionKey: sectionInfo.key,
       value: null,
       displayValue: "",
       isSectionHeader: true,
+      isLoaded,
     });
 
-    for (const field of matchedFields) {
-      const rawValue = configData ? configData[field.key] : undefined;
-      rows.push({
-        field,
-        value: rawValue,
-        displayValue: configData ? formatValue(field, rawValue) : "Loading...",
-        isSectionHeader: false,
-      });
+    // Only show fields if section data is loaded
+    if (isLoaded) {
+      for (const field of matchedFields) {
+        const rawValue = configData[field.key];
+        rows.push({
+          field,
+          value: rawValue,
+          displayValue: formatValue(field, rawValue),
+          isSectionHeader: false,
+        });
+      }
     }
   }
 
   // Channels section
   const validChannels = channels.filter(ch => ch != null).sort((a, b) => a.index - b.index);
-  if (validChannels.length > 0) {
+  {
     const channelFieldsMatch = !lowerFilter || "channel".includes(lowerFilter) || "channels".includes(lowerFilter);
     if (channelFieldsMatch) {
       rows.push({
         field: null,
         sectionHeader: "CHANNELS",
+        sectionKey: "channels",
         value: null,
         displayValue: "",
         isSectionHeader: true,
+        isLoaded: validChannels.length > 0,
       });
 
       for (const ch of validChannels) {
@@ -502,47 +512,51 @@ export function buildFlatRows(
   }
 
   // User section
-  if (owner) {
+  {
     const userFieldsMatch = !lowerFilter || "user".includes(lowerFilter) || "owner".includes(lowerFilter) || "name".includes(lowerFilter);
     if (userFieldsMatch) {
       rows.push({
         field: null,
         sectionHeader: "USER",
+        sectionKey: "user",
         value: null,
         displayValue: "",
         isSectionHeader: true,
+        isLoaded: !!owner,
       });
 
-      rows.push({
-        field: { section: "user", key: "longName", label: "Long Name", type: "text", category: "user" },
-        value: owner.longName,
-        displayValue: owner.longName || "Not set",
-        isSectionHeader: false,
-      });
-      rows.push({
-        field: { section: "user", key: "shortName", label: "Short Name", type: "text", category: "user" },
-        value: owner.shortName,
-        displayValue: owner.shortName || "Not set",
-        isSectionHeader: false,
-      });
-      rows.push({
-        field: { section: "user", key: "id", label: "ID", type: "readonly", category: "user" },
-        value: owner.id,
-        displayValue: owner.id || "-",
-        isSectionHeader: false,
-      });
-      rows.push({
-        field: { section: "user", key: "hwModel", label: "Hardware Model", type: "readonly", category: "user" },
-        value: owner.hwModel,
-        displayValue: getHardwareModelName(owner.hwModel),
-        isSectionHeader: false,
-      });
-      rows.push({
-        field: { section: "user", key: "isLicensed", label: "Is Licensed", type: "readonly", category: "user" },
-        value: owner.isLicensed,
-        displayValue: owner.isLicensed ? "Yes" : "No",
-        isSectionHeader: false,
-      });
+      if (owner) {
+        rows.push({
+          field: { section: "user", key: "longName", label: "Long Name", type: "text", category: "user" },
+          value: owner.longName,
+          displayValue: owner.longName || "Not set",
+          isSectionHeader: false,
+        });
+        rows.push({
+          field: { section: "user", key: "shortName", label: "Short Name", type: "text", category: "user" },
+          value: owner.shortName,
+          displayValue: owner.shortName || "Not set",
+          isSectionHeader: false,
+        });
+        rows.push({
+          field: { section: "user", key: "id", label: "ID", type: "readonly", category: "user" },
+          value: owner.id,
+          displayValue: owner.id || "-",
+          isSectionHeader: false,
+        });
+        rows.push({
+          field: { section: "user", key: "hwModel", label: "Hardware Model", type: "readonly", category: "user" },
+          value: owner.hwModel,
+          displayValue: getHardwareModelName(owner.hwModel),
+          isSectionHeader: false,
+        });
+        rows.push({
+          field: { section: "user", key: "isLicensed", label: "Is Licensed", type: "readonly", category: "user" },
+          value: owner.isLicensed,
+          displayValue: owner.isLicensed ? "Yes" : "No",
+          isSectionHeader: false,
+        });
+      }
     }
   }
 
