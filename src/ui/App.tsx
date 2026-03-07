@@ -65,6 +65,44 @@ const ROUTING_ERROR_NAMES: Record<number, string> = {
 
 type AppMode = "packets" | "nodes" | "chat" | "dm" | "config" | "log" | "meshview";
 
+interface TabDef {
+  mode: AppMode;
+  label: string;
+  short: string;
+  meshviewOnly?: boolean;
+  onEnter?: string;
+}
+
+const TABS: TabDef[] = [
+  { mode: "packets", label: "PACKETS", short: "P" },
+  { mode: "nodes", label: "NODES", short: "N" },
+  { mode: "chat", label: "CHAT", short: "C" },
+  { mode: "dm", label: "DM", short: "D" },
+  { mode: "log", label: "LOG", short: "L" },
+  { mode: "meshview", label: "MESHVIEW", short: "M", meshviewOnly: true },
+  { mode: "config", label: "CONFIG", short: "CFG", onEnter: "startBatchEdit" },
+];
+
+const NavBar = React.memo(function NavBar({ mode, terminalWidth, hasMeshView }: { mode: AppMode; terminalWidth: number; hasMeshView: boolean }) {
+  const compact = terminalWidth <= 90;
+  const visibleTabs = TABS.filter(t => !t.meshviewOnly || hasMeshView);
+  return (
+    <Text>
+      {visibleTabs.map((tab, i) => {
+        const active = mode === tab.mode;
+        const key = String(i + 1);
+        const label = compact ? `${key}:${tab.short}` : `${key}:${tab.label}`;
+        return (
+          <React.Fragment key={tab.mode}>
+            {i > 0 && <Text dimColor> | </Text>}
+            <Text bold={active} {...(active ? { color: theme.fg.accent } : { dimColor: true })}>{label}</Text>
+          </React.Fragment>
+        );
+      })}
+    </Text>
+  );
+});
+
 export interface ChannelInfo {
   index: number;
   name: string;
@@ -2060,17 +2098,17 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
 
     // Mode switching (allow only when input not focused)
     if (!isInputFocused) {
-      if (input === "1") { setMode("packets"); setChatInputFocused(false); setDmInputFocused(false); return; }
-      if (input === "2") { setMode("nodes"); setChatInputFocused(false); setDmInputFocused(false); return; }
-      if (input === "3") { setMode("chat"); return; }
-      if (input === "4") { setMode("dm"); return; }
-      if (input === "5") { setMode("log"); setChatInputFocused(false); setDmInputFocused(false); return; }
-      if (input === "6" && localMeshViewUrl) { setMode("meshview"); setChatInputFocused(false); setDmInputFocused(false); return; }
-      if (input === (localMeshViewUrl ? "7" : "6")) { setMode("config"); setChatInputFocused(false); setDmInputFocused(false); if (!batchEditMode) startBatchEdit(); return; }
+      const visibleTabs = TABS.filter(t => !t.meshviewOnly || localMeshViewUrl);
+      const numKey = parseInt(input);
+      if (numKey >= 1 && numKey <= visibleTabs.length) {
+        const tab = visibleTabs[numKey - 1];
+        setMode(tab.mode);
+        if (tab.mode !== "chat" && tab.mode !== "dm") { setChatInputFocused(false); setDmInputFocused(false); }
+        if (tab.onEnter === "startBatchEdit" && !batchEditMode) startBatchEdit();
+        return;
+      }
       // Bracket keys for tab switching
-      const modes: AppMode[] = localMeshViewUrl
-        ? ["packets", "nodes", "chat", "dm", "log", "meshview", "config"]
-        : ["packets", "nodes", "chat", "dm", "log", "config"];
+      const modes: AppMode[] = visibleTabs.map(t => t.mode);
       if (input === "[") {
         const idx = modes.indexOf(mode);
         const newMode = modes[(idx - 1 + modes.length) % modes.length];
@@ -3140,37 +3178,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
 
   const selectedPacket = packets[selectedPacketIndex];
 
-  const getModeLabel = () => {
-    const p = mode === "packets";
-    const n = mode === "nodes";
-    const c = mode === "chat";
-    const d = mode === "dm";
-    const cfg = mode === "config";
-    const l = mode === "log";
-    const mv = mode === "meshview";
-    const compact = terminalWidth <= 90;
-    return (
-      <Text>
-        <Text color={p ? theme.fg.accent : theme.fg.muted} bold={p}>{compact ? "[P]" : "[PACKETS]"}</Text>
-        {" "}
-        <Text color={n ? theme.fg.accent : theme.fg.muted} bold={n}>{compact ? "[N]" : "[NODES]"}</Text>
-        {" "}
-        <Text color={c ? theme.fg.accent : theme.fg.muted} bold={c}>{compact ? "[C]" : "[CHAT]"}</Text>
-        {" "}
-        <Text color={d ? theme.fg.accent : theme.fg.muted} bold={d}>{compact ? "[D]" : "[DM]"}</Text>
-        {" "}
-        <Text color={l ? theme.fg.accent : theme.fg.muted} bold={l}>{compact ? "[L]" : "[LOG]"}</Text>
-        {localMeshViewUrl && (
-          <>
-            {" "}
-            <Text color={mv ? theme.fg.accent : theme.fg.muted} bold={mv}>{compact ? "[M]" : "[MESHVIEW]"}</Text>
-          </>
-        )}
-        {" "}
-        <Text color={cfg ? theme.fg.accent : theme.fg.muted} bold={cfg}>{compact ? "[CFG]" : "[CONFIG]"}</Text>
-      </Text>
-    );
-  };
+  const hasMeshView = !!localMeshViewUrl;
 
   const statusColor = status === "connected" ? theme.status.online : theme.status.offline;
   const nodeCount = nodes.length;
@@ -3226,7 +3234,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           {truncatedNodeName} <Text color={theme.fg.muted}>{formatNodeId(myNodeNum)}</Text>
         </Text>
         <Box flexShrink={0}>
-          {getModeLabel()}
+          <NavBar mode={mode} terminalWidth={terminalWidth} hasMeshView={hasMeshView} />
         </Box>
       </Box>
 
