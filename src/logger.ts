@@ -42,8 +42,14 @@ class Logger {
     Logger.instance?.log(LogLevel.INFO, context, message, data);
   }
 
-  static warn(context: string, message: string, data?: Record<string, any>): void {
-    Logger.instance?.log(LogLevel.WARN, context, message, data);
+  static warn(context: string, message: string, errorOrData?: Error | Record<string, any>, data?: Record<string, any>): void {
+    let errorData: Record<string, any> | undefined;
+    if (errorOrData instanceof Error) {
+      errorData = { ...data, error: errorOrData.message, stack: errorOrData.stack };
+    } else {
+      errorData = errorOrData;
+    }
+    Logger.instance?.log(LogLevel.WARN, context, message, errorData);
   }
 
   static error(context: string, message: string, error?: Error, data?: Record<string, any>): void {

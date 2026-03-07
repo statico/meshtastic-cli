@@ -423,9 +423,9 @@ export function upsertNode(node: DbNode) {
     node.channelUtilization ?? null,
     node.airUtilTx ?? null,
     node.channel ?? null,
-    node.viaMqtt ? 1 : null,
+    node.viaMqtt != null ? (node.viaMqtt ? 1 : 0) : null,
     node.hopsAway ?? null,
-    node.isFavorite ? 1 : null,
+    node.isFavorite != null ? (node.isFavorite ? 1 : 0) : null,
     node.publicKey ?? null,
     Date.now(),
   ]);
@@ -879,19 +879,27 @@ export function getDMConversations(myNodeNum: number): DMConversation[] {
   // A DM is either: to_node = myNodeNum (received) or from_node = myNodeNum AND to_node != broadcast (sent)
     const rows = ensureDb().query(`
     SELECT
-      CASE
-        WHEN from_node = ? THEN to_node
-        ELSE from_node
-      END as other_node,
-      text as last_message,
-      MAX(timestamp) as last_timestamp,
-      SUM(CASE WHEN from_node != ? AND status = 'received' THEN 1 ELSE 0 END) as unread_count
-    FROM messages
-    WHERE to_node != ?
-      AND (from_node = ? OR to_node = ?)
+      other_node,
+      (SELECT m2.text FROM messages m2
+       WHERE m2.to_node != ?
+         AND ((m2.from_node = ? AND m2.to_node = other_node) OR (m2.from_node = other_node AND m2.to_node = ?))
+       ORDER BY m2.timestamp DESC LIMIT 1) as last_message,
+      MAX(m.timestamp) as last_timestamp,
+      SUM(CASE WHEN m.from_node != ? AND m.status = 'received' THEN 1 ELSE 0 END) as unread_count
+    FROM (
+      SELECT
+        CASE
+          WHEN from_node = ? THEN to_node
+          ELSE from_node
+        END as other_node,
+        from_node, timestamp, status
+      FROM messages
+      WHERE to_node != ?
+        AND (from_node = ? OR to_node = ?)
+    ) m
     GROUP BY other_node
     ORDER BY last_timestamp DESC
-  `).all(myNodeNum, myNodeNum, BROADCAST_ADDR, myNodeNum, myNodeNum) as Array<{
+  `).all(BROADCAST_ADDR, myNodeNum, myNodeNum, myNodeNum, myNodeNum, BROADCAST_ADDR, myNodeNum, myNodeNum) as Array<{
     other_node: number;
     last_message: string;
     last_timestamp: number;

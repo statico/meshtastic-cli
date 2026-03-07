@@ -283,7 +283,7 @@ let session = "default";
 let clearSession = false;
 let meshViewUrl: string | undefined;
 let useFahrenheit = false;
-let enableLogging = true;
+let enableLogging = false;
 let packetLimit = 1000;
 let httpPort: number | undefined;
 let useTls = false;
