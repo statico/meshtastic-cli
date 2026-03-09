@@ -79,17 +79,19 @@ const chatKeys = [
 const dmKeys = [
   { key: "j / ↓", desc: "Next conversation/message" },
   { key: "k / ↑", desc: "Previous conversation/message" },
-  { key: "l / →", desc: "Enter message selection" },
-  { key: "h / ←", desc: "Back to conversations" },
+  { key: "Ctrl+d/PgDn", desc: "Page down" },
+  { key: "Ctrl+u/PgUp", desc: "Page up" },
   { key: "g / G", desc: "First / Last" },
+  { key: "l / → / Enter", desc: "Enter message view" },
+  { key: "h / ← / Esc", desc: "Back to conversations" },
   { key: "r", desc: "Reply to message" },
   { key: "R", desc: "Resend failed message" },
   { key: "n", desc: "Go to node" },
   { key: "p", desc: "Go to packet" },
   { key: "u", desc: "Update node from MeshView" },
   { key: "#", desc: "Delete conversation" },
-  { key: "Enter", desc: "Focus input" },
-  { key: "Escape", desc: "Back / Clear reply" },
+  { key: "Enter", desc: "Focus input (in message view)" },
+  { key: "Escape", desc: "Unfocus / Clear reply" },
 ];
 
 const configKeys = [

@@ -2825,8 +2825,18 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         setSelectedDMConvoIndex((i) => Math.max(i - 1, 0));
         return;
       }
-      // 'l' or right arrow to enter message selection mode
-      if ((input === "l" || key.rightArrow) && dmMessages.length > 0) {
+      // Page up/down for conversation list
+      const convoPageSize = Math.max(1, Math.floor((terminalHeight - 8) / 2));
+      if ((key.ctrl && input === "d") || key.pageDown) {
+        setSelectedDMConvoIndex((i) => Math.min(i + convoPageSize, dmConversations.length - 1));
+        return;
+      }
+      if ((key.ctrl && input === "u") || key.pageUp) {
+        setSelectedDMConvoIndex((i) => Math.max(i - convoPageSize, 0));
+        return;
+      }
+      // 'l' or right arrow or Enter to enter message selection mode
+      if ((input === "l" || key.rightArrow || key.return) && dmMessages.length > 0) {
         setSelectedDMMessageIndex(dmMessages.length - 1); // Start at most recent message
         return;
       }
