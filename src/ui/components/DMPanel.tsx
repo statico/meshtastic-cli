@@ -196,7 +196,7 @@ function DMPanelComponent({
       </Box>
 
       {/* Right panel - Chat */}
-      <Box flexDirection="column" flexGrow={1}>
+      <Box flexDirection="column" flexGrow={1} height={height} overflowY="hidden">
         {/* Chat header - 2 lines of node info */}
         <NodeInfoHeader
           nodeNum={selectedConvo?.nodeNum}
