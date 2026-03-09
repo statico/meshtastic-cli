@@ -1991,7 +1991,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
     if (nodeIndex >= 0) {
       setMode("nodes");
       setSelectedNodeIndex(nodeIndex);
-      // Set ref directly so the selection preservation effect targets the right node
+      // Set pending nav ref so the selection preservation effect doesn't overwrite it
+      pendingNodeNavRef.current = nodeNum;
       selectedNodeNumRef.current = nodeNum;
     } else {
       showNotification("Node not found in list", theme.status.offline);
@@ -2011,16 +2012,20 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
 
   // Preserve node selection across list updates by tracking selected node number
   const selectedNodeNumRef = useRef<number | null>(null);
-  // Keep ref in sync with current selection
-  if (filteredNodes[selectedNodeIndex]) {
+  // Keep ref in sync with current selection (but don't overwrite pending navigations)
+  const pendingNodeNavRef = useRef<number | null>(null);
+  if (pendingNodeNavRef.current == null && filteredNodes[selectedNodeIndex]) {
     selectedNodeNumRef.current = filteredNodes[selectedNodeIndex].num;
   }
   useEffect(() => {
-    const prev = selectedNodeNumRef.current;
-    if (prev != null && filteredNodes.length > 0) {
-      const newIndex = filteredNodes.findIndex(n => n.num === prev);
+    // If there's a pending navigation, use that target
+    const target = pendingNodeNavRef.current ?? selectedNodeNumRef.current;
+    pendingNodeNavRef.current = null;
+    if (target != null && filteredNodes.length > 0) {
+      const newIndex = filteredNodes.findIndex(n => n.num === target);
       if (newIndex >= 0) {
         setSelectedNodeIndex(newIndex);
+        selectedNodeNumRef.current = target;
       } else {
         // Node disappeared (filtered out) — clamp to valid range and update ref
         setSelectedNodeIndex(i => {
