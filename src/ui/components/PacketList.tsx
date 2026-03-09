@@ -77,6 +77,9 @@ function PacketListComponent({ packets, selectedIndex, nodeStore, height = 20, i
       selectedIndex - halfView,
       packets.length - visibleCount
     ));
+    // Ensure selected index is always within visible window
+    if (selectedIndex < startIndex) startIndex = selectedIndex;
+    if (selectedIndex >= startIndex + visibleCount) startIndex = selectedIndex - visibleCount + 1;
   }
 
   const visiblePackets = packets.slice(startIndex, startIndex + visibleCount);
@@ -693,9 +696,8 @@ const PacketRow = React.memo(function PacketRow({ packet, nodeStore, isSelected,
 });
 
 export const PacketList = React.memo(PacketListComponent, (prevProps, nextProps) => {
-  // Only re-render if relevant props changed
   return (
-    prevProps.packets.length === nextProps.packets.length &&
+    prevProps.packets === nextProps.packets &&
     prevProps.selectedIndex === nextProps.selectedIndex &&
     prevProps.height === nextProps.height &&
     prevProps.isFollowing === nextProps.isFollowing &&
