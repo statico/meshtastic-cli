@@ -1,6 +1,8 @@
 import type { Mesh, Telemetry } from "@meshtastic/protobufs";
 import * as db from "../db";
 
+const stripNewlines = (s?: string) => s?.replace(/[\r\n]+/g, " ").trim();
+
 export interface NodeData {
   num: number;
   userId?: string;
@@ -66,8 +68,8 @@ export class NodeStore {
     const updated: NodeData = {
       ...existing,
       userId: info.user?.id || existing.userId,
-      longName: info.user?.longName || existing.longName,
-      shortName: info.user?.shortName || existing.shortName,
+      longName: stripNewlines(info.user?.longName) || existing.longName,
+      shortName: stripNewlines(info.user?.shortName) || existing.shortName,
       hwModel: info.user?.hwModel ?? existing.hwModel,
       publicKey: info.user?.publicKey?.length ? info.user.publicKey : existing.publicKey,
       latitudeI: info.position?.latitudeI ?? existing.latitudeI,
@@ -94,8 +96,8 @@ export class NodeStore {
     const updated: NodeData = {
       ...existing,
       userId: user.id || existing.userId,
-      longName: user.longName || existing.longName,
-      shortName: user.shortName || existing.shortName,
+      longName: stripNewlines(user.longName) || existing.longName,
+      shortName: stripNewlines(user.shortName) || existing.shortName,
       hwModel: user.hwModel ?? existing.hwModel,
       role: user.role ?? existing.role,
       publicKey: user.publicKey?.length ? user.publicKey : existing.publicKey,
@@ -191,8 +193,8 @@ export class NodeStore {
 
     const updated: NodeData = {
       ...existing,
-      longName: data.longName || existing.longName,
-      shortName: data.shortName || existing.shortName,
+      longName: stripNewlines(data.longName) || existing.longName,
+      shortName: stripNewlines(data.shortName) || existing.shortName,
       hwModel: hwModelNum,
       role: roleNum,
       latitudeI: data.lastLat ?? existing.latitudeI,
