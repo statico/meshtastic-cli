@@ -31,6 +31,7 @@ export type ConfigStore = Map<string, Record<string, unknown>>;
 // Extract number->string map from TS numeric enum
 export function enumEntries(e: Record<string | number, string | number>): Record<number, string> {
   const result: Record<number, string> = {};
+  if (e == null) return result;
   for (const [k, v] of Object.entries(e)) {
     if (typeof v === "number") continue; // skip reverse mappings
     const num = Number(k);
