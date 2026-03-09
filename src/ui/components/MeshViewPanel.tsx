@@ -285,7 +285,8 @@ function getShortName(longName: string | undefined, nodeId: number): string {
 }
 
 function MeshViewPacketRow({ packet, isSelected, useFahrenheit }: MeshViewPacketRowProps) {
-  const time = new Date(packet.import_time).toLocaleTimeString(undefined, { hour12: false });
+  const d = packet.import_time_us ? new Date(packet.import_time_us / 1000) : new Date(packet.import_time);
+  const time = isNaN(d.getTime()) ? "??:??" : d.toLocaleTimeString(undefined, { hour12: false });
   const bgColor = isSelected ? theme.bg.selected : undefined;
   const portName = getPortName(packet.portnum);
   const portColor = getPortColor(packet.portnum);
@@ -756,7 +757,7 @@ function MeshViewInfoView({ packet, height, scrollOffset, meshViewUrl, useFahren
   // Time
   allLines.push(
     <InfoLine key="time" label="Time">
-      <Text color={theme.data.time}>{new Date(packet.import_time).toLocaleString()}</Text>
+      <Text color={theme.data.time}>{(() => { const d = packet.import_time_us ? new Date(packet.import_time_us / 1000) : new Date(packet.import_time); return isNaN(d.getTime()) ? packet.import_time : d.toLocaleString(); })()}</Text>
       <Text color={theme.fg.muted}>  ID: </Text>
       <Text color={theme.fg.secondary}>{packet.id}</Text>
     </InfoLine>
