@@ -3272,7 +3272,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
   const truncatedNodeName = nodeName.length > maxNodeNameLength ? nodeName.slice(0, maxNodeNameLength - 1) + "…" : nodeName;
 
   return (
-    <Box flexDirection="column" width="100%" height={terminalHeight - 1}>
+    <Box flexDirection="column" width="100%" height={terminalHeight}>
       {/* Header */}
       <Box
         height={3}
@@ -3300,7 +3300,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         return (
       <Box key={refreshKey} flexGrow={1} flexDirection="column">
         {mode === "packets" && (() => {
-          const contentHeight = terminalHeight - 5;
+          const contentHeight = terminalHeight - 4;
           const listHeight = inspectorExpanded
             ? Math.floor(contentHeight * 0.2)
             : contentHeight - inspectorHeight;
@@ -3335,7 +3335,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               <NodesPanel
                 nodes={filteredNodes}
                 selectedIndex={selectedNodeIndex}
-                height={terminalHeight - 7}
+                height={terminalHeight - 6}
                 filter={nodesFilter}
                 filterInputActive={nodesFilterInput}
                 sortKey={nodesSortKey}
@@ -3358,7 +3358,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
                 inputFocused={chatInputFocused}
                 nodeStore={nodeStore}
                 myNodeNum={myNodeNum}
-                height={terminalHeight - 5}
+                height={terminalHeight - 4}
                 width={terminalWidth}
                 selectedMessageIndex={selectedChatMessageIndex}
                 showEmojiSelector={showEmojiSelector}
@@ -3374,7 +3374,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         )}
 
         {mode === "dm" && (() => {
-          const contentHeight = terminalHeight - 5;
+          const contentHeight = terminalHeight - 4;
           return (
             <ErrorBoundary context="DM Panel">
               <Box height={contentHeight} borderStyle="single" borderColor={theme.border.normal}>
@@ -3404,7 +3404,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               <ConfigPanel
                 rows={flatConfigRows}
                 selectedIndex={selectedConfigIndex}
-                height={terminalHeight - 7}
+                height={terminalHeight - 6}
                 loading={configLoading}
                 editingField={configEditing}
                 editValue={configEditValue}
@@ -3424,7 +3424,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               <LogPanel
               responses={logResponses}
               selectedIndex={selectedLogIndex}
-              height={terminalHeight - 7}
+              height={terminalHeight - 6}
               nodeStore={nodeStore}
             />
             </Box>
