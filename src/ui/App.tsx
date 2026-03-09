@@ -3011,6 +3011,23 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         return;
       }
 
+      // Ctrl+d/PgDn and Ctrl+u/PgUp for page navigation
+      const configPageSize = Math.max(1, terminalHeight - 10);
+      if ((key.ctrl && input === "d") || key.pageDown) {
+        setSelectedConfigIndex(i => {
+          let target = Math.min(i + configPageSize, flatConfigRows.length - 1);
+          return findNextSelectable(target - 1, 1);
+        });
+        return;
+      }
+      if ((key.ctrl && input === "u") || key.pageUp) {
+        setSelectedConfigIndex(i => {
+          let target = Math.max(i - configPageSize, 0);
+          return findNextSelectable(target + 1, -1);
+        });
+        return;
+      }
+
       // g/G for first/last row
       if (input === "g") {
         if (flatConfigRows.length > 0) setSelectedConfigIndex(0);

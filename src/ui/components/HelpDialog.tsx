@@ -95,9 +95,10 @@ const dmKeys = [
 ];
 
 const configKeys = [
-  { key: "h / l", desc: "Previous / Next column" },
   { key: "j / ↓", desc: "Next option" },
   { key: "k / ↑", desc: "Previous option" },
+  { key: "Ctrl+d/PgDn", desc: "Page down" },
+  { key: "Ctrl+u/PgUp", desc: "Page up" },
   { key: "g / G", desc: "First / Last option" },
   { key: "Enter", desc: "Select / Edit toggle" },
   { key: "Escape", desc: "Back to menu" },
