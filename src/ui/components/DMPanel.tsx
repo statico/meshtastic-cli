@@ -83,7 +83,7 @@ function DMPanelComponent({
   const rightPanelWidth = width - LEFT_PANEL_WIDTH - 3; // 3 for borders/padding
   const textWidth = Math.max(10, rightPanelWidth - 22); // 20 prefix + 2 padding
   const replyRowHeight = replyTo ? 1 : 0;
-  const chatHeight = height - 7 - replyRowHeight; // 3-line header + separator + input area + optional reply
+  const chatHeight = height - 8 - replyRowHeight; // 3-line header + separator + input box (3 with border) + optional reply
 
   // Calculate line height per message (for multi-line wrapping)
   const getMessageHeight = (msg: DbMessage): number => {
@@ -239,15 +239,7 @@ function DMPanelComponent({
         )}
 
         {/* Input */}
-        <Box
-          paddingX={1}
-          borderStyle="single"
-          borderColor={inputFocused ? theme.border.focused : theme.border.normal}
-          borderTop
-          borderBottom={false}
-          borderLeft={false}
-          borderRight={false}
-        >
+        <Box paddingX={1} borderStyle="single" borderColor={inputFocused ? theme.border.focused : theme.border.normal} flexShrink={0}>
           <Text color={inputFocused ? theme.fg.accent : theme.fg.muted}>{">"} </Text>
           <Text color={theme.fg.primary}>{input}</Text>
           {inputFocused ? (
