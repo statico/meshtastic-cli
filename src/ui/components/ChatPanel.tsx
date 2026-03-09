@@ -146,10 +146,6 @@ function ChatPanelComponent({
         if (remaining) lineCount++;
       }
     }
-    // Add 1 line if message has a reply indicator
-    if (msg.replyId && messages.find(m => m.packetId === msg.replyId)) {
-      lineCount++;
-    }
     return lineCount || 1; // Ensure at least 1 line
   };
 
@@ -293,7 +289,7 @@ function ChatPanelComponent({
       )}
 
       {/* Messages */}
-      <Box flexDirection="column" flexGrow={1} flexShrink={1} paddingX={1} overflowY="hidden">
+      <Box flexDirection="column" flexGrow={1} flexShrink={1} paddingX={1} overflowY="hidden" justifyContent="flex-end">
         {filteredMessages.length === 0 ? (
           hasFilter ? (
             <Text color={theme.fg.muted}>No messages matching "{filter}"</Text>
