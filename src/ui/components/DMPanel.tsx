@@ -88,7 +88,7 @@ function DMPanelComponent({
   // Calculate line height per message (for multi-line wrapping)
   const getMessageHeight = (msg: DbMessage): number => {
     if (!msg?.text) return 1;
-    const cleanText = msg.text.replace(/[\r\x00-\x09\x0b\x0c\x0e-\x1f]/g, "");
+    const cleanText = msg.text.replace(/[\r\x00-\x09\x0b\x0c\x0e-\x1f]/g, "").replace(/\uFE0F/g, "");
     const maxWidth = Math.max(10, textWidth);
     let lineCount = 0;
     for (const line of cleanText.split("\n")) {
@@ -395,8 +395,8 @@ const MessageRow = React.memo(function MessageRow({ message, nodeStore, isOwn, i
     return result;
   };
 
-  // Clean control chars but preserve newlines
-  const cleanText = (message.text || "").replace(/[\r\x00-\x09\x0b\x0c\x0e-\x1f]/g, "");
+  // Clean control chars but preserve newlines; strip variation selectors
+  const cleanText = (message.text || "").replace(/[\r\x00-\x09\x0b\x0c\x0e-\x1f]/g, "").replace(/\uFE0F/g, "");
   const lines = wrapText(cleanText, maxWidth);
   const continuationPadding = " ".repeat(PREFIX_WIDTH);
 

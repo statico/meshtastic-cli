@@ -130,7 +130,7 @@ function ChatPanelComponent({
   const textWidth = Math.max(20, width - PREFIX_WIDTH - 4 - 6);
   const getMessageHeight = (msg: DbMessage): number => {
     if (!msg || !msg.text) return 1; // Fallback for messages without text
-    const cleanText = msg.text.replace(/[\r\x00-\x1f]/g, "");
+    const cleanText = msg.text.replace(/[\r\x00-\x1f]/g, "").replace(/\uFE0F/g, "");
     let lineCount = 0;
     for (const line of cleanText.split("\n")) {
       if (line.length <= textWidth) {
@@ -487,8 +487,8 @@ const MessageRow = React.memo(function MessageRow({ message, nodeStore, isOwn, i
     return result;
   };
 
-  // Remove carriage returns and other control characters that break terminal display
-  const cleanText = (message.text || "").replace(/[\r\x00-\x1f]/g, "");
+  // Remove control characters and variation selectors that break terminal display
+  const cleanText = (message.text || "").replace(/[\r\x00-\x1f]/g, "").replace(/\uFE0F/g, "");
   const lines = wrapText(cleanText, textWidth);
   const continuationPadding = " ".repeat(PREFIX_WIDTH);
 
