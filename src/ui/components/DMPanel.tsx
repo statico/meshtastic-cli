@@ -205,7 +205,7 @@ function DMPanelComponent({
         />
 
         {/* Messages */}
-        <Box height={chatHeight} flexDirection="column" paddingX={1}>
+        <Box flexGrow={1} flexDirection="column" paddingX={1} justifyContent="flex-end" overflowY="hidden">
           {!selectedConvo ? (
             null
           ) : messages.length === 0 ? (

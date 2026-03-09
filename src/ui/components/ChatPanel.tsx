@@ -154,60 +154,53 @@ function ChatPanelComponent({
     ? Math.min(selectedMessageIndex, filteredMessages.length - 1)
     : -1;
 
-  // Calculate visible messages based on actual line heights
+  // Simple scroll: find the start index of the viewport
+  // Like Slack/Discord: newest messages at bottom, scroll up moves viewport up
   const visibleMessages: DbMessage[] = [];
-  let scrollOffset = 0;
 
-  // Compute bottom-anchored view (what's visible when showing most recent messages)
-  let bottomLinesUsed = 0;
-  let bottomViewStart = filteredMessages.length;
-  for (let i = filteredMessages.length - 1; i >= 0; i--) {
-    const h = getMessageHeight(filteredMessages[i]);
-    if (bottomLinesUsed + h <= messageAreaHeight) {
-      bottomLinesUsed += h;
-      bottomViewStart = i;
+  // Find viewport start: the earliest message index that fills the viewport from selection to bottom
+  let viewportStart = 0;
+
+  if (clampedSelection < 0) {
+    // No selection — anchor to bottom (show latest messages)
+    let linesUsed = 0;
+    viewportStart = filteredMessages.length;
+    for (let i = filteredMessages.length - 1; i >= 0; i--) {
+      const h = getMessageHeight(filteredMessages[i]);
+      if (linesUsed + h > messageAreaHeight) break;
+      linesUsed += h;
+      viewportStart = i;
+    }
+  } else {
+    // Selection active — ensure selected message is visible
+    // Start by trying to show selection at its current position in the viewport
+    // First, find the bottom-anchored start
+    let bottomStart = filteredMessages.length;
+    let linesUsed = 0;
+    for (let i = filteredMessages.length - 1; i >= 0; i--) {
+      const h = getMessageHeight(filteredMessages[i]);
+      if (linesUsed + h > messageAreaHeight) break;
+      linesUsed += h;
+      bottomStart = i;
+    }
+
+    if (clampedSelection >= bottomStart) {
+      // Selection is in the bottom viewport — use bottom anchor
+      viewportStart = bottomStart;
     } else {
-      break;
+      // Selection is above — put selection at top of viewport
+      viewportStart = clampedSelection;
     }
   }
 
-  if (clampedSelection < 0 || clampedSelection >= bottomViewStart) {
-    // No selection, or selection is within the bottom view — show bottom-anchored view
-    for (let i = bottomViewStart; i < filteredMessages.length; i++) {
+  // Fill visible messages from viewportStart
+  {
+    let linesUsed = 0;
+    for (let i = viewportStart; i < filteredMessages.length; i++) {
+      const h = getMessageHeight(filteredMessages[i]);
+      if (linesUsed + h > messageAreaHeight) break;
+      linesUsed += h;
       visibleMessages.push(filteredMessages[i]);
-    }
-    scrollOffset = bottomViewStart;
-  } else {
-    // Selection is above the bottom view — scroll up to keep it visible
-    // Show selected message near the bottom third with context above
-    visibleMessages.push(filteredMessages[clampedSelection]);
-    let linesUsed = getMessageHeight(filteredMessages[clampedSelection]);
-    scrollOffset = clampedSelection;
-
-    // Fill below (newer messages for context, up to ~1/3 of viewport)
-    const maxBelowLines = Math.floor(messageAreaHeight / 3);
-    let belowLines = 0;
-    for (let i = clampedSelection + 1; i < filteredMessages.length; i++) {
-      const h = getMessageHeight(filteredMessages[i]);
-      if (belowLines + h <= maxBelowLines && linesUsed + h <= messageAreaHeight) {
-        visibleMessages.push(filteredMessages[i]);
-        belowLines += h;
-        linesUsed += h;
-      } else {
-        break;
-      }
-    }
-
-    // Fill above with remaining space
-    for (let i = clampedSelection - 1; i >= 0; i--) {
-      const h = getMessageHeight(filteredMessages[i]);
-      if (linesUsed + h <= messageAreaHeight) {
-        visibleMessages.unshift(filteredMessages[i]);
-        linesUsed += h;
-        scrollOffset = i;
-      } else {
-        break;
-      }
     }
   }
 
