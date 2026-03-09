@@ -14,7 +14,7 @@
 - Use official npm packages, not local references
 
 ## Design
-- **Cypherpunk aesthetic**: Terminal hacker vibes, Matrix-style data streams
+- **Cyberpunk aesthetic**: Terminal hacker vibes, Matrix-style data streams
 - Colors should be bold and varied - neon greens, cyans, magentas, oranges
 - Each piece of information should have distinct coloring
 - Packet type colors: message=green, position=cyan, telemetry=orange, nodeinfo=purple, routing=gray, encrypted=red

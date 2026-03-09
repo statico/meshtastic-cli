@@ -21,7 +21,7 @@ export const theme = {
     unknown: "#ff00ff",
     direct: "#00ff00",
     config: "#8080ff",
-    // Additional port type colors - cypherpunk neon palette
+    // Additional port type colors - cyberpunk neon palette
     remoteHardware: "#ff0099",     // Hot pink for hardware control
     admin: "#ff3300",              // Red-orange for admin commands
     compressed: "#00ff66",         // Bright green for compressed messages

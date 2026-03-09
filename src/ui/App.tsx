@@ -3241,24 +3241,39 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
 
   // Show connecting screen
   if (!transport) {
-    const banner = terminalWidth <= 90 ? "▓ MESHTASTIC ▓" : "▓▓▓ MESHTASTIC ▓▓▓";
     return (
-      <Box flexDirection="column" width="100%" height="100%" justifyContent="center" alignItems="center">
-        <Box flexDirection="column" alignItems="center">
-          <Text bold color={theme.fg.accent}>{banner}</Text>
+      <Box flexDirection="column" width="100%" height={terminalHeight}>
+        <Box flexGrow={1} flexDirection="column" justifyContent="center" alignItems="center">
+          {(() => {
+            const ver = `v${packageJson.version}`;
+            const pad = (s: string, w: number) => { const p = w - s.length; const l = Math.floor(p / 2); return " ".repeat(l) + s + " ".repeat(p - l); };
+            return (
+              <>
+                <Text bold color={theme.fg.accent}>▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</Text>
+                <Text bold color={theme.fg.accent}>▓▓▓{"                        "}▓▓▓</Text>
+                <Text bold color={theme.fg.accent}>▓▓▓   <Text color={theme.fg.primary}>{pad("MESHTASTIC CLI", 18)}</Text>   ▓▓▓</Text>
+                <Text bold color={theme.fg.accent}>▓▓▓   <Text color={theme.fg.secondary}>{pad(ver, 18)}</Text>   ▓▓▓</Text>
+                <Text bold color={theme.fg.accent}>▓▓▓{"                        "}▓▓▓</Text>
+                <Text bold color={theme.fg.accent}>▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</Text>
+              </>
+            );
+          })()}
           <Text> </Text>
           {connectError ? (
             <>
-              <Text color={theme.packet.encrypted}>Connection failed</Text>
+              <Text color={theme.packet.encrypted}>CONNECTION FAILED</Text>
               <Text color={theme.fg.muted}>{connectError}</Text>
               <Text> </Text>
-              <Text color={theme.fg.secondary}>Press q to quit</Text>
+              <Text color={theme.fg.secondary}>Press <Text color={theme.fg.accent}>q</Text> to quit</Text>
             </>
           ) : (
             <>
-              <Text color={theme.fg.accent}>{SPINNER_FRAMES[spinnerFrame]} Connecting to {address}...</Text>
+              <Text color={theme.fg.accent}>{SPINNER_FRAMES[spinnerFrame]} Connecting to <Text color={theme.fg.primary}>{address}</Text></Text>
             </>
           )}
+        </Box>
+        <Box height={1} paddingX={1}>
+          <Text color={theme.fg.muted}>Press <Text color={theme.fg.secondary}>q</Text> to quit</Text>
         </Box>
       </Box>
     );
