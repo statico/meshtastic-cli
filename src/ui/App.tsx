@@ -84,7 +84,7 @@ const TABS: TabDef[] = [
 ];
 
 const NavBar = React.memo(function NavBar({ mode, terminalWidth, hasMeshView }: { mode: AppMode; terminalWidth: number; hasMeshView: boolean }) {
-  const compact = terminalWidth <= 90;
+  const compact = terminalWidth <= 120;
   const visibleTabs = TABS.filter(t => !t.meshviewOnly || hasMeshView);
   return (
     <Text>
