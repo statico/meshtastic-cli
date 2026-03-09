@@ -345,7 +345,7 @@ const MessageRow = React.memo(function MessageRow({ message, nodeStore, isOwn, i
     const preview = cleanReplyText.length > 30
       ? cleanReplyText.slice(0, 27) + "..."
       : cleanReplyText;
-    return `(replying to "${preview}")`;
+    return `(↪ "${preview}")`;
   })() : null;
 
   return (
