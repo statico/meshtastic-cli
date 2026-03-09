@@ -97,14 +97,13 @@ export function ConfigPanel({
                 <Text color={isSelected ? theme.fg.accent : theme.fg.muted}>
                   {isSelected ? "> " : "  "}
                 </Text>
-                <Text color={theme.fg.muted}>── {row.sectionHeader} ──</Text>
+                <Text color={row.isLoaded ? theme.fg.accent : theme.fg.secondary} bold={row.isLoaded}>
+                  {row.isLoaded ? "▼ " : "▶ "}{row.sectionHeader}
+                </Text>
                 {row.sectionKey && !row.isLoaded && (
                   <Text color={isSelected ? theme.fg.accent : theme.fg.muted}>
-                    {isSelected ? " [Enter] load" : " (not loaded)"}
+                    {isSelected ? " [Enter] load" : ""}
                   </Text>
-                )}
-                {row.isLoaded && (
-                  <Text color={theme.fg.muted}> ✓</Text>
                 )}
               </Box>
             );
