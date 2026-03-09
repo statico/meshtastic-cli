@@ -3541,7 +3541,7 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               setTimeout(() => {
                 Logger.info("App", "Shutdown complete - clearing screen and exiting");
                 Logger.shutdown(); // Force flush logs before exit
-                process.stdout.write('\x1bc'); // Clear screen on quit
+                process.stdout.write("\x1b[?1049l"); // Leave alternate screen buffer
                 process.exit(0);
               }, 100);
             }}

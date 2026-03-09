@@ -151,7 +151,7 @@ process.on("uncaughtException", (error) => {
   Logger.shutdown();
 
   // Clear screen and show error
-  process.stdout.write('\x1bc'); // Clear screen
+  process.stdout.write("\x1b[?1049l"); // Leave alternate screen buffer
   console.error("Fatal error:", error.message);
   console.error(`Full stack trace saved to ${ERROR_LOG_PATH}`);
   console.error(`Exit details saved to ${EXIT_LOG_PATH}`);
@@ -178,7 +178,7 @@ process.on("unhandledRejection", (reason) => {
   Logger.shutdown();
 
   // Clear screen and show error
-  process.stdout.write('\x1bc'); // Clear screen
+  process.stdout.write("\x1b[?1049l"); // Leave alternate screen buffer
   console.error("Unhandled promise rejection:", reason);
   console.error(`Full details saved to ${EXIT_LOG_PATH}`);
 
@@ -224,7 +224,7 @@ process.on("SIGTERM", () => {
   Logger.shutdown();
   clearInterval(heartbeatInterval);
 
-  process.stdout.write('\x1bc'); // Clear screen
+  process.stdout.write("\x1b[?1049l"); // Leave alternate screen buffer
   process.exit(0);
 });
 
@@ -238,7 +238,7 @@ process.on("SIGINT", () => {
   Logger.shutdown();
   clearInterval(heartbeatInterval);
 
-  process.stdout.write('\x1bc'); // Clear screen
+  process.stdout.write("\x1b[?1049l"); // Leave alternate screen buffer
   process.exit(0);
 });
 
@@ -252,7 +252,7 @@ process.on("SIGHUP", () => {
   Logger.shutdown();
   clearInterval(heartbeatInterval);
 
-  process.stdout.write('\x1bc'); // Clear screen
+  process.stdout.write("\x1b[?1049l"); // Leave alternate screen buffer
   process.exit(0);
 });
 
@@ -271,7 +271,7 @@ process.on("exit", (code) => {
   Logger.shutdown();
 
   // Final clear screen
-  process.stdout.write('\x1bc');
+  process.stdout.write("\x1b[?1049l");
 });
 
 // Parse CLI arguments
@@ -482,6 +482,9 @@ db.setPacketRetentionLimit(packetLimit);
 const packetStore = new PacketStore(packetLimit);
 const nodeStore = new NodeStore();
 
+// Enter alternate screen buffer (prevents scroll contamination in tmux)
+process.stdout.write("\x1b[?1049h");
+
 const { waitUntilExit } = render(
   React.createElement(App, {
     address,
@@ -510,7 +513,7 @@ waitUntilExit()
       isShuttingDown = true;
       logExit("NORMAL_EXIT", 0, { reason: "User quit application" });
       clearInterval(heartbeatInterval);
-      process.stdout.write('\x1bc'); // Clear screen
+      process.stdout.write("\x1b[?1049l"); // Leave alternate screen buffer
     }
   })
   .catch((e) => {
@@ -527,7 +530,7 @@ waitUntilExit()
     Logger.error("Main", "Application exit error", error);
     Logger.shutdown();
 
-    process.stdout.write('\x1bc'); // Clear screen
+    process.stdout.write("\x1b[?1049l"); // Leave alternate screen buffer
     console.error("Application failed:", error.message);
     console.error(`Full details saved to ${EXIT_LOG_PATH}`);
 
