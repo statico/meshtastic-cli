@@ -74,13 +74,13 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { mode: "packets", label: "PACKETS", short: "P" },
-  { mode: "nodes", label: "NODES", short: "N" },
-  { mode: "chat", label: "CHAT", short: "C" },
-  { mode: "dm", label: "DM", short: "D" },
-  { mode: "log", label: "LOG", short: "L" },
-  { mode: "meshview", label: "MESHVIEW", short: "M", meshviewOnly: true },
-  { mode: "config", label: "CONFIG", short: "CFG", onEnter: "startBatchEdit" },
+  { mode: "packets", label: "PACKETS", short: "Pkt" },
+  { mode: "nodes", label: "NODES", short: "Nod" },
+  { mode: "chat", label: "CHAT", short: "Chat" },
+  { mode: "dm", label: "DM", short: "DM" },
+  { mode: "log", label: "LOG", short: "Log" },
+  { mode: "meshview", label: "MESHVIEW", short: "Mesh", meshviewOnly: true },
+  { mode: "config", label: "CONFIG", short: "Cfg", onEnter: "startBatchEdit" },
 ];
 
 const NavBar = React.memo(function NavBar({ mode, terminalWidth, hasMeshView }: { mode: AppMode; terminalWidth: number; hasMeshView: boolean }) {
@@ -91,11 +91,13 @@ const NavBar = React.memo(function NavBar({ mode, terminalWidth, hasMeshView }: 
       {visibleTabs.map((tab, i) => {
         const active = mode === tab.mode;
         const key = String(i + 1);
-        const label = compact ? `${key}:${tab.short}` : `${key}:${tab.label}`;
+        const label = compact ? tab.short : tab.label;
         return (
           <React.Fragment key={tab.mode}>
-            {i > 0 && <Text dimColor> | </Text>}
-            <Text bold={active} {...(active ? { color: theme.fg.accent } : { dimColor: true })}>{label}</Text>
+            {i > 0 && <Text color={theme.fg.muted}> </Text>}
+            <Text color={active ? theme.fg.accent : theme.fg.muted}>{key}</Text>
+            <Text color={active ? theme.fg.accent : theme.fg.muted}>{"⟩"}</Text>
+            <Text bold={active} color={active ? theme.fg.accent : theme.fg.secondary}>{label}</Text>
           </React.Fragment>
         );
       })}
