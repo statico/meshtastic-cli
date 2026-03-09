@@ -98,9 +98,9 @@ function LogList({ responses, selectedIndex, height, nodeStore }: {
   return (
     <>
       <Box paddingX={1}>
+        <Text color={theme.fg.muted}>{"TIME".padEnd(14)}</Text>
         <Text color={theme.fg.muted}>{"TYPE".padEnd(5)}</Text>
-        <Text color={theme.fg.muted}>{"NAME".padEnd(14)}</Text>
-        <Text color={theme.fg.muted}>{"TIME"}</Text>
+        <Text color={theme.fg.muted}>{"NAME"}</Text>
       </Box>
       {visibleResponses.map((response, i) => (
         <LogRow
@@ -142,9 +142,9 @@ function LogRow({ response, isSelected, nodeStore }: {
 
   return (
     <Box backgroundColor={bgColor} paddingX={1}>
+      <Text color={theme.fg.muted}>{"[" + time + "] "}</Text>
       <Text color={typeColor}>{type.padEnd(5)}</Text>
-      <Text color={theme.fg.accent}>{fitVisual(fromName, 12)}  </Text>
-      <Text color={theme.fg.secondary}>{time}</Text>
+      <Text color={theme.fg.accent}>{fromName}</Text>
     </Box>
   );
 }
