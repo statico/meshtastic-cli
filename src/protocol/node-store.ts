@@ -42,7 +42,7 @@ export class NodeStore {
   private loadFromDb() {
     const dbNodes = db.getAllNodes();
     for (const n of dbNodes) {
-      this.nodes.set(n.num, { ...n, lastHeard: n.lastHeard || 0, publicKey: n.publicKey });
+      this.nodes.set(n.num, { ...n, lastHeard: n.lastHeard || 0, publicKey: n.publicKey, longName: stripNewlines(n.longName), shortName: stripNewlines(n.shortName) });
     }
   }
 
@@ -266,8 +266,8 @@ export class NodeStore {
 
   getNodeName(num: number): string {
     const node = this.nodes.get(num);
-    if (node?.shortName) return node.shortName;
-    if (node?.longName) return node.longName.slice(0, 8);
+    if (node?.shortName) return stripNewlines(node.shortName) || node.shortName;
+    if (node?.longName) return (stripNewlines(node.longName) || node.longName).slice(0, 8);
     return `!${num.toString(16).padStart(8, "0")}`;
   }
 

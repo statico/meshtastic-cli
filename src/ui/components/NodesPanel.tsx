@@ -154,7 +154,7 @@ function NodeRow({ node, isSelected, terminalWidth = 100 }: NodeRowProps) {
     : "-";
   const battery = getBatteryDisplay(node.batteryLevel, node.voltage);
   const lastHeard = formatLastHeard(node.lastHeard);
-  const longName = node.longName || "";
+  const longName = (node.longName || "").replace(/[\r\n]+/g, " ").trim();
 
   const nameColor = node.hopsAway === 0 ? theme.fg.accent : theme.fg.primary;
 
@@ -209,7 +209,7 @@ function NodeInspector({ node, allNodes, height, meshViewUrl }: { node?: NodeDat
       {node.longName && (
         <>
           <Text color={theme.fg.muted}>  Long: </Text>
-          <Text color={theme.fg.primary}>{node.longName}</Text>
+          <Text color={theme.fg.primary}>{(node.longName || "").replace(/[\r\n]+/g, " ").trim()}</Text>
         </>
       )}
     </Box>
