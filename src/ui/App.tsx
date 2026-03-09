@@ -744,6 +744,16 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
               next[channel.index] = channel;
               return next;
             });
+            setChannels((prev) => {
+              const next = new Map(prev);
+              next.set(channel.index, {
+                index: channel.index,
+                name: channel.settings?.name || "",
+                role: channel.role,
+                psk: channel.settings?.psk && channel.settings.psk.length > 0 ? channel.settings.psk : null,
+              });
+              return next;
+            });
             setPendingChannels((prev) => {
               const updated = new Set(prev);
               updated.add(channel.index);

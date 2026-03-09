@@ -257,7 +257,7 @@ function ChatPanelComponent({
               <Text color={theme.fg.muted}>{getPskDisplay(channelInfo.psk)}</Text>
             </>
           ) : (
-            <Text color={theme.fg.muted}>No channel info (connect to device)</Text>
+            <Text color={theme.fg.muted}>Channel {channel} (loading...)</Text>
           )}
         </Box>
         {loraConfig && (
