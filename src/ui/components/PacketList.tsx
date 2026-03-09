@@ -156,7 +156,7 @@ function renderPacketSummary(packet: DecodedPacket, nodeStore: NodeStore, useFah
 
   // Text message
   if (typeof packet.payload === "string") {
-    const text = packet.payload.slice(0, 40);
+    const text = packet.payload.replace(/[\r\n]+/g, " ").slice(0, 40);
     return <Text color={theme.data.quote}> "{text}{packet.payload.length > 40 ? "..." : ""}"</Text>;
   }
 
@@ -219,7 +219,7 @@ function renderPacketSummary(packet: DecodedPacket, nodeStore: NodeStore, useFah
     const user = packet.payload as Mesh.User;
     return (
       <>
-        {user.longName && <Text color={theme.fg.primary}> {user.longName}</Text>}
+        {user.longName && <Text color={theme.fg.primary}> {user.longName.replace(/[\r\n]+/g, " ")}</Text>}
         {user.hwModel !== undefined && user.hwModel !== 0 && (
           <Text color={theme.data.hardware}> | {getHardwareModelName(user.hwModel)}</Text>
         )}
@@ -290,7 +290,7 @@ function renderPacketSummary(packet: DecodedPacket, nodeStore: NodeStore, useFah
     const data = packet.payload as { data?: Uint8Array };
     if (data.data) {
       try {
-        const text = new TextDecoder().decode(data.data).slice(0, 30);
+        const text = new TextDecoder().decode(data.data).replace(/[\r\n]+/g, " ").slice(0, 30);
         return <Text color={theme.data.quote}> "{text}"</Text>;
       } catch {
         return null;
@@ -335,7 +335,7 @@ function renderPacketSummary(packet: DecodedPacket, nodeStore: NodeStore, useFah
     }
     if (sf.variant.case === "text") {
       try {
-        const text = new TextDecoder().decode(sf.variant.value).slice(0, 30);
+        const text = new TextDecoder().decode(sf.variant.value).replace(/[\r\n]+/g, " ").slice(0, 30);
         return (
           <>
             <Text color={theme.data.channel}> {rrName}</Text>
@@ -461,7 +461,7 @@ const PacketRow = React.memo(function PacketRow({ packet, nodeStore, isSelected,
   if (variantCase === "nodeInfo") {
     const info = fr.payloadVariant.value as Mesh.NodeInfo;
     const shortName = info.user?.shortName || `!${info.num.toString(16)}`;
-    const longName = info.user?.longName || "";
+    const longName = (info.user?.longName || "").replace(/[\r\n]+/g, " ");
     const hw = info.user?.hwModel !== undefined && info.user?.hwModel !== 0
       ? getHardwareModelName(info.user.hwModel)
       : "";
