@@ -2230,21 +2230,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       }
       // Jump to node from packet
       if (key.return && selectedPacket?.meshPacket) {
-        const fromNode = selectedPacket.meshPacket.from;
-        const nodeIndex = nodes.findIndex(n => n.num === fromNode);
-        if (nodeIndex >= 0) {
-          setSelectedNodeIndex(nodeIndex);
-        }
-        setMode("nodes");
+        navigateToNode(selectedPacket.meshPacket.from);
       }
-      // 'n' to jump to sender node without leaving packet view
+      // 'n' to jump to sender node
       if (input === "n" && selectedPacket?.meshPacket) {
-        const fromNode = selectedPacket.meshPacket.from;
-        const nodeIndex = nodes.findIndex(n => n.num === fromNode);
-        if (nodeIndex >= 0) {
-          setSelectedNodeIndex(nodeIndex);
-        }
-        setMode("nodes");
+        navigateToNode(selectedPacket.meshPacket.from);
       }
       // 'u' to update sender node from MeshView
       if (input === "u" && selectedPacket?.meshPacket) {
