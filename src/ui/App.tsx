@@ -3296,7 +3296,11 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         </Box>
       </Box>
 
-      {/* Main content */}
+      {/* Main content - hidden when modal is active to prevent emoji rendering glitches */}
+      {(() => {
+        const modalActive = showHelp || showQuitDialog || showResponseModal || showRebootModal || !!deviceNotification;
+        if (modalActive) return <Box key={refreshKey} flexGrow={1} />;
+        return (
       <Box key={refreshKey} flexGrow={1} flexDirection="column">
         {mode === "packets" && (() => {
           const contentHeight = terminalHeight - 4;
@@ -3465,6 +3469,8 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           );
         })()}
       </Box>
+        );
+      })()}
 
       {/* Status bar */}
       <Box height={1} paddingX={1} flexWrap="nowrap" overflow="hidden">
