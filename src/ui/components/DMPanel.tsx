@@ -340,25 +340,23 @@ const MessageRow = React.memo(function MessageRow({ message, nodeStore, isOwn, i
   const repliedMessage = message.replyId
     ? allMessages.find(m => m.packetId === message.replyId)
     : null;
-  const replyPreview = repliedMessage
-    ? (repliedMessage.text || "").slice(0, 20) + ((repliedMessage.text || "").length > 20 ? "..." : "")
-    : null;
+  const replyText = repliedMessage ? (() => {
+    const cleanReplyText = (repliedMessage.text || "").replace(/[\r\n\x00-\x1f]/g, " ");
+    const preview = cleanReplyText.length > 30
+      ? cleanReplyText.slice(0, 27) + "..."
+      : cleanReplyText;
+    return `(replying to "${preview}")`;
+  })() : null;
 
   return (
-    <Box flexDirection="column" backgroundColor={isSelected ? theme.bg.selected : undefined}>
-      {repliedMessage && (
-        <Text color={theme.fg.muted}>
-          {"            "}┌ replying to{" "}
-          <Text color={theme.fg.secondary}>{nodeStore.getNodeName(repliedMessage.fromNode)}</Text>
-          : "{replyPreview}"
-        </Text>
-      )}
+    <Box backgroundColor={isSelected ? theme.bg.selected : undefined}>
       <Text wrap="truncate">
         <Text color={theme.fg.muted}>[{time}] </Text>
         <Text color={nameColor}>{fitVisual(fromName, 8)} </Text>
         <Text color={theme.fg.primary}>{displayText}</Text>
         {getStatusIndicator()}
         {getMeshViewIndicator()}
+        {replyText && <Text color={theme.fg.muted}> {replyText}</Text>}
       </Text>
     </Box>
   );

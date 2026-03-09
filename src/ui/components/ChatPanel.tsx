@@ -508,26 +508,13 @@ const MessageRow = React.memo(function MessageRow({ message, nodeStore, isOwn, i
     ? allMessages.find(m => m.packetId === message.replyId)
     : null;
 
-  // Build reply indicator with proper width constraints
-  const replyIndicator = repliedMessage ? (() => {
-    const prefix = "└─ replying to ";
-    const name = nodeStore.getNodeName(repliedMessage.fromNode);
-    const quoteSuffix = ': "';
-    const quoteEnd = '"';
-
-    // Calculate available width for the preview text (accounting for continuation padding)
-    const prefixLength = PREFIX_WIDTH + prefix.length + name.length + quoteSuffix.length;
-    const availableWidth = width - prefixLength - quoteEnd.length - 2; // -2 for padding
-
-    // Truncate the preview if needed
+  // Build inline reply text
+  const replyText = repliedMessage ? (() => {
     const cleanReplyText = (repliedMessage.text || "").replace(/[\r\n\x00-\x1f]/g, " ");
-    const replyPreview = availableWidth > 10
-      ? (cleanReplyText.length > availableWidth
-          ? cleanReplyText.slice(0, availableWidth - 3) + "..."
-          : cleanReplyText)
-      : "...";
-
-    return { prefix, name, quoteSuffix, replyPreview, quoteEnd };
+    const preview = cleanReplyText.length > 30
+      ? cleanReplyText.slice(0, 27) + "..."
+      : cleanReplyText;
+    return `(replying to "${preview}")`;
   })() : null;
 
   return (
@@ -547,19 +534,10 @@ const MessageRow = React.memo(function MessageRow({ message, nodeStore, isOwn, i
             <Text color={theme.fg.primary}>{line}</Text>
             {lineIndex === lines.length - 1 && getStatusIndicator()}
             {lineIndex === lines.length - 1 && getMeshViewIndicator()}
+            {lineIndex === lines.length - 1 && replyText && <Text color={theme.fg.muted}> {replyText}</Text>}
           </Box>
         ))}
       </Box>
-      {replyIndicator && (
-        <Box>
-          <Text>
-            <Text>{continuationPadding}</Text>
-            <Text color={theme.fg.muted}>{replyIndicator.prefix}</Text>
-            <Text color={theme.fg.secondary}>{replyIndicator.name}</Text>
-            <Text color={theme.fg.muted}>{replyIndicator.quoteSuffix}{replyIndicator.replyPreview}{replyIndicator.quoteEnd}</Text>
-          </Text>
-        </Box>
-      )}
     </Box>
   );
 }, (prevProps, nextProps) => {
