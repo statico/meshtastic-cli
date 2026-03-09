@@ -3227,12 +3227,13 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         paddingX={2}
         justifyContent="space-between"
         alignItems="center"
-        flexWrap="nowrap"
       >
-        {banner && <Text bold color={theme.fg.accent}>{banner}</Text>}
-        <Text color={theme.fg.secondary} flexShrink={1}>
-          {truncatedNodeName} <Text color={theme.fg.muted}>{formatNodeId(myNodeNum)}</Text>
-        </Text>
+        <Box flexShrink={1} flexWrap="nowrap">
+          {banner && <Text bold color={theme.fg.accent}>{banner} </Text>}
+          <Text color={theme.fg.secondary}>
+            {truncatedNodeName} <Text color={theme.fg.muted}>{formatNodeId(myNodeNum)}</Text>
+          </Text>
+        </Box>
         <Box flexShrink={0}>
           <NavBar mode={mode} terminalWidth={terminalWidth} hasMeshView={hasMeshView} />
         </Box>
