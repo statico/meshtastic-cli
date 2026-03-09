@@ -2682,6 +2682,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
           fetchNodeFromMeshView(msg.fromNode);
           return;
         }
+        // 'i' to request nodeinfo from sender
+        if (input === "i" && filteredMessages[selectedChatMessageIndex]) {
+          const msg = filteredMessages[selectedChatMessageIndex];
+          sendNodeInfoRequest(msg.fromNode);
+          return;
+        }
         // 'p' to go to packet
         if (input === "p" && filteredMessages[selectedChatMessageIndex]) {
           const msg = filteredMessages[selectedChatMessageIndex];
@@ -2799,6 +2805,12 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
         if (input === "u" && dmMessages[selectedDMMessageIndex]) {
           const msg = dmMessages[selectedDMMessageIndex];
           fetchNodeFromMeshView(msg.fromNode);
+          return;
+        }
+        // 'i' to request nodeinfo from sender
+        if (input === "i" && dmMessages[selectedDMMessageIndex]) {
+          const msg = dmMessages[selectedDMMessageIndex];
+          sendNodeInfoRequest(msg.fromNode);
           return;
         }
         // 'p' to go to packet
