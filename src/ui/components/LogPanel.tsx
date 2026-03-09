@@ -15,7 +15,7 @@ interface LogPanelProps {
 
 function LogPanelComponent({ responses, selectedIndex, height, nodeStore }: LogPanelProps) {
   // Left panel width for list
-  const LEFT_PANEL_WIDTH = 30;
+  const LEFT_PANEL_WIDTH = 36;
 
   if (responses.length === 0) {
     return (
@@ -98,8 +98,8 @@ function LogList({ responses, selectedIndex, height, nodeStore }: {
   return (
     <>
       <Box paddingX={1}>
-        <Text color={theme.fg.muted}>{"TYPE".padEnd(4)}</Text>
-        <Text color={theme.fg.muted}>{"NAME".padEnd(12)}</Text>
+        <Text color={theme.fg.muted}>{"TYPE".padEnd(5)}</Text>
+        <Text color={theme.fg.muted}>{"NAME".padEnd(14)}</Text>
         <Text color={theme.fg.muted}>{"TIME"}</Text>
       </Box>
       {visibleResponses.map((response, i) => (
@@ -133,13 +133,17 @@ function LogRow({ response, isSelected, nodeStore }: {
   const typeColor = isPosition ? theme.packet.position : isNodeInfo ? theme.packet.nodeinfo : theme.packet.traceroute;
   const fromName = nodeStore.getNodeName(response.fromNode);
   const d = new Date(response.timestamp * 1000);
-  const time = `${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getDate().toString().padStart(2,"0")} ${d.toLocaleTimeString(undefined, { hour12: false })}`;
+  const mm = (d.getMonth()+1).toString().padStart(2,"0");
+  const dd = d.getDate().toString().padStart(2,"0");
+  const hh = d.getHours().toString().padStart(2,"0");
+  const min = d.getMinutes().toString().padStart(2,"0");
+  const time = `${mm}/${dd} ${hh}:${min}`;
   const bgColor = isSelected ? theme.bg.selected : undefined;
 
   return (
     <Box backgroundColor={bgColor} paddingX={1}>
-      <Text color={typeColor}>{type.padEnd(4)}</Text>
-      <Text color={theme.fg.accent}>{fitVisual(fromName, 10)}  </Text>
+      <Text color={typeColor}>{type.padEnd(5)}</Text>
+      <Text color={theme.fg.accent}>{fitVisual(fromName, 12)}  </Text>
       <Text color={theme.fg.secondary}>{time}</Text>
     </Box>
   );
