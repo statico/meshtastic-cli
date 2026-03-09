@@ -81,24 +81,69 @@ function DMPanelComponent({
 
   // Right panel dimensions
   const rightPanelWidth = width - LEFT_PANEL_WIDTH - 3; // 3 for borders/padding
+  const textWidth = Math.max(10, rightPanelWidth - 22); // 20 prefix + 2 padding
   const replyRowHeight = replyTo ? 1 : 0;
   const chatHeight = height - 7 - replyRowHeight; // 3-line header + separator + input area + optional reply
 
-  // Calculate scroll offset for messages
-  const visibleMsgCount = chatHeight;
+  // Calculate line height per message (for multi-line wrapping)
+  const getMessageHeight = (msg: DbMessage): number => {
+    if (!msg?.text) return 1;
+    const cleanText = msg.text.replace(/[\r\x00-\x09\x0b\x0c\x0e-\x1f]/g, "");
+    const maxWidth = Math.max(10, textWidth);
+    let lineCount = 0;
+    for (const line of cleanText.split("\n")) {
+      if (line.length === 0) { lineCount++; continue; }
+      let remaining = line;
+      while (remaining.length > maxWidth) {
+        let bp = remaining.lastIndexOf(" ", maxWidth);
+        if (bp <= 0) bp = maxWidth;
+        lineCount++;
+        remaining = remaining.slice(bp).trimStart();
+      }
+      if (remaining) lineCount++;
+    }
+    return lineCount || 1;
+  };
+
+  // Calculate visible messages using line heights (bottom-anchored)
+  const visibleMessages: DbMessage[] = [];
   let msgScrollOffset = 0;
-  if (messages.length > visibleMsgCount) {
-    if (selectedMessageIndex < 0) {
-      msgScrollOffset = Math.max(0, messages.length - visibleMsgCount);
+  {
+    // Bottom-anchored view
+    let bottomLinesUsed = 0;
+    let bottomStart = messages.length;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const h = getMessageHeight(messages[i]);
+      if (bottomLinesUsed + h <= chatHeight) {
+        bottomLinesUsed += h;
+        bottomStart = i;
+      } else break;
+    }
+
+    if (selectedMessageIndex < 0 || selectedMessageIndex >= bottomStart) {
+      for (let i = bottomStart; i < messages.length; i++) visibleMessages.push(messages[i]);
+      msgScrollOffset = bottomStart;
     } else {
-      const halfView = Math.floor(visibleMsgCount / 2);
-      msgScrollOffset = Math.max(0, Math.min(
-        selectedMessageIndex - halfView,
-        messages.length - visibleMsgCount
-      ));
+      // Scroll to keep selection visible
+      let linesUsed = getMessageHeight(messages[selectedMessageIndex]);
+      visibleMessages.push(messages[selectedMessageIndex]);
+      // Add messages above
+      for (let i = selectedMessageIndex - 1; i >= 0 && linesUsed < chatHeight; i--) {
+        const h = getMessageHeight(messages[i]);
+        if (linesUsed + h > chatHeight) break;
+        linesUsed += h;
+        visibleMessages.unshift(messages[i]);
+      }
+      // Add messages below
+      for (let i = selectedMessageIndex + 1; i < messages.length && linesUsed < chatHeight; i++) {
+        const h = getMessageHeight(messages[i]);
+        if (linesUsed + h > chatHeight) break;
+        linesUsed += h;
+        visibleMessages.push(messages[i]);
+      }
+      msgScrollOffset = messages.indexOf(visibleMessages[0]);
     }
   }
-  const visibleMessages = messages.slice(msgScrollOffset, msgScrollOffset + visibleMsgCount);
 
   return (
     <Box flexDirection="row" width="100%" height={height}>
@@ -167,7 +212,7 @@ function DMPanelComponent({
             <Text color={theme.fg.muted}>No messages yet. Start the conversation!</Text>
           ) : (
             visibleMessages.filter(msg => msg != null).map((msg, i) => {
-              const actualIndex = msgScrollOffset + i;
+              const actualIndex = messages.indexOf(msg);
               return (
                 <MessageRow
                   key={msg.id ?? `${msg.packetId}-${i}`}
@@ -175,7 +220,7 @@ function DMPanelComponent({
                   nodeStore={nodeStore}
                   isOwn={msg.fromNode === myNodeNum}
                   isSelected={actualIndex === selectedMessageIndex && !inputFocused}
-                  textWidth={rightPanelWidth - 25}
+                  textWidth={textWidth}
                   meshViewConfirmedIds={meshViewConfirmedIds}
                   allMessages={messages}
                 />
@@ -329,12 +374,31 @@ const MessageRow = React.memo(function MessageRow({ message, nodeStore, isOwn, i
     return <Text color={theme.fg.muted}> [M]</Text>;
   };
 
-  const maxLen = Math.max(10, textWidth);
-  // Remove carriage returns and other control characters that break terminal display
-  const cleanText = (message.text || "").replace(/[\r\x00-\x1f]/g, "");
-  const displayText = cleanText.length > maxLen
-    ? cleanText.slice(0, maxLen - 3) + "..."
-    : cleanText;
+  // PREFIX_WIDTH: [HH:MM:SS] (10) + space (1) + name (8) + space (1) = 20
+  const PREFIX_WIDTH = 20;
+  const maxWidth = Math.max(10, textWidth);
+
+  // Word-wrap text preserving newlines
+  const wrapText = (text: string, w: number): string[] => {
+    const result: string[] = [];
+    for (const line of text.split("\n")) {
+      if (line.length === 0) { result.push(""); continue; }
+      let remaining = line;
+      while (remaining.length > w) {
+        let breakPoint = remaining.lastIndexOf(" ", w);
+        if (breakPoint <= 0) breakPoint = w;
+        result.push(remaining.slice(0, breakPoint));
+        remaining = remaining.slice(breakPoint).trimStart();
+      }
+      if (remaining) result.push(remaining);
+    }
+    return result;
+  };
+
+  // Clean control chars but preserve newlines
+  const cleanText = (message.text || "").replace(/[\r\x00-\x09\x0b\x0c\x0e-\x1f]/g, "");
+  const lines = wrapText(cleanText, maxWidth);
+  const continuationPadding = " ".repeat(PREFIX_WIDTH);
 
   // Find the message being replied to
   const repliedMessage = message.replyId
@@ -349,15 +413,23 @@ const MessageRow = React.memo(function MessageRow({ message, nodeStore, isOwn, i
   })() : null;
 
   return (
-    <Box backgroundColor={isSelected ? theme.bg.selected : undefined}>
-      <Text wrap="truncate">
-        <Text color={theme.fg.muted}>[{time}] </Text>
-        <Text color={nameColor}>{fitVisual(fromName, 8)} </Text>
-        <Text color={theme.fg.primary}>{displayText}</Text>
-        {getStatusIndicator()}
-        {getMeshViewIndicator()}
-        {replyText && <Text color={theme.fg.muted}> {replyText}</Text>}
-      </Text>
+    <Box flexDirection="column" backgroundColor={isSelected ? theme.bg.selected : undefined}>
+      {lines.map((line, lineIndex) => (
+        <Box key={lineIndex}>
+          {lineIndex === 0 ? (
+            <Text>
+              <Text color={theme.fg.muted}>[{time}] </Text>
+              <Text color={nameColor}>{fitVisual(fromName, 8)} </Text>
+            </Text>
+          ) : (
+            <Text>{continuationPadding}</Text>
+          )}
+          <Text color={theme.fg.primary}>{line}</Text>
+          {lineIndex === lines.length - 1 && getStatusIndicator()}
+          {lineIndex === lines.length - 1 && getMeshViewIndicator()}
+          {lineIndex === lines.length - 1 && replyText && <Text color={theme.fg.muted}> {replyText}</Text>}
+        </Box>
+      ))}
     </Box>
   );
 }, (prevProps, nextProps) => {
