@@ -914,6 +914,13 @@ export function getDMConversations(myNodeNum: number): DMConversation[] {
   }));
 }
 
+export function markDMsRead(myNodeNum: number, otherNodeNum: number): void {
+  ensureDb().run(`
+    UPDATE messages SET status = 'read'
+    WHERE from_node = ? AND to_node = ? AND status = 'received'
+  `, otherNodeNum, myNodeNum);
+}
+
 export function getDMMessages(myNodeNum: number, otherNodeNum: number, limit = 100): DbMessage[] {
   // Get messages between myNodeNum and otherNodeNum (excluding broadcast)
   const rows = ensureDb().query(`

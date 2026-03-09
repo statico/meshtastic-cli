@@ -452,10 +452,18 @@ export function App({ address, packetStore, nodeStore, skipConfig = false, skipN
       const otherNode = dmConversations[selectedDMConvoIndex].nodeNum;
       const msgs = db.getDMMessages(myNodeNum, otherNode, 100);
       setDmMessages(msgs);
+      // Mark messages as read after a short delay
+      if (dmConversations[selectedDMConvoIndex].unreadCount > 0 && mode === "dm") {
+        const timer = setTimeout(() => {
+          db.markDMsRead(myNodeNum, otherNode);
+          setDmConversations(db.getDMConversations(myNodeNum));
+        }, 500);
+        return () => clearTimeout(timer);
+      }
     } else {
       setDmMessages([]);
     }
-  }, [myNodeNum, dmConversations, selectedDMConvoIndex]);
+  }, [myNodeNum, dmConversations, selectedDMConvoIndex, mode]);
 
   // Try to detect myNodeNum from loaded nodes if not set
   useEffect(() => {
